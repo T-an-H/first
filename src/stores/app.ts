@@ -450,6 +450,61 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('studentGroups', studentGroups.value)
   }
 
+  /** 获取某课程的分组列表 */
+  function getCourseGroups(courseId: string): StudentGroup[] {
+    return studentGroups.value.filter((g) => g.courseId === courseId)
+  }
+
+  /** 清空某课程所有分组 */
+  function clearCourseGroups(courseId: string) {
+    studentGroups.value = studentGroups.value.filter((g) => g.courseId !== courseId)
+    saveToStorage('studentGroups', studentGroups.value)
+  }
+
+  /** 批量设置某课程的分组 */
+  function setCourseGroups(courseId: string, groups: { name: string; memberIds: string[] }[]) {
+    // 先清空旧分组
+    studentGroups.value = studentGroups.value.filter((g) => g.courseId !== courseId)
+    // 添加新分组
+    groups.forEach((g, i) => {
+      studentGroups.value.push({
+        id: `grp-${courseId}-${Date.now()}-${i}`,
+        courseId,
+        name: g.name,
+        memberIds: g.memberIds,
+      })
+    })
+    saveToStorage('studentGroups', studentGroups.value)
+  }
+
+  /** 随机分组：将某课程的学生随机分成 n 组 */
+  function randomGroup(courseId: string, groupCount: number) {
+    // 获取该课程所有未退课学生
+    const members = enrollments.value
+      .filter((e) => e.courseId === courseId && e.status !== 'dropped')
+      .map((e) => e.studentId)
+    // 洗牌算法
+    const shuffled = [...members]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    // 均分到各组
+    const groups: { name: string; memberIds: string[] }[] = []
+    const perGroup = Math.ceil(shuffled.length / groupCount)
+    for (let g = 0; g < groupCount; g++) {
+      const start = g * perGroup
+      const end = start + perGroup
+      if (start >= shuffled.length) break
+      groups.push({
+        name: `第${'一二三四五六七八九十'[g] || g + 1}组`,
+        memberIds: shuffled.slice(start, end),
+      })
+    }
+    setCourseGroups(courseId, groups)
+    return groups
+  }
+
   function detectAnomalies(courseId: string, sessionNumber: number): EvalAnomaly[] {
     const course = courses.value.find((c) => c.id === courseId)
     if (!course) return []
@@ -1319,6 +1374,7 @@ export const useAppStore = defineStore('app', () => {
     submitHomework, getHomeworkSubmission,
     addEvaluation, updateEvaluation, deleteEvaluation,
     setEvalConfig, addStudentGroup, addStudent, updateStudent, updateStudentGroup, deleteStudentGroup,
+    getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
     addExamScore, updateExamScore, submitExamScores, getExamScoresForCourse, getExamNames,
