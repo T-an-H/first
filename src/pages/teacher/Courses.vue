@@ -74,19 +74,19 @@
       <!-- Tab 切换 -->
       <div class="flex gap-1 border-b border-gray-200">
         <button
-          @click="activeTab = 'progress'"
-          :class="`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${activeTab === 'progress' ? 'bg-white text-blue-600 border border-b-0 border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-700'}`"
+          @click="selectCourse(course.id); activeTab = 'students'"
+          :class="`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${activeTab === 'students' ? 'bg-white text-blue-600 border border-b-0 border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-700'}`"
         >
-          <Users class="w-4 h-4 inline mr-1.5" />学员进度
+          <Users class="w-4 h-4 inline mr-1.5" />学员管理
         </button>
         <button
-          @click="activeTab = 'resources'"
+          @click="selectCourse(course.id); activeTab = 'resources'"
           :class="`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${activeTab === 'resources' ? 'bg-white text-blue-600 border border-b-0 border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-700'}`"
         >
           <FileText class="w-4 h-4 inline mr-1.5" />课程资源
         </button>
         <button
-          @click="activeTab = 'evaluation'"
+          @click="selectCourse(course.id); activeTab = 'evaluation'"
           :class="`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${activeTab === 'evaluation' ? 'bg-white text-blue-600 border border-b-0 border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-700'}`"
         >
           <ClipboardCheck class="w-4 h-4 inline mr-1.5" />评价管理
@@ -114,6 +114,189 @@
       <div v-if="myCourses.length === 0" class="col-span-2 text-center py-16 text-gray-400">
         <BookOpen class="w-12 h-12 mx-auto mb-4 text-gray-200" />
         <p>暂无课程</p>
+      </div>
+
+      <!-- Tab 1: 学员管理 -->
+      <div v-if="activeTab === 'students'" class="space-y-6">
+        <!-- 课程信息提示 -->
+        <div v-if="selectedCourseData" class="bg-brand-50 border border-brand-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <BookOpen class="w-5 h-5 text-brand-600" />
+          <span class="text-sm font-medium text-brand-800">
+            当前课程：<span class="font-bold">{{ selectedCourseData.title }}</span>
+          </span>
+          <span class="text-xs text-brand-500 ml-auto">点击其他课程的"学员管理"标签可切换课程</span>
+        </div>
+        <div v-else class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+          请点击任意课程卡片中的"学员管理"标签，查看该课程的学员与班级信息
+        </div>
+
+        <!-- 顶部栏目 -->
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <h2 class="font-semibold text-gray-900">学员管理</h2>
+            <span v-if="selectedCourseData" class="text-xs text-gray-400">（课程：{{ selectedCourseData.title }}）</span>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <button @click="handleImportStudents" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+              <Upload class="w-3.5 h-3.5" />
+              导入学员
+            </button>
+            <button @click="handleImportGroups" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-brand-600 hover:bg-brand-700 rounded-lg transition-colors">
+              <Upload class="w-3.5 h-3.5" />
+              导入分组
+            </button>
+            <button @click="handleRandomGroup" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
+              <RefreshCw class="w-3.5 h-3.5" />
+              随机分组
+            </button>
+            <button @click="clearGroups" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">
+              清空分组
+            </button>
+          </div>
+        </div>
+
+        <!-- 班级板块：横向平均分割 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div v-for="(classData, clsIdx) in classBlocks" :key="clsIdx" class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-lg text-gray-900 flex items-center gap-2">
+                <span class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded">班级</span>
+                {{ classData.className }}
+                <span class="text-xs text-gray-400 font-normal">（{{ classData.students.length }}人）</span>
+              </h3>
+              <div class="flex gap-1">
+                <button @click="randomGroupForClass(classData.className)" class="text-xs px-2 py-1 bg-brand-600 text-white rounded-lg hover:bg-brand-700 flex items-center gap-1">
+                  <RefreshCw class="w-3 h-3" />随机分组
+                </button>
+              </div>
+            </div>
+
+            <!-- 学生列表 -->
+            <div class="space-y-2 mb-4 max-h-64 overflow-y-auto">
+              <div v-for="student in classData.students" :key="student.id"
+                class="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors group"
+                :class="{ 'bg-brand-50 border-brand-200': isInGroup(classData.className, student.id) }">
+                <div class="w-6 h-6 rounded-full bg-brand-100 flex items-center justify-center text-xs font-medium text-brand-700 flex-shrink-0">
+                  {{ student.name[0] }}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-sm text-gray-700 truncate">{{ student.name }}</span>
+                    <span v-if="getStuGroupName(classData.className, student.id)" class="text-[10px] px-1.5 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200 flex-shrink-0">
+                      {{ getStuGroupName(classData.className, student.id) }}
+                    </span>
+                  </div>
+                  <p class="text-[11px] text-gray-400 truncate">{{ student.studentId || '-' }}</p>
+                </div>
+                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                  <button @click.stop="openEditStudent(student)" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="编辑学生">
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button @click.stop="removeStudentFromCourse(student.id, classData.className)" class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="移出课程">
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div v-if="classData.students.length === 0" class="text-center py-6 text-gray-400 text-xs">暂无学员</div>
+            </div>
+
+            <!-- 分组结果显示 & 管理 -->
+            <div v-if="getGroupsForClass(classData.className).length > 0">
+              <div class="border-t border-gray-100 pt-3 space-y-2">
+                <div v-for="group in getGroupsForClass(classData.className)" :key="group.id"
+                  class="group/grp p-2 rounded-lg border border-gray-100 hover:border-gray-200">
+                  <div class="flex items-center justify-between mb-1">
+                    <p class="text-xs font-medium text-gray-500">
+                      {{ group.name }}（{{ group.memberIds.length }}人）
+                    </p>
+                    <div class="flex gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
+                      <button @click.stop="openEditGroup(group)" class="p-0.5 text-gray-400 hover:text-blue-600" title="编辑分组">
+                        <Pencil class="w-3 h-3" />
+                      </button>
+                      <button @click.stop="deleteGroupById(group.id)" class="p-0.5 text-gray-400 hover:text-red-600" title="删除分组">
+                        <Trash2 class="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-1">
+                    <span v-for="sid in group.memberIds" :key="sid"
+                      class="text-[11px] px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200">
+                      {{ getStuName(sid) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="border-t border-gray-100 pt-3">
+              <p class="text-xs text-gray-400 text-center py-2">该班级暂无分组，点击上方"随机分组"按钮为该班级划分小组</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 编辑学生弹窗 -->
+      <div v-if="showEditStudent" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showEditStudent = false">
+        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-900">编辑学生信息</h3>
+            <button @click="showEditStudent = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">姓名</label>
+              <input v-model="editStudentForm.name" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">学号</label>
+              <input v-model="editStudentForm.studentId" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">班级</label>
+              <input v-model="editStudentForm.className" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div class="flex gap-2 pt-2">
+              <button @click="showEditStudent = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+              <button @click="saveEditStudent" class="flex-1 px-4 py-2 text-sm text-white bg-brand-600 rounded-lg hover:bg-brand-700">保存</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 编辑分组弹窗 -->
+      <div v-if="showEditGroup" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showEditGroup = false">
+        <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-gray-900">编辑分组</h3>
+            <button @click="showEditGroup = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">组名</label>
+              <input v-model="editGroupForm.name" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">成员管理（点击切换）</label>
+              <div class="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                <div v-for="stu in availableMembersForEditGroup" :key="stu.id"
+                  @click="toggleEditGroupMember(stu.id)"
+                  class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+                  :class="editGroupForm.memberIds.includes(stu.id) ? 'bg-brand-50 text-brand-700' : 'hover:bg-gray-50 text-gray-600'">
+                  <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                    :class="editGroupForm.memberIds.includes(stu.id) ? 'border-brand-500 bg-brand-500' : 'border-gray-300'">
+                    <span v-if="editGroupForm.memberIds.includes(stu.id)" class="text-white text-[10px]">✓</span>
+                  </div>
+                  <span>{{ stu.name }}</span>
+                  <span class="text-xs text-gray-400 ml-auto">{{ stu.studentId }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-2 pt-2">
+              <button @click="showEditGroup = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+              <button @click="saveEditGroup" class="flex-1 px-4 py-2 text-sm text-white bg-brand-600 rounded-lg hover:bg-brand-700">保存</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Tab 2: 课程资源 -->
       <div v-if="activeTab === 'resources'" class="space-y-6">
@@ -178,7 +361,7 @@
                 {{ EvalTypeLabels[t] }} ✗
               </span>
               <span v-else-if="(t === 'intra_group' || t === 'inter_group') && !courseHasGroups || t === 'mentor' && selectedConfig && !selectedConfig.hasMentor"
-                class="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-500 border border-amber-200">
+                class="text-xs px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 border border-brand-200">
                 <EyeOff class="w-3 h-3 inline mr-0.5" />
                 {{ EvalTypeLabels[t] }}（自动隐藏）
               </span>
@@ -377,23 +560,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-
-import { BookOpen, Users, ArrowRight } from 'lucide-vue-next'
 
 import {
   BookOpen, ChevronDown, ChevronUp, Users, ClipboardCheck,
   Search, Settings, RefreshCw, AlertTriangle, Eye, EyeOff,
-  FileText, Upload, Trash2
+  FileText, Upload, Trash2, ArrowRight, Pencil, Plus, X
 } from 'lucide-vue-next'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
   EvalTypeLabels, EvalTypeColors,
   EvalFrequencyLabels, EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, EvaluationConfig } from '@/types'
 
 
 const router = useRouter()
@@ -409,16 +590,16 @@ const myCourses = computed(() => {
   return store.courses.filter((c) => c.teacher === store.currentUser)
 })
 
-/** 根据课程 ID 分配不同的渐变配色 */
+/** 根据课程 ID 分配不同的蓝色渐变配色 */
 const gradients = [
-  'linear-gradient(135deg, #4F46E5, #429fc4)',
-  'linear-gradient(135deg, #429fc4, #429fc4)',
-  'linear-gradient(135deg, #429fc4, #429fc4)',
-  'linear-gradient(135deg, #DC2626, #429fc4)',
-  'linear-gradient(135deg, #429fc4, #429fc4)',
-  'linear-gradient(135deg, #429fc4, #429fc4)',
-  'linear-gradient(135deg, #0891B2, #22D3EE)',
-  'linear-gradient(135deg, #BE123C, #FB7185)',
+  'linear-gradient(135deg, #1e3a5f, #2563eb)',
+  'linear-gradient(135deg, #1e40af, #3b82f6)',
+  'linear-gradient(135deg, #1e3a8a, #60a5fa)',
+  'linear-gradient(135deg, #0f172a, #1e40af)',
+  'linear-gradient(135deg, #1e3a5f, #3b82f6)',
+  'linear-gradient(135deg, #1e40af, #60a5fa)',
+  'linear-gradient(135deg, #1e3a8a, #93c5fd)',
+  'linear-gradient(135deg, #0f172a, #2563eb)',
 ]
 
 
@@ -426,7 +607,15 @@ function getCourseGradient(courseId: string): string {
   let hash = 0
   for (let i = 0; i < courseId.length; i++) {
     hash = ((hash << 5) - hash) + courseId.charCodeAt(i)
-    hash |= 0
+  }
+  hash |= 0
+  return gradients[Math.abs(hash) % gradients.length]
+}
+
+/** 选中一门课程，用于学员管理 / 资源 / 评价面板 */
+function selectCourse(courseId: string) {
+  selectedCourseId.value = courseId
+}
 
 const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
 const EVAL_TEMPLATE_KEYS = Object.keys(EvalTemplateLabels) as EvalTemplate[]
@@ -435,7 +624,7 @@ const OVERDUE_RULE_KEYS = Object.keys(OverdueRuleLabels) as OverdueRule[]
 
 // 课程选择 & Tab
 const selectedCourseId = ref<string | null>(null)
-const activeTab = ref<'progress' | 'resources' | 'evaluation'>('progress')
+const activeTab = ref<'students' | 'resources' | 'evaluation'>('students')
 
 // 学员进度
 const search = ref('')
@@ -446,7 +635,6 @@ const showSettings = ref(false)
 const evalTypeFilter = ref<'all' | EvalType>('all')
 
 // 计算属性
-const myCourses = computed(() => store.courses.filter((c) => c.teacher === store.currentUser))
 const selectedCourseData = computed(() => selectedCourseId.value ? store.courses.find((c) => c.id === selectedCourseId.value) : null)
 const selectedConfig = computed(() => selectedCourseId.value ? store.evalConfigs.find((c) => c.courseId === selectedCourseId.value) : null)
 const baseEnabledTypes = computed<EvalType[]>(() => selectedConfig.value ? TEMPLATE_EVAL_TYPES[selectedConfig.value.template] : [])
@@ -533,7 +721,7 @@ const statusLabels: Record<string, string> = {
   enrolled: '已报名', in_progress: '学习中', completed: '已完成', dropped: '已退课',
 }
 const statusColors: Record<string, string> = {
-  enrolled: 'bg-blue-50 text-blue-600', in_progress: 'bg-amber-50 text-amber-600',
+  enrolled: 'bg-blue-50 text-blue-600', in_progress: 'bg-brand-50 text-brand-700',
   completed: 'bg-emerald-50 text-emerald-600', dropped: 'bg-red-50 text-red-600',
 }
 
@@ -556,10 +744,9 @@ const anomalies = computed(() => {
   const results: { session: number; anomaly: import('@/types').EvalAnomaly }[] = []
   for (let s = 1; s <= totalSessions.value; s++) {
     store.detectAnomalies(selectedCourseId.value, s).forEach((a) => results.push({ session: s, anomaly: a }))
-
   }
-  return gradients[Math.abs(hash) % gradients.length]
-}
+  return results
+})
 
 function studentCount(courseId: string) {
   return store.enrollments.filter((e) => e.courseId === courseId && e.status !== 'dropped').length
@@ -567,5 +754,373 @@ function studentCount(courseId: string) {
 
 function goDetail(courseId: string) {
   router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}`)
+}
+
+// ===== 评价配置 & 批量操作（模板引用，统一放在此处） =====
+
+function handleSetConfig(partial: Partial<EvaluationConfig>) {
+  if (!selectedCourseId.value) return
+  const existing = store.evalConfigs.find((c) => c.courseId === selectedCourseId.value)
+  const config: EvaluationConfig = {
+    courseId: selectedCourseId.value,
+    template: 'basic',
+    frequency: 'weekly',
+    hasMentor: false,
+    overdueRule: 'average',
+    ...existing,
+    ...partial,
+  }
+  store.setEvalConfig(config)
+}
+
+function handleProcessOverdue() {
+  if (!selectedCourseId.value) return
+  for (let s = 1; s <= totalSessions.value; s++) {
+    store.processSessionOverdue(selectedCourseId.value, s)
+  }
+}
+
+const LEVEL_OPTIONS = [
+  { label: '优秀', range: [90, 100], color: 'bg-green-100 text-green-700 border-green-200' },
+  { label: '良好', range: [80, 89], color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { label: '中等', range: [70, 79], color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  { label: '及格', range: [60, 69], color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { label: '不及格', range: [0, 59], color: 'bg-red-100 text-red-700 border-red-200' },
+]
+
+async function handleBatchEval(type: string, levelLabel: string) {
+  if (!selectedCourseId.value) return
+  const level = LEVEL_OPTIONS.find((l) => l.label === levelLabel)
+  if (!level) return
+  const score = Math.round((level.range[0] + level.range[1]) / 2)
+  // 为所有学生批量生成该类型的第一次评价
+  const cId = selectedCourseId.value
+  for (const { student } of enrolledStudents.value) {
+    if (!student) continue
+    const exists = store.evaluations.find(
+      (e) => e.courseId === cId && e.studentId === student.id && e.type === type && e.sessionNumber === 1
+    )
+    if (!exists) {
+      store.addEvaluation({
+        id: `batch-${cId}-${student.id}-${type}-${Date.now()}-${Math.random()}`,
+        courseId: cId,
+        studentId: student.id,
+        sessionNumber: 1,
+        type: type as EvalType,
+        score,
+        evaluatorId: store.currentUser || '',
+        evaluatorName: store.currentUser || '',
+        comment: `批量评价：${levelLabel}`,
+        createdAt: new Date().toISOString(),
+      })
+    }
+  }
+}
+
+function getScoreClass(studentId: string, sessionNum: number, type: string) {
+  const ev = store.evaluations.find(
+    (e) => e.courseId === selectedCourseId.value && e.studentId === studentId && e.sessionNumber === sessionNum && e.type === type
+  )
+  if (!ev) return 'bg-gray-50 text-gray-400'
+  if (ev.score >= 90) return 'bg-green-50 text-green-600'
+  if (ev.score >= 80) return 'bg-blue-50 text-blue-600'
+  if (ev.score >= 70) return 'bg-yellow-50 text-yellow-600'
+  if (ev.score >= 60) return 'bg-orange-50 text-orange-600'
+  return 'bg-red-50 text-red-600'
+}
+
+function getScoreDisplay(studentId: string, sessionNum: number, type: string) {
+  const ev = store.evaluations.find(
+    (e) => e.courseId === selectedCourseId.value && e.studentId === studentId && e.sessionNumber === sessionNum && e.type === type
+  )
+  return ev ? `${ev.score}分` : '-'
+}
+
+function showAnomalyIcon(studentId: string, sessionNum: number, type: string) {
+  if (!selectedCourseId.value) return false
+  const anomaly = store.detectAnomalies(selectedCourseId.value, sessionNum)
+    .find((a) => a.studentId === studentId && a.type === type)
+  return !!anomaly
+}
+
+// ===== 学员管理相关 =====
+
+// === 编辑学生弹窗状态 ===
+const showEditStudent = ref(false)
+const editStudentForm = ref({ id: '', name: '', studentId: '', className: '' })
+function openEditStudent(student: any) {
+  editStudentForm.value = {
+    id: student.id,
+    name: student.name,
+    studentId: student.studentId || '',
+    className: student.className || '',
+  }
+  showEditStudent.value = true
+}
+function saveEditStudent() {
+  const f = editStudentForm.value
+  store.updateStudent(f.id, { name: f.name, studentId: f.studentId || undefined, className: f.className || undefined })
+  showEditStudent.value = false
+}
+function removeStudentFromCourse(studentId: string, className: string) {
+  if (!selectedCourseId.value || !confirm(`确定将 ${getStuName(studentId)} 移出该课程？`)) return
+  const enrollment = store.enrollments.find(e => e.studentId === studentId && e.courseId === selectedCourseId.value)
+  if (enrollment) store.deleteEnrollment(enrollment.id)
+  // 同时从涉及的分组中移除
+  const groups = store.getCourseGroups(selectedCourseId.value)
+  groups.forEach(g => {
+    if (g.memberIds.includes(studentId)) {
+      store.updateStudentGroup(g.id, { memberIds: g.memberIds.filter(id => id !== studentId) })
+    }
+  })
+}
+
+// === 编辑分组弹窗状态 ===
+const showEditGroup = ref(false)
+const editGroupForm = ref({ id: '', name: '', memberIds: [] as string[] })
+const availableMembersForEditGroup = computed(() => {
+  if (!selectedCourseId.value) return []
+  const enrolledIds = store.enrollments
+    .filter(e => e.courseId === selectedCourseId.value && e.status !== 'dropped')
+    .map(e => e.studentId)
+  return store.students.filter(s => enrolledIds.includes(s.id) && s.status === 'active')
+})
+function openEditGroup(group: any) {
+  editGroupForm.value = {
+    id: group.id,
+    name: group.name,
+    memberIds: [...group.memberIds],
+  }
+  showEditGroup.value = true
+}
+function toggleEditGroupMember(studentId: string) {
+  const idx = editGroupForm.value.memberIds.indexOf(studentId)
+  if (idx >= 0) {
+    editGroupForm.value.memberIds.splice(idx, 1)
+  } else {
+    editGroupForm.value.memberIds.push(studentId)
+  }
+}
+function saveEditGroup() {
+  store.updateStudentGroup(editGroupForm.value.id, {
+    name: editGroupForm.value.name,
+    memberIds: editGroupForm.value.memberIds,
+  })
+  showEditGroup.value = false
+}
+function deleteGroupById(groupId: string) {
+  if (!confirm('确定删除该分组？')) return
+  store.deleteStudentGroup(groupId)
+}
+
+/** 每组数量 */
+const groupCount = ref(3)
+
+/** 计算属性：将某课程的学生按班级分组 */
+const classBlocks = computed(() => {
+  const cId = selectedCourseId.value
+  if (!cId) return []
+
+  const enrolledStuIds = store.enrollments
+    .filter(e => e.courseId === cId && e.status !== 'dropped')
+    .map(e => e.studentId)
+
+  const classMap = new Map<string, any[]>()
+  store.students
+    .filter(s => enrolledStuIds.includes(s.id) && s.status === 'active')
+    .forEach(s => {
+      const cn = s.className || '未分班'
+      if (!classMap.has(cn)) classMap.set(cn, [])
+      classMap.get(cn)!.push(s)
+    })
+
+  return Array.from(classMap.entries()).map(([className, students]) => ({
+    className,
+    students,
+  }))
+})
+
+/** 通过学生 id 获取姓名（与已有 getStudentName 区分） */
+const getStuName = (sid: string) => store.students.find(s => s.id === sid)?.name || sid
+
+function getGroupsForClass(className: string) {
+  if (!selectedCourseId.value) return []
+  return store.getCourseGroups(selectedCourseId.value)
+}
+
+function getStuGroupName(className: string, studentId: string) {
+  const groups = getGroupsForClass(className)
+  for (const g of groups) {
+    if (g.memberIds.includes(studentId)) return g.name
+  }
+  return ''
+}
+
+function isInGroup(className: string, studentId: string) {
+  return !!getStuGroupName(className, studentId)
+}
+
+/** 点击学生切换分组选中状态（用于手动拖入分组） */
+const selectedStudents = ref<string[]>([])
+function toggleGroupMember(className: string, studentId: string) {
+  const idx = selectedStudents.value.indexOf(studentId)
+  if (idx >= 0) {
+    selectedStudents.value.splice(idx, 1)
+  } else {
+    selectedStudents.value.push(studentId)
+  }
+}
+
+/** 随机分组（整个课程级别） */
+function handleRandomGroup() {
+  if (!selectedCourseId.value) return
+  const cnt = groupCount.value
+  if (cnt < 2) { alert('至少分 2 组'); return }
+  store.randomGroup(selectedCourseId.value, cnt)
+}
+
+/** 对单个班级一键随机分组 */
+function randomGroupForClass(className: string) {
+  if (!selectedCourseId.value) return
+  const block = classBlocks.value.find(b => b.className === className)
+  if (!block || block.students.length === 0) return
+
+  const memberIds = block.students.map(s => s.id)
+  const shuffled = [...memberIds]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+  const cnt = Math.min(groupCount.value, shuffled.length)
+  const perGroup = Math.ceil(shuffled.length / cnt)
+  const groups: { name: string; memberIds: string[] }[] = []
+  for (let g = 0; g < cnt; g++) {
+    const start = g * perGroup
+    if (start >= shuffled.length) break
+    groups.push({
+      name: `${className}·第${'一二三四五六七八九十'[g] || g + 1}组`,
+      memberIds: shuffled.slice(start, start + perGroup),
+    })
+  }
+
+  const otherGroups = store.getCourseGroups(selectedCourseId.value)
+    .filter(g => !groupMemberIds(g.memberIds, block.students.map(s => s.id)))
+
+  store.clearCourseGroups(selectedCourseId.value)
+  ;[...groups, ...otherGroups].forEach(g => {
+    store.addStudentGroup({
+      id: `grp-${selectedCourseId.value}-${Date.now()}-${Math.random()}`,
+      courseId: selectedCourseId.value!,
+      name: g.name,
+      memberIds: g.memberIds,
+    })
+  })
+}
+
+function groupMemberIds(memberIds: string[], classIds: string[]): boolean {
+  return memberIds.some(id => classIds.includes(id))
+}
+
+/** 清空所有分组 */
+function clearGroups() {
+  if (!selectedCourseId.value || !confirm('确定清空该课程所有分组？')) return
+  store.clearCourseGroups(selectedCourseId.value)
+}
+
+/** Excel 导入学员 */
+async function handleImportStudents() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls,.csv'
+  input.onchange = async (e: any) => {
+    const file = e.target?.files?.[0]
+    if (!file || !selectedCourseId.value) return
+
+    const XLSX = await import('xlsx')
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+
+    let imported = 0
+    for (const row of rows) {
+      const name = row['姓名'] || row['name'] || ''
+      const studentId = row['学号'] || row['studentId'] || ''
+      const className = row['班级'] || row['className'] || '未分班'
+      if (!name) continue
+
+      let stu = store.students.find(s => s.studentId === studentId || s.name === name)
+      if (!stu) {
+        const newId = `stu-import-${Date.now()}-${Math.random()}`
+        store.addStudent({
+          id: newId,
+          name,
+          studentId: studentId || undefined,
+          className,
+          phone: row['手机号'] || row['phone'] || '',
+          email: row['邮箱'] || row['email'] || '',
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+          joinDate: new Date().toISOString().split('T')[0],
+          status: 'active',
+        })
+        stu = store.students.find(s => s.id === newId)!
+      }
+
+      const enrolled = store.enrollments.some(e => e.studentId === stu!.id && e.courseId === selectedCourseId.value)
+      if (!enrolled) {
+        store.addEnrollment({
+          id: `enr-${selectedCourseId.value}-${stu.id}`,
+          studentId: stu.id,
+          courseId: selectedCourseId.value,
+          scheduleId: '',
+          enrollDate: new Date().toISOString().split('T')[0],
+          progress: 0,
+          status: 'in_progress',
+        })
+      }
+      imported++
+    }
+    alert(`成功导入 ${imported} 名学生`)
+  }
+  input.click()
+}
+
+/** Excel 导入分组 */
+async function handleImportGroups() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls,.csv'
+  input.onchange = async (e: any) => {
+    const file = e.target?.files?.[0]
+    if (!file || !selectedCourseId.value) return
+
+    const XLSX = await import('xlsx')
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+
+    const groups: { name: string; memberIds: string[] }[] = []
+    for (const row of rows) {
+      const groupName = row['组名'] || row['group'] || ''
+      const memberNames = (row['成员姓名'] || row['members'] || '').toString().split(/[,，、\s]+/).filter(Boolean)
+      if (!groupName || memberNames.length === 0) continue
+
+      const memberIds = memberNames.map((n: string) => {
+        const stu = store.students.find(s => s.name === n.trim())
+        return stu ? stu.id : n.trim()
+      }).filter(Boolean)
+
+      groups.push({ name: groupName, memberIds })
+    }
+
+    if (groups.length > 0) {
+      store.setCourseGroups(selectedCourseId.value, groups)
+      alert(`成功导入 ${groups.length} 个分组`)
+    } else {
+      alert('未识别到有效分组数据，请确保 Excel 包含"组名"和"成员姓名"列')
+    }
+  }
+  input.click()
 }
 </script>
