@@ -154,13 +154,24 @@ flowchart TD
 
 ## 5. 技术栈选型
 
+### 5.1 前端
+
 | 技术 | 用途 |
 |------|------|
-| React 18 + TypeScript | 前端框架 |
+| Vue 3 + TypeScript | 前端框架 |
 | Vite | 构建工具 |
 | Tailwind CSS 3 | 样式框架 |
-| React Router 6 | 路由管理 |
-| Zustand | 状态管理 |
-| Recharts | 图表库 |
-| React Big Calendar | 日历组件 |
-| Lucide React | 图标库 |
+| Vue Router 4 (Hash 模式) | 路由管理 |
+| Pinia | 状态管理 |
+| D3.js | 图表库/数据可视化 |
+| Lucide Vue Next | 图标库 |
+| date-fns | 日期处理 |
+
+### 5.2 后端
+
+| 技术 | 用途 |
+|------|------|
+| Node.js + Express 4 | 后端框架 |
+| mysql2 | 数据库连接 |
+| JSON Web Token | 认证授权 |
+| bcryptjs | 密码加密 |

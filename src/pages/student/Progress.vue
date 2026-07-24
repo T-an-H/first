@@ -23,8 +23,8 @@ const getGradeColor = (score: number | null) => {
   if (score === null || score === undefined) return 'text-gray-400'
   if (score >= 90) return 'text-emerald-600'
   if (score >= 80) return 'text-blue-600'
-  if (score >= 70) return 'text-amber-600'
-  if (score >= 60) return 'text-orange-600'
+  if (score >= 70) return 'text-brand-700'
+  if (score >= 60) return 'text-brand-700'
   return 'text-red-600'
 }
 
@@ -114,7 +114,7 @@ function renderProgress(root: HTMLElement) {
 
     addBar('学习进度', getProgress(courseId), 'bg-brand-600')
     addBar('平时成绩', getRegularScore(courseId), 'bg-emerald-500')
-    addBar('期中成绩', getMidtermScore(courseId), 'bg-amber-500')
+    addBar('期中成绩', getMidtermScore(courseId), 'bg-brand-600')
     addBar('期末成绩', getFinalScore(courseId), 'bg-purple-500')
   })
 }

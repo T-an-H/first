@@ -5,8 +5,8 @@
         <h1 class="text-2xl font-bold text-gray-900">学员管理</h1>
         <p class="text-gray-500 mt-1">管理所有学员信息（数据来源：MySQL 数据库）</p>
       </div>
-      <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-amber-500' : 'text-green-500'">
-        <span class="w-2 h-2 rounded-full" :class="loading ? 'bg-amber-500 animate-pulse' : 'bg-green-500'"></span>
+      <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-brand-600' : 'text-green-500'">
+        <span class="w-2 h-2 rounded-full" :class="loading ? 'bg-brand-600 animate-pulse' : 'bg-green-500'"></span>
         {{ loading ? '加载中...' : `已连接 · ${total} 名学员` }}
       </div>
     </div>
