@@ -16,7 +16,7 @@ const PORT = 3000;
 
 // CORS：允许前端跨域请求（开发时前端在 localhost:5173）
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:5173'],
+  origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:4173', 'http://127.0.0.1:5173'],
   credentials: true,
 }));
 

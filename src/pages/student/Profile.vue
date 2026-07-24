@@ -221,8 +221,8 @@ const abilityAnalysis = computed(() => {
 function getScoreClass(score: number): string {
   if (score >= 90) return 'bg-emerald-100 text-emerald-700'
   if (score >= 80) return 'bg-blue-100 text-blue-700'
-  if (score >= 70) return 'bg-amber-100 text-gray-800'
-  if (score >= 60) return 'bg-brand-600/15 text-orange-700'
+  if (score >= 70) return 'bg-brand-50 text-gray-800'
+  if (score >= 60) return 'bg-brand-600/15 text-brand-800'
   return 'bg-brand-600/15 text-red-700'
 }
 
@@ -289,7 +289,7 @@ function renderProfile(root: HTMLElement) {
   const stats = [
     { value: enrs.length, label: '已报名', bg: 'bg-blue-50', text: 'text-brand-600' },
     { value: completed.value, label: '已完成', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    { value: avgScore.value, label: '平均分', bg: 'bg-brand-400/10', text: 'text-amber-600' },
+    { value: avgScore.value, label: '平均分', bg: 'bg-brand-400/10', text: 'text-brand-700' },
   ]
   stats.forEach((st) => {
     const box = statsRow.append('div').attr('class', `text-center px-4 py-3 ${st.bg} rounded-lg`)
@@ -378,7 +378,7 @@ function renderProfile(root: HTMLElement) {
     { label: '学习中课程', value: `${inProgress.value} 门`, color: 'text-gray-900' },
     { label: '已完成课程', value: `${completed.value} 门`, color: 'text-emerald-600' },
     { label: '总学分', value: `${totalCredits.value} 学分`, color: 'text-brand-600' },
-    { label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-amber-600' },
+    { label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' },
     { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900' },
   ]
   const statBody = statCard.append('div').attr('class', 'space-y-4')

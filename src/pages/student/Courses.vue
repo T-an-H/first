@@ -58,7 +58,7 @@ const getTierBadge = (courseId: string) => {
 const progressBarColor = (progress: number) => {
   if (progress >= 80) return 'bg-brand-600'
   if (progress >= 40) return 'bg-brand-600'
-  return 'bg-amber-500'
+  return 'bg-brand-600'
 }
 
 const statusBadgeClass = (status: string) => {

@@ -1,8 +1,8 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-amber-50 to-amber-100 flex items-center justify-center p-4">
+  <div class="min-h-screen bg-gradient-to-br from-brand-50 to-brand-50 flex items-center justify-center p-4">
     <div class="flex w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden">
       <!-- Left brand panel -->
-      <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-amber-500 to-amber-700 p-12 flex-col justify-between">
+      <div class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-brand-600 to-brand-800 p-12 flex-col justify-between">
         <div>
           <div class="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center mb-6">
             <GraduationCap class="w-12 h-12 text-white" />
@@ -20,7 +20,7 @@
       <!-- Right login form -->
       <div class="w-full lg:w-1/2 p-8">
         <div class="text-center mb-8 lg:hidden">
-          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center mx-auto mb-4">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center mx-auto mb-4">
             <GraduationCap class="w-8 h-8 text-white" />
           </div>
           <h2 class="text-xl font-bold text-gray-900">EduManage</h2>
@@ -38,7 +38,7 @@
                 v-model="account"
                 type="text"
                 placeholder="请输入账号"
-                class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                class="w-full pl-10 pr-4 py-3 rounded-lg border border-gray-200 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 outline-none transition-all"
                 @input="error = ''"
               />
             </div>
@@ -52,7 +52,7 @@
                 :type="showPassword ? 'text' : 'password'"
                 v-model="password"
                 placeholder="请输入密码"
-                class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-200 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                class="w-full pl-10 pr-10 py-3 rounded-lg border border-gray-200 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 outline-none transition-all"
                 @input="error = ''"
               />
               <button type="button" @click="showPassword = !showPassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -66,7 +66,7 @@
           <button
             type="submit"
             :disabled="loading"
-            :class="['w-full py-3 font-medium rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2', loading ? 'bg-amber-400 cursor-not-allowed' : 'bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/25']"
+            :class="['w-full py-3 font-medium rounded-lg transition-colors shadow-lg flex items-center justify-center gap-2', loading ? 'bg-brand-400 cursor-not-allowed' : 'bg-brand-600 hover:bg-brand-700 text-white shadow-lg shadow-brand-600/25']"
           >
             <template v-if="loading">
               <LoaderCircle class="w-5 h-5 animate-spin" />
@@ -78,7 +78,7 @@
             </template>
           </button>
 
-          <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-600">
+          <div class="bg-brand-50 border border-brand-200 rounded-lg p-3 text-xs text-brand-700">
             <p class="font-medium mb-1">测试账号（密码统一：666666）</p>
             <p>管理员：admin</p>
             <p>教师：teacher-wang、teacher-li</p>
@@ -105,6 +105,29 @@ const showPassword = ref(false)
 const error = ref('')
 const loading = ref(false)
 
+/** Mock 用户数据（与 seed-users.js 一致） */
+const MOCK_USERS: Record<string, { password: string; name: string; role: string; sub_role?: string }> = {
+  admin:            { password: '666666', name: '系统管理员', role: 'admin' },
+  'teacher-wang':   { password: '666666', name: '王老师', role: 'teacher' },
+  'teacher-li':     { password: '666666', name: '李老师', role: 'teacher' },
+  'mentor-zhang':   { password: '666666', name: '张导师', role: 'teacher', sub_role: 'mentor' },
+  'leader-liu':     { password: '666666', name: '刘院长', role: 'teacher', sub_role: 'leader' },
+  S2024001:         { password: '666666', name: '张明', role: 'student' },
+  '202511053250':    { password: '666666', name: '李傲天', role: 'student' },
+}
+
+/** Mock 跳转地址 */
+function mockPortal(role: string, subRole?: string): string {
+  if (role === 'admin') return '/admin/categories'
+  if (role === 'teacher') {
+    if (subRole === 'mentor') return '/mentor/courses'
+    if (subRole === 'leader') return '/leader/courses'
+    return '/teacher/courses'
+  }
+  if (role === 'student') return '/student/courses'
+  return '/'
+}
+
 const handleLogin = async () => {
   if (!account.value.trim() || !password.value.trim()) {
     error.value = '请输入账号和密码'
@@ -115,25 +138,27 @@ const handleLogin = async () => {
   error.value = ''
 
   try {
+    // 优先尝试后端登录
     const res = await unifiedLogin(account.value, password.value)
-
-    // 保存 token
     localStorage.setItem('token', res.token)
     localStorage.setItem('userInfo', JSON.stringify(res.user))
-
-    // 确定角色（处理教师子角色：授课导师/企业导师/学院领导）
     let role = res.user.role
-    if (role === 'teacher' && res.user.sub_role) {
-      role = res.user.sub_role
-    }
-
-    // 调用 store.login 让应用状态同步
+    if (role === 'teacher' && res.user.sub_role) role = res.user.sub_role
     store.login(res.user.name, role)
-
-    // 跳转到对应页面
     router.push(res.portal)
-  } catch (e: any) {
-    error.value = e.message || '登录失败，请检查账号和密码'
+  } catch (_e: any) {
+    // 后端不可用时，走 Mock 登录（演示模式）
+    const mock = MOCK_USERS[account.value.trim()]
+    if (!mock || mock.password !== password.value.trim()) {
+      error.value = '账号或密码错误（演示模式）'
+      loading.value = false
+      return
+    }
+    localStorage.setItem('isDemoMode', 'true')
+    let role = mock.role
+    if (role === 'teacher' && mock.sub_role) role = mock.sub_role
+    store.login(mock.name, role as any)
+    router.push(mockPortal(mock.role, mock.sub_role))
   }
 
 }

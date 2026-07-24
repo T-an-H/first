@@ -183,8 +183,8 @@ const store = useAppStore()
 const GRADE_COLORS = [
   { range: [90, 100], label: '优秀', color: 'bg-emerald-100 text-emerald-800', bar: 'bg-emerald-500' },
   { range: [80, 89], label: '良好', color: 'bg-blue-100 text-blue-800', bar: 'bg-blue-500' },
-  { range: [70, 79], label: '中等', color: 'bg-amber-100 text-amber-800', bar: 'bg-amber-500' },
-  { range: [60, 69], label: '及格', color: 'bg-orange-100 text-orange-800', bar: 'bg-orange-500' },
+  { range: [70, 79], label: '中等', color: 'bg-brand-50 text-brand-800', bar: 'bg-brand-600' },
+  { range: [60, 69], label: '及格', color: 'bg-brand-50 text-brand-800', bar: 'bg-brand-600' },
   { range: [0, 59], label: '不及格', color: 'bg-red-100 text-red-800', bar: 'bg-red-500' },
 ]
 
@@ -339,8 +339,8 @@ const getGradeLevel = (score: number) => {
 const getTotalColorClass = (total: number) => {
   if (total >= 90) return 'text-emerald-600'
   if (total >= 80) return 'text-blue-600'
-  if (total >= 70) return 'text-amber-600'
-  if (total >= 60) return 'text-orange-600'
+  if (total >= 70) return 'text-brand-700'
+  if (total >= 60) return 'text-brand-700'
   return 'text-red-500'
 }
 

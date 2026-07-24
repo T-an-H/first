@@ -22,11 +22,11 @@
           <!-- ===== AI 分层 ===== -->
           <div v-if="activeTab === 'ai_tier'" class="space-y-6">
             <!-- 未到开始条件 -->
-            <div v-if="!firstClassEnded" class="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center">
-              <Layers class="w-12 h-12 mx-auto mb-3 text-amber-400" />
-              <h3 class="text-lg font-semibold text-amber-700 mb-2">AI 分层测试</h3>
-              <p class="text-sm text-amber-600">第一节课尚未结束，AI 分层测试将在第一节课结束后开启</p>
-              <p class="text-xs text-amber-400 mt-1">届时将根据第一节课内容生成 10 道测试题，依据得分判定学习层级</p>
+            <div v-if="!firstClassEnded" class="bg-brand-50 border border-brand-200 rounded-xl p-8 text-center">
+              <Layers class="w-12 h-12 mx-auto mb-3 text-brand-400" />
+              <h3 class="text-lg font-semibold text-brand-800 mb-2">AI 分层测试</h3>
+              <p class="text-sm text-brand-700">第一节课尚未结束，AI 分层测试将在第一节课结束后开启</p>
+              <p class="text-xs text-brand-400 mt-1">届时将根据第一节课内容生成 10 道测试题，依据得分判定学习层级</p>
             </div>
 
             <!-- 测试窗口期（第一节课后～第二节课前） -->
@@ -34,7 +34,7 @@
               <Sparkles class="w-12 h-12 mx-auto mb-3 text-blue-500" />
               <h3 class="text-lg font-semibold text-blue-800 mb-2">AI 分层测试已开放</h3>
               <p class="text-sm text-blue-600 mb-2">完成 10 道测试题（单选+判断），系统将根据得分判定你的学习层级</p>
-              <p class="text-xs text-amber-500 mb-6">⚠ 测试窗口：第一节课结束后 ~ 第二节课开始前，逾期将自动分配到基础层</p>
+              <p class="text-xs text-brand-600 mb-6">⚠ 测试窗口：第一节课结束后 ~ 第二节课开始前，逾期将自动分配到基础层</p>
               <button @click="openAITest"
                 class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/25 inline-flex items-center gap-2">
                 <HelpCircle class="w-5 h-5" />
@@ -48,7 +48,7 @@
               <h3 class="text-lg font-semibold text-red-700 mb-2">测试窗口已关闭</h3>
               <p class="text-sm text-red-600 mb-4">第二节课已开始，AI 分层测试逾期未完成，已自动分配到基础层</p>
               <div class="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm">
-                <Layers class="w-4 h-4 text-amber-500" />
+                <Layers class="w-4 h-4 text-brand-600" />
                 <span class="text-sm font-bold text-gray-800">基础层</span>
               </div>
               <p class="text-xs text-gray-400 mt-4">本学期不可修改，后续任务、资源、作业将根据基础层进行适配</p>
@@ -156,7 +156,7 @@
               </div>
 
               <div class="flex items-center justify-between mt-6 pt-4 border-t border-brand-400/20">
-                <span v-if="!allAnswered" class="text-xs text-amber-500">请完成所有题目后再提交</span>
+                <span v-if="!allAnswered" class="text-xs text-brand-600">请完成所有题目后再提交</span>
                 <span v-else class="text-xs text-emerald-500">所有题目已作答</span>
                 <button @click="submitAITest" :disabled="!allAnswered"
                   class="px-6 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -170,8 +170,8 @@
             <template v-else>
               <div class="text-center py-6 space-y-4">
                 <div class="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
-                  :class="testScore >= 80 ? 'bg-emerald-100' : testScore >= 60 ? 'bg-blue-100' : 'bg-amber-100'">
-                  <Award class="w-10 h-10" :class="testScore >= 80 ? 'text-emerald-500' : testScore >= 60 ? 'text-blue-500' : 'text-amber-500'" />
+                  :class="testScore >= 80 ? 'bg-emerald-100' : testScore >= 60 ? 'bg-blue-100' : 'bg-brand-50'">
+                  <Award class="w-10 h-10" :class="testScore >= 80 ? 'text-emerald-500' : testScore >= 60 ? 'text-blue-500' : 'text-brand-600'" />
                 </div>
                 <div>
                   <p class="text-4xl font-bold text-gray-900">{{ testScore }}<span class="text-lg text-gray-400">/{{ totalQuestions * 10 }}</span></p>
@@ -383,7 +383,7 @@
                     <p class="text-xs text-gray-400 mt-2">截止：{{ hw.dueDate }} · 创建者：{{ hw.createdBy }}</p>
                   </div>
                   <span v-if="isHomeworkSubmitted(hw.id)" class="px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 rounded-full">已提交</span>
-                  <span v-else class="px-2 py-1 text-xs font-medium text-amber-600 bg-amber-50 rounded-full">未提交</span>
+                  <span v-else class="px-2 py-1 text-xs font-medium text-brand-700 bg-brand-50 rounded-full">未提交</span>
                 </div>
                 <div v-if="isHomeworkSubmitted(hw.id)" class="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
                   <FileText class="w-4 h-4 text-gray-400" />
@@ -478,10 +478,10 @@
             </div>
 
             <!-- 成绩权重说明 -->
-            <div v-if="currentCfg" class="bg-amber-50 rounded-xl p-4 border border-amber-200 text-sm text-amber-800">
+            <div v-if="currentCfg" class="bg-brand-50 rounded-xl p-4 border border-brand-200 text-sm text-brand-800">
               <p class="font-medium mb-1">成绩构成</p>
               <p>总成绩 = 平时成绩({{ currentCfg.regularWeight }}%) + 期中成绩({{ currentCfg.midtermWeight }}%) + 期末成绩({{ currentCfg.finalWeight }}%)</p>
-              <p class="text-xs text-amber-600 mt-1">
+              <p class="text-xs text-brand-700 mt-1">
                 平时成绩构成：自评({{ currentCfg.selfEvalWeight }}%) + 互评({{ currentCfg.peerReviewWeight }}%) + 组间评({{ currentCfg.interGroupEvalWeight }}%) + 教师({{ currentCfg.teacherScoreWeight }}%) + 导师({{ currentCfg.mentorScoreWeight }}%)
               </p>
             </div>
@@ -594,9 +594,9 @@ const tierLabel = computed(() => {
 })
 
 const tierBadgeClass = computed(() => {
-  if (!tierFinalized.value) return 'bg-amber-400/10 text-amber-600 border border-amber-400'
+  if (!tierFinalized.value) return 'bg-brand-400/10 text-brand-700 border border-brand-400'
   const map = {
-    basic: 'bg-amber-400/10 text-amber-600 border border-amber-400',
+    basic: 'bg-brand-400/10 text-brand-700 border border-brand-400',
     advanced: 'bg-blue-600/10 text-blue-600 border border-blue-400',
     excellent: 'bg-emerald-600/10 text-emerald-600 border border-emerald-400',
   }
@@ -604,7 +604,7 @@ const tierBadgeClass = computed(() => {
 })
 
 const tierComparison = computed(() => [
-  { level: 'basic' as const, label: '基础层', color: 'text-amber-600', desc: '初步掌握课程基础知识，建议加强练习与复习' },
+  { level: 'basic' as const, label: '基础层', color: 'text-brand-700', desc: '初步掌握课程基础知识，建议加强练习与复习' },
   { level: 'advanced' as const, label: '进阶层', color: 'text-blue-600', desc: '较好掌握课程核心知识，可尝试拓展深入学习' },
   { level: 'excellent' as const, label: '卓越层', color: 'text-emerald-600', desc: '全面掌握课程内容，具备独立项目实践能力' },
 ])
