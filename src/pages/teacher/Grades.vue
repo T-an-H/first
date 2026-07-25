@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">成绩查询</h1>
-        <p class="text-gray-400 mt-1">查看学生成绩、课程统计概览，支持导出和打印</p>
+        <p class="text-gray-400 mt-1">查看学生成绩、课程统计概览，支持导出和成绩同步</p>
       </div>
       <div class="flex items-center gap-2">
         <button @click="handleExportGrades"
@@ -12,13 +12,30 @@
           <Download class="w-4 h-4" />
           导出 Excel
         </button>
-        <button @click="handlePrintGrades"
-          class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-lg border border-brand-400/30 text-gray-400 hover:bg-brand-400/10 transition-colors">
-          <Printer class="w-4 h-4" />
-          打印成绩表
+        <button @click="handleExportGradesToSystem"
+          :disabled="isExporting"
+          class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors"
+          :class="isExporting ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' : 'border border-brand-600 bg-brand-600 text-white hover:bg-brand-700'">
+          <Loader2 v-if="isExporting" class="w-4 h-4 animate-spin" />
+          <Upload v-else class="w-4 h-4" />
+          {{ isExporting ? '导出中...' : '导出成绩' }}
         </button>
       </div>
     </div>
+
+    <!-- 导出成功通知 -->
+    <Transition name="toast">
+      <div v-if="showExportToast"
+        class="fixed top-6 right-6 z-[60] bg-white rounded-xl shadow-xl border border-green-200 px-5 py-4 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+          <CheckCircle class="w-5 h-5 text-green-500" />
+        </div>
+        <div>
+          <p class="text-sm font-medium text-gray-900">成绩数据导出成功</p>
+          <p class="text-xs text-gray-500 mt-0.5">数据支持同步至教务系统</p>
+        </div>
+      </div>
+    </Transition>
 
     <!-- 筛选栏 -->
     <div class="flex flex-wrap gap-4">
@@ -252,7 +269,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Printer, Search, X } from 'lucide-vue-next'
+import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Upload, Loader2, CheckCircle, Search, X } from 'lucide-vue-next'
 import ScoreDetail from '@/components/ScoreDetail.vue'
 import type { DetailedGrade, Enrollment } from '@/types'
 
@@ -284,6 +301,12 @@ const gradeSearch = ref('')
 const showGradePopup = ref(false)
 const detailTarget = ref<{ studentName: string; courseTitle: string; courseId: string; studentId: string } | null>(null)
 const printRef = ref<HTMLElement | null>(null)
+const selectedGradeClass = ref('')
+
+// ====== Export to system state ======
+const isExporting = ref(false)
+const showExportToast = ref(false)
+let exportToastTimer: ReturnType<typeof setTimeout> | null = null
 
 // ====== Computed ======
 const isMentor = computed(() => store.currentRole === 'mentor')
@@ -627,31 +650,51 @@ async function handleExportGrades() {
   }
 }
 
-/** 打印成绩表 */
-function handlePrintGrades() {
-  if (!printRef.value) return
-  const printContent = printRef.value.innerHTML
-  const style = `
-    <style>
-      table { width: 100%; border-collapse: collapse; font-size: 14px; }
-      th, td { padding: 10px 16px; text-align: left; border-bottom: 1px solid #d1d9e6; }
-      th { background: #bac9bd; font-weight: 600; color: #429fc4; }
-    </style>
-  `
-  const win = window.open('', '_blank')
-  if (win) {
-    win.document.write(`
-      <html>
-        <head><title>成绩表 - ${selectedCourseTitle.value}</title>${style}</head>
-        <body>
-          <h2 style="text-align:center;margin:20px 0;font-size:20px;">成绩表 - ${selectedCourseTitle.value}</h2>
-          ${printContent}
-        </body>
-      </html>
-    `)
-    win.document.close()
-    win.focus()
-    win.print()
-  }
+/**
+ * 【导出成绩功能业务逻辑说明】
+ * 点击按钮后向后端发起请求，后端将课程学生成绩数据整理，提供文件下载；
+ * 后续支持对接学校教务系统接口，可将成绩数据推送同步至第三方教务平台。
+ */
+async function handleExportGradesToSystem() {
+  if (isExporting.value) return
+  isExporting.value = true
+
+  // 模拟接口请求延迟 1s
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  // 模拟下载效果
+  const blob = new Blob(['模拟成绩导出文件'], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `成绩导出-${selectedCourseTitle.value}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+
+  isExporting.value = false
+
+  // 显示成功通知
+  showExportToast.value = true
+  if (exportToastTimer) clearTimeout(exportToastTimer)
+  exportToastTimer = setTimeout(() => {
+    showExportToast.value = false
+  }, 4000)
 }
 </script>
+
+<style scoped>
+.toast-enter-active {
+  transition: all 0.3s ease-out;
+}
+.toast-leave-active {
+  transition: all 0.25s ease-in;
+}
+.toast-enter-from {
+  opacity: 0;
+  transform: translateX(40px);
+}
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(40px);
+}
+</style>
