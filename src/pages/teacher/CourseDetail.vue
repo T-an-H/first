@@ -563,15 +563,23 @@
             <!-- 头部 -->
             <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 class="text-lg font-semibold text-gray-800">班级 {{ selectedGradeClass }} - 成绩管理（{{ selectedExam }}）</h3>
-              <button @click="closeGradePopup()" class="text-gray-400 hover:text-gray-600">
-                <X class="w-5 h-5" />
-              </button>
+              <div class="flex items-center gap-2">
+                <div class="relative w-48">
+                  <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input v-model="gradePopupSearch" type="text" placeholder="搜索学生姓名或学号..."
+                    class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
+                </div>
+                <button @click="closeGradePopup()" class="text-gray-400 hover:text-gray-600">
+                  <X class="w-5 h-5" />
+                </button>
+              </div>
             </div>
             <!-- 内容 -->
             <div class="flex-1 overflow-auto px-6 py-4">
               <div v-if="!currentGradeClassSection" class="text-center py-8 text-gray-400">暂无数据</div>
+              <div v-else-if="filteredGradePopupGroups.length === 0" class="text-center py-8 text-gray-400">未找到匹配的学生</div>
               <template v-if="currentGradeClassSection">
-                <div v-for="(group, gi) in currentGradeClassSection.groups" :key="gi" class="mb-4">
+                <div v-for="(group, gi) in filteredGradePopupGroups" :key="gi" class="mb-4">
                   <div class="text-xs font-semibold text-gray-600 mb-2 px-1">{{ group.groupName }}（{{ group.items.length }}人）</div>
                   <table class="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
                     <thead>
@@ -588,7 +596,15 @@
                         class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                         :class="{ 'bg-emerald-50/20': isExamSubmitted(student!.id) }">
                         <td class="py-2 px-3">
-                          <span class="text-sm font-medium text-gray-900">{{ student!.name }}</span>
+                          <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <span class="text-xs font-medium text-blue-600">{{ student!.name.charAt(0) }}</span>
+                            </div>
+                            <div>
+                              <p class="font-medium text-gray-900 text-sm">{{ student!.name }}</p>
+                              <p class="text-xs text-gray-400">{{ student!.studentId || student!.id }}</p>
+                            </div>
+                          </div>
                         </td>
                         <td class="py-2 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
                         <td class="py-2 px-3">
@@ -971,7 +987,7 @@ import {
   EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
-import { AlertTriangle, ChevronRight, X } from 'lucide-vue-next'
+import { AlertTriangle, ChevronRight, Search, X } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -1149,6 +1165,7 @@ const gradeFilterClass = ref('')
 const gradeFilterGroup = ref('')
 const showGradePopup = ref(false)
 const selectedGradeClass = ref('')
+const gradePopupSearch = ref('')
 
 const myCourses = computed(() => store.courses.filter((c) => c.teacher === store.currentUser))
 const selectedConfig = computed(() => courseId.value ? store.evalConfigs.find((c) => c.courseId === courseId.value) : null)
@@ -1427,6 +1444,20 @@ const filteredGradeClassBlocks = computed(() => {
 const currentGradeClassSection = computed(() => {
   if (!selectedGradeClass.value) return null
   return filteredGradeClassBlocks.value.find(cb => cb.className === selectedGradeClass.value) || null
+})
+
+/** 弹窗内按搜索过滤后的分组数据 */
+const filteredGradePopupGroups = computed(() => {
+  const section = currentGradeClassSection.value
+  if (!section) return []
+  const search = gradePopupSearch.value.trim().toLowerCase()
+  if (!search) return section.groups
+  return section.groups.map(g => ({
+    ...g,
+    items: g.items.filter(({ student }) =>
+      student && (student.name.toLowerCase().includes(search) || student.id.toLowerCase().includes(search) || (student.studentId && student.studentId.toLowerCase().includes(search)))
+    )
+  })).filter(g => g.items.length > 0)
 })
 
 /** 弹窗内当前班级的所有学生 ID */
@@ -2219,6 +2250,7 @@ function closeEvalPopup() {
 function closeGradePopup() {
   showGradePopup.value = false
   selectedGradeClass.value = ''
+  gradePopupSearch.value = ''
 }
 
 const selectedUnsubmittedCount = computed(() => {

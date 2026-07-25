@@ -31,6 +31,11 @@
         class="px-4 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm bg-white min-w-[160px]">
         <option v-for="(sem, idx) in SEMESTERS" :key="idx" :value="idx === SEMESTERS.length - 1 ? 'all' : String(idx)">{{ sem.label }}</option>
       </select>
+      <div class="relative min-w-[200px]">
+        <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input v-model="gradeSearch" type="text" placeholder="搜索学生姓名..."
+          class="w-full pl-9 pr-3 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm bg-white" />
+      </div>
       <button @click="showStats = !showStats"
         class="flex items-center gap-1 px-3 py-2 text-sm text-gray-400 hover:text-gray-800 rounded-lg border border-brand-400/30 bg-white">
         <BarChart3 class="w-4 h-4" />
@@ -246,7 +251,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Printer, X } from 'lucide-vue-next'
+import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Printer, Search, X } from 'lucide-vue-next'
 import ScoreDetail from '@/components/ScoreDetail.vue'
 import type { DetailedGrade, Enrollment } from '@/types'
 
@@ -274,6 +279,7 @@ const showStats = ref(true)
 const selectedSemester = ref('all')
 const gradeFilterClass = ref('')
 const gradeFilterGroup = ref('')
+const gradeSearch = ref('')
 const showGradePopup = ref(false)
 const detailTarget = ref<{ studentName: string; courseTitle: string; courseId: string; studentId: string } | null>(null)
 const printRef = ref<HTMLElement | null>(null)
@@ -432,7 +438,16 @@ const openDetail = (enr: Enrollment) => {
 const gradeClassBlocks = computed(() => {
   if (selectedCourse.value === 'all') return []
   const cId = selectedCourse.value
-  const enrolled = filteredEnrollments.value.filter(e => e.courseId === cId)
+  let enrolled = filteredEnrollments.value.filter(e => e.courseId === cId)
+
+  // 按姓名搜索过滤
+  const search = gradeSearch.value.trim().toLowerCase()
+  if (search) {
+    enrolled = enrolled.filter(e => {
+      const student = store.students.find(s => s.id === e.studentId)
+      return student && (student.name.toLowerCase().includes(search) || student.id.toLowerCase().includes(search) || (student.studentId && student.studentId.toLowerCase().includes(search)))
+    })
+  }
 
   // 按班级分组
   const classMap = new Map<string, Enrollment[]>()
