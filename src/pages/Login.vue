@@ -112,6 +112,9 @@ const MOCK_USERS: Record<string, { password: string; name: string; role: string;
   'teacher-li':     { password: '666666', name: '李老师', role: 'teacher' },
   'mentor-zhang':   { password: '666666', name: '张导师', role: 'teacher', sub_role: 'mentor' },
   'leader-liu':     { password: '666666', name: '刘院长', role: 'teacher', sub_role: 'leader' },
+  'leader-zhou':    { password: '666666', name: '周院长', role: 'teacher', sub_role: 'leader' },
+  'leader-wu':      { password: '666666', name: '吴院长', role: 'teacher', sub_role: 'leader' },
+  'leader-zheng':   { password: '666666', name: '郑院长', role: 'teacher', sub_role: 'leader' },
   S2024001:         { password: '666666', name: '张明', role: 'student' },
   '202511053250':    { password: '666666', name: '李傲天', role: 'student' },
 }

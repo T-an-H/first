@@ -77,8 +77,8 @@ export const useAppStore = defineStore('app', () => {
 
   // 企业导师数据
   const mentors = ref<Mentor[]>(loadFromStorage<Mentor[]>('mentors', mockMentors))
-  // 学院领导数据
-  const leaders = ref<Leader[]>(loadFromStorage<Leader[]>('leaders', mockLeaders))
+  // 学院领导数据（只读演示数据，不从 localStorage 缓存，确保新数据及时生效）
+  const leaders = ref<Leader[]>([...mockLeaders])
   // 次要角色（用于 leader+teacher/mentor 双重身份）
   const secondaryRoles = ref<UserRole[]>(loadFromStorage<UserRole[]>('secondaryRoles', []))
 
@@ -721,7 +721,7 @@ export const useAppStore = defineStore('app', () => {
 
   /**
    * 判断最终评价轮次是否已过截止期
-   * 最后一次评价在课程结束后结束（最后一节课结束时间）
+   * 最终评价截止时间为最后一节课结束时间后第三天
    */
   function isFinalSessionDeadlinePassed(courseId: string, totalSessions: number): boolean {
     const courseSchedules = schedules.value
@@ -730,8 +730,9 @@ export const useAppStore = defineStore('app', () => {
 
     if (courseSchedules.length === 0) return false
 
-    // 最终评价截止时间：最后一节课结束
+    // 最终评价截止时间：最后一节课结束时间 + 3天
     const lastEndDate = new Date(courseSchedules[courseSchedules.length - 1].endDate)
+    lastEndDate.setDate(lastEndDate.getDate() + 3)
     return new Date() > lastEndDate
   }
 
@@ -791,8 +792,9 @@ export const useAppStore = defineStore('app', () => {
     if (courseSchedules.length === 0) return ''
 
     if (sessionNumber >= totalSessions) {
-      // 最终轮次：最后一节课结束时间
+      // 最终轮次：最后一节课结束时间后第三天
       const lastEnd = new Date(courseSchedules[courseSchedules.length - 1].endDate)
+      lastEnd.setDate(lastEnd.getDate() + 3)
       return lastEnd.toISOString().split('T')[0]
     }
     // 非最终轮次：该轮次最后一节课结束时间

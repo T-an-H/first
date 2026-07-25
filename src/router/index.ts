@@ -57,6 +57,11 @@ const router = createRouter({
           component: () => import('@/pages/teacher/Grades.vue'),
         },
         {
+          path: 'schedule',
+          name: 'TeacherSchedule',
+          component: () => import('@/pages/teacher/Schedule.vue'),
+        },
+        {
           path: 'extra',
           name: 'TeacherExtra',
           component: () => import('@/pages/teacher/Extra.vue'),
@@ -119,6 +124,11 @@ const router = createRouter({
           path: 'courses',
           name: 'MentorCourses',
           component: () => import('@/pages/mentor/Courses.vue'),
+        },
+        {
+          path: 'schedule',
+          name: 'MentorSchedule',
+          component: () => import('@/pages/teacher/Schedule.vue'),
         },
         {
           path: 'courses/:id',
