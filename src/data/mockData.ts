@@ -1,9 +1,9 @@
 import type { Category, Course, Student, Schedule, Enrollment, Teacher, Grade, Evaluation, EvaluationConfig, StudentGroup, Mentor, Leader } from '@/types';
 
 export const categories: Category[] = [
-  { id: 'cat-1', name: '编程开发', color: '#3b82f6', courseCount: 8 },
+  { id: 'cat-1', name: '编程开发', color: '#3b82f6', courseCount: 7 },
   { id: 'cat-2', name: '数据科学', color: '#10b981', courseCount: 4 },
-  { id: 'cat-3', name: '设计创意', color: '#f59e0b', courseCount: 3 },
+  { id: 'cat-3', name: '设计创意', color: '#f59e0b', courseCount: 2 },
   { id: 'cat-4', name: '商务管理', color: '#8b5cf6', courseCount: 4 },
   { id: 'cat-5', name: '语言学习', color: '#ec4899', courseCount: 3 },
 ];
