@@ -62,8 +62,8 @@
       </select>
     </div>
 
-    <!-- 统计概览 -->
-    <div v-if="showStats" class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5 space-y-4">
+    <!-- 统计概览（仅选择具体课程后显示） -->
+    <div v-if="showStats && selectedCourse !== 'all'" class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5 space-y-4">
       <!-- 关键指标 -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div class="bg-brand-600/10 rounded-lg p-3">
@@ -244,6 +244,7 @@
       :detail="detailTargetDetail"
       :cfg="detailTargetCfg"
       :total-score="detailTargetTotalScore"
+      :exam-scores="detailTargetExamScores"
     />
   </div>
 </template>
@@ -396,6 +397,11 @@ const detailTargetCfg = computed(() => {
 const detailTargetTotalScore = computed(() => {
   if (!detailTarget.value) return 0
   return store.grades.find((g) => g.studentId === detailTarget.value!.studentId && g.courseId === detailTarget.value!.courseId)?.score ?? 0
+})
+
+const detailTargetExamScores = computed(() => {
+  if (!detailTarget.value) return []
+  return store.examScores.filter((s) => s.studentId === detailTarget.value!.studentId && s.courseId === detailTarget.value!.courseId)
 })
 
 // ====== Functions ======

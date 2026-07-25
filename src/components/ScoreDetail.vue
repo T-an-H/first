@@ -12,7 +12,7 @@
       </div>
 
       <div class="p-5 space-y-5">
-        <div v-if="!hasDetail" class="text-center py-8 text-gray-400 text-sm">暂无分项成绩数据</div>
+        <div v-if="!hasDetail && (!totalScore || totalScore <= 0) && (!examScores || examScores.length === 0)" class="text-center py-8 text-gray-400 text-sm">暂无分项成绩数据</div>
 
         <template v-if="hasDetail">
           <SectionCalc
@@ -40,23 +40,35 @@
             :contribution="finalContrib"
             :items="finalSubs"
           />
-
-          <div class="border-t border-brand-400/20 pt-4">
-            <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-gray-400">最终成绩</span>
-              <span class="text-2xl font-bold text-gray-900 tabular-nums">{{ (totalScore ?? 0).toFixed(1) }}</span>
-            </div>
-            <p class="text-xs text-gray-400 mt-1 tabular-nums">
-              {{ regularScore.toFixed(1) }}×{{ cfg.regularWeight }}%
-              {{ cfg.midtermWeight > 0 ? `+ ${midtermScore.toFixed(1)}×${cfg.midtermWeight}%` : '' }}
-              {{ cfg.finalWeight > 0 ? `+ ${finalScore.toFixed(1)}×${cfg.finalWeight}%` : '' }}
-              =
-              {{ regularContrib.toFixed(1) }}{{ cfg.midtermWeight > 0 ? ` + ${midtermContrib.toFixed(1)}` : '' }}{{ cfg.finalWeight > 0 ? ` + ${finalContrib.toFixed(1)}` : '' }}
-              =
-              <span class="font-semibold">{{ (totalScore ?? 0).toFixed(1) }}</span>
-            </p>
-          </div>
         </template>
+
+        <!-- 总成绩：无论是否有分项数据都显示 -->
+        <div v-if="totalScore && totalScore > 0" class="border-t border-brand-400/20 pt-4">
+          <div class="flex items-center justify-between">
+            <span class="text-sm font-medium text-gray-400">最终成绩</span>
+            <span class="text-2xl font-bold text-gray-900 tabular-nums">{{ (totalScore ?? 0).toFixed(1) }}</span>
+          </div>
+          <p v-if="hasDetail" class="text-xs text-gray-400 mt-1 tabular-nums">
+            {{ regularScore.toFixed(1) }}×{{ cfg.regularWeight }}%
+            {{ cfg.midtermWeight > 0 ? `+ ${midtermScore.toFixed(1)}×${cfg.midtermWeight}%` : '' }}
+            {{ cfg.finalWeight > 0 ? `+ ${finalScore.toFixed(1)}×${cfg.finalWeight}%` : '' }}
+            =
+            {{ regularContrib.toFixed(1) }}{{ cfg.midtermWeight > 0 ? ` + ${midtermContrib.toFixed(1)}` : '' }}{{ cfg.finalWeight > 0 ? ` + ${finalContrib.toFixed(1)}` : '' }}
+            =
+            <span class="font-semibold">{{ (totalScore ?? 0).toFixed(1) }}</span>
+          </p>
+        </div>
+
+        <!-- 考试/项目成绩（来自课程详情成绩录入） -->
+        <div v-if="examScores && examScores.length > 0" class="border-t border-brand-400/20 pt-4">
+          <div class="text-sm font-medium text-gray-400 mb-2">考试/项目成绩</div>
+          <div class="space-y-1.5">
+            <div v-for="es in examScores" :key="es.id" class="flex items-center justify-between">
+              <span class="text-xs text-gray-400">{{ es.examName }}（{{ es.weight }}%）</span>
+              <span class="text-sm font-medium text-gray-800 tabular-nums">{{ es.score.toFixed(1) }}</span>
+            </div>
+          </div>
+        </div>
 
         <div class="bg-brand-400/10 rounded-xl p-4 text-xs text-gray-400 space-y-1">
           <p><span class="font-medium">权重配置：</span>平时 {{ cfg.regularWeight }}% + 期中 {{ cfg.midtermWeight }}% + 期末 {{ cfg.finalWeight }}%</p>
@@ -71,7 +83,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { X } from 'lucide-vue-next'
-import type { DetailedGrade, GradeWeightConfig } from '@/types'
+import type { DetailedGrade, GradeWeightConfig, ExamScore } from '@/types'
 import SectionCalc from './ScoreDetail/SectionCalc.vue'
 
 const props = defineProps<{
@@ -82,6 +94,7 @@ const props = defineProps<{
   detail: DetailedGrade | null
   cfg: GradeWeightConfig
   totalScore: number
+  examScores?: ExamScore[]
 }>()
 
 const wAvg = (subScores: { score: number | undefined; weight: number }[]): number => {
