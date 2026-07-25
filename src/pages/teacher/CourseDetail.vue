@@ -380,22 +380,6 @@
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               添加考试/项目
             </button>
-            <!-- Excel导入 -->
-            <label :class="`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${isReadOnly ? 'bg-gray-100 text-gray-400' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'}`">
-              <FileSpreadsheet class="w-3.5 h-3.5" />
-              导入 Excel
-              <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly" />
-            </label>
-            <button @click="handleDownloadTemplate" :disabled="isReadOnly"
-              class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
-              <FileSpreadsheet class="w-3.5 h-3.5" />
-              下载模板
-            </button>
-            <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
-              <input type="checkbox" v-model="includeClassInTemplate"
-                class="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-              含班级列
-            </label>
           </div>
           <span v-if="isMentor" class="text-xs text-gray-400 italic">导师仅可查看，如需操作请联系授课教师</span>
         </div>
@@ -474,6 +458,17 @@
               <input v-model="gradeSearch" type="text" placeholder="搜索学生姓名或学号..."
                 class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
             </div>
+            <!-- Excel导入 -->
+            <label v-if="!isMentor" :class="`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${isReadOnly ? 'bg-gray-100 text-gray-400' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'}`">
+              <FileSpreadsheet class="w-3.5 h-3.5" />
+              导入 Excel
+              <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly" />
+            </label>
+            <button v-if="!isMentor" @click="openDownloadTemplateModal" :disabled="isReadOnly"
+              class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+              <FileSpreadsheet class="w-3.5 h-3.5" />
+              下载模板
+            </button>
           </div>
         </div>
 
@@ -1015,6 +1010,53 @@
     :open="showGradeConfig"
     :on-close="() => { showGradeConfig = false; if (pendingFinalExamSelect) { selectedExam = pendingFinalExamSelect; pendingFinalExamSelect = ''; } }"
   />
+
+  <!-- 下载模板弹窗 -->
+  <Teleport to="body">
+    <div v-if="showDownloadTemplateModal" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/50" @click="showDownloadTemplateModal = false" />
+      <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-gray-900 text-lg">下载成绩模板</h3>
+          <button @click="showDownloadTemplateModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs text-gray-500 block mb-2 font-medium">选择班级</label>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
+                :class="downloadTemplateClass === '__all__' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                <input type="radio" v-model="downloadTemplateClass" value="__all__"
+                  class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <p class="text-sm font-medium text-gray-900">全部班级</p>
+                  <p class="text-xs text-gray-400">所有已分班或未分班的学生</p>
+                </div>
+              </label>
+              <label v-for="cb in classBlocks" :key="cb.className"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
+                :class="downloadTemplateClass === cb.className ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                <input type="radio" v-model="downloadTemplateClass" :value="cb.className"
+                  class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <p class="text-sm font-medium text-gray-900">{{ cb.className || '未分班' }}</p>
+                  <p class="text-xs text-gray-400">{{ cb.students.length }} 名学生</p>
+                </div>
+              </label>
+            </div>
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button @click="showDownloadTemplateModal = false"
+              class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+            <button @click="handleDownloadTemplate"
+              class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+              下载模板
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -1215,8 +1257,17 @@ const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_exam' | 'midterm_project' | 'final_exam' | 'final_project' | 'quiz' | 'assignment'>('midterm_exam')
 const selectedExam = ref('')
 const gradeSearch = ref('')
-/** 下载模板时是否包含班级列 */
-const includeClassInTemplate = ref(false)
+/** 下载模板弹窗 */
+const showDownloadTemplateModal = ref(false)
+const downloadTemplateClass = ref('__all__')
+function openDownloadTemplateModal() {
+  if (!courseId.value || !selectedExam.value) {
+    alert('请先选择一个考试/项目')
+    return
+  }
+  downloadTemplateClass.value = '__all__'
+  showDownloadTemplateModal.value = true
+}
 const showWeightReminderModal = ref(false)
 const pendingFinalExamSelect = ref('')
 
@@ -1876,23 +1927,29 @@ async function handleExcelImport(event: Event) {
 }
 
 async function handleDownloadTemplate() {
-  if (!courseId.value || !selectedExam.value) {
-    alert('请先选择一个考试/项目')
-    return
-  }
+  if (!courseId.value || !selectedExam.value) return
+  const targetClass = downloadTemplateClass.value
   try {
     const XLSX = await import('xlsx')
-    const data = enrolledStudents.value.map(({ student }) => {
-      const row: Record<string, string | number> = {
-        '学生姓名': student!.name,
-        '学生学号': student!.id,
-        [selectedExam.value]: '',
-      }
-      if (includeClassInTemplate.value) {
-        row['班级'] = student!.className || ''
-      }
-      return row
-    })
+    const data = enrolledStudents.value
+      .filter(({ student }) => {
+        if (targetClass === '__all__') return true
+        return (student!.className || '') === targetClass
+      })
+      .map(({ student }) => {
+        const row: Record<string, string | number> = {
+          '学生姓名': student!.name,
+          '学生学号': student!.id,
+          '班级': student!.className || '',
+          [selectedExam.value]: '',
+        }
+        return row
+      })
+    if (data.length === 0) {
+      alert('所选班级暂无学生')
+      return
+    }
+    const suffix = targetClass === '__all__' ? '全部班级' : targetClass
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '成绩')
@@ -1901,9 +1958,10 @@ async function handleDownloadTemplate() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${selectedExam.value}-成绩模板.xlsx`
+    a.download = `${selectedExam.value}-${suffix}-成绩模板.xlsx`
     a.click()
     URL.revokeObjectURL(url)
+    showDownloadTemplateModal.value = false
   } catch (err) {
     console.error('下载模板失败:', err)
     alert('下载模板失败')

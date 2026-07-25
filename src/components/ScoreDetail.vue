@@ -44,16 +44,16 @@
           <div class="border-t border-brand-400/20 pt-4">
             <div class="flex items-center justify-between">
               <span class="text-sm font-medium text-gray-400">最终成绩</span>
-              <span class="text-2xl font-bold text-gray-900">{{ totalScore }}</span>
+              <span class="text-2xl font-bold text-gray-900 tabular-nums">{{ (totalScore ?? 0).toFixed(1) }}</span>
             </div>
-            <p class="text-xs text-gray-400 mt-1">
-              {{ regularScore }}×{{ cfg.regularWeight }}%
-              {{ cfg.midtermWeight > 0 ? `+ ${midtermScore}×${cfg.midtermWeight}%` : '' }}
-              {{ cfg.finalWeight > 0 ? `+ ${finalScore}×${cfg.finalWeight}%` : '' }}
+            <p class="text-xs text-gray-400 mt-1 tabular-nums">
+              {{ regularScore.toFixed(1) }}×{{ cfg.regularWeight }}%
+              {{ cfg.midtermWeight > 0 ? `+ ${midtermScore.toFixed(1)}×${cfg.midtermWeight}%` : '' }}
+              {{ cfg.finalWeight > 0 ? `+ ${finalScore.toFixed(1)}×${cfg.finalWeight}%` : '' }}
               =
               {{ regularContrib.toFixed(1) }}{{ cfg.midtermWeight > 0 ? ` + ${midtermContrib.toFixed(1)}` : '' }}{{ cfg.finalWeight > 0 ? ` + ${finalContrib.toFixed(1)}` : '' }}
               =
-              <span class="font-semibold">{{ totalScore }}</span>
+              <span class="font-semibold">{{ (totalScore ?? 0).toFixed(1) }}</span>
             </p>
           </div>
         </template>
@@ -85,8 +85,10 @@ const props = defineProps<{
 }>()
 
 const wAvg = (subScores: { score: number | undefined; weight: number }[]): number => {
+  const totalWeight = subScores.reduce((s, item) => s + item.weight, 0)
+  if (totalWeight === 0) return 0
   const total = subScores.reduce((s, item) => s + (item.score ?? 0) * item.weight, 0)
-  return Math.round(total * 100) / 100
+  return Math.round((total / totalWeight) * 100) / 100
 }
 
 const regularSubs = computed(() => [
@@ -114,5 +116,10 @@ const regularContrib = computed(() => regularScore.value * props.cfg.regularWeig
 const midtermContrib = computed(() => midtermScore.value * props.cfg.midtermWeight / 100)
 const finalContrib = computed(() => finalScore.value * props.cfg.finalWeight / 100)
 
-const hasDetail = computed(() => props.detail && regularSubs.value.some((s) => s.score !== undefined))
+const hasDetail = computed(() =>
+  props.detail &&
+  (regularSubs.value.some((s) => s.score !== undefined) ||
+   midtermSubs.value.some((s) => s.score !== undefined) ||
+   finalSubs.value.some((s) => s.score !== undefined))
+)
 </script>
