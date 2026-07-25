@@ -167,6 +167,10 @@ export const leaders: Leader[] = [
   { id: 'l-1', name: '刘院长', phone: '139****3001', email: 'liuhead@example.com', categoryIds: ['cat-1', 'cat-2'], asTeacher: true },
   { id: 'l-2', name: '陈院长', phone: '139****3002', email: 'chenhead@example.com', categoryIds: ['cat-3', 'cat-4', 'cat-5'], asMentor: false },
   { id: 'l-3', name: '张院长', phone: '139****3003', email: 'zhanghead@example.com', categoryIds: ['cat-1', 'cat-4'], asMentor: true },
+  // 新增演示账号
+  { id: 'l-4', name: '周院长', phone: '139****3004', email: 'zhouhead@example.com', categoryIds: ['cat-5'], asMentor: false },
+  { id: 'l-5', name: '吴院长', phone: '139****3005', email: 'wuhead@example.com', categoryIds: ['cat-3'], asMentor: true },
+  { id: 'l-6', name: '郑院长', phone: '139****3006', email: 'zhenghead@example.com', categoryIds: ['cat-1'], asTeacher: true },
 ];
 
 export const grades: Grade[] = [

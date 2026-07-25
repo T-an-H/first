@@ -19,6 +19,7 @@ const adminNavItems = [
 
 const teacherNavItems = [
   { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
+  { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
   { to: '/teacher/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
@@ -33,6 +34,7 @@ const studentNavItems = [
 
 const mentorNavItems = [
   { to: '/mentor/courses', icon: 'bookOpen' as const, label: '我的课程' },
+  { to: '/mentor/schedule', icon: 'calendar' as const, label: '课程表' },
   { to: '/mentor/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/mentor/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]

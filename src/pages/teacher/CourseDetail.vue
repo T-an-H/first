@@ -143,6 +143,99 @@
         </template>
       </div>
 
+      <!-- 课程安排（上课时间设定，影响评价轮次开闭时间） -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <Calendar class="w-5 h-5 text-gray-400" />
+            <h2 class="font-semibold text-gray-900">课程安排</h2>
+            <span class="text-xs text-gray-400">设定上课时间，评价轮次依据课表时间自动开闭</span>
+          </div>
+          <button v-if="!isReadOnly && !isMentor" @click="showAddSchedule = true"
+            class="text-xs flex items-center gap-1 px-3 py-1.5 bg-brand-400/10 text-gray-600 border border-brand-400/30 rounded-lg hover:bg-brand-400/20 transition-colors">
+            <Plus class="w-3 h-3" />
+            添加课程
+          </button>
+        </div>
+
+        <div v-if="courseSchedules.length === 0" class="text-center py-4 text-sm text-gray-400">
+          <p>尚未添加课程安排</p>
+          <p class="text-xs mt-1">添加课程后将自动影响评价的开闭时间</p>
+        </div>
+        <div v-else class="space-y-2">
+          <div v-for="(sch, idx) in sortedCourseSchedules" :key="sch.id"
+            class="flex items-center justify-between px-3 py-2 bg-brand-400/5 rounded-lg border border-brand-400/20 text-sm">
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-gray-400 font-medium min-w-[2rem]">第{{ idx + 1 }}节</span>
+              <span class="text-xs bg-white px-2 py-0.5 rounded border border-brand-400/30 text-gray-600">{{ sch.startDate }}</span>
+              <span class="text-xs text-gray-400">~</span>
+              <span class="text-xs bg-white px-2 py-0.5 rounded border border-brand-400/30 text-gray-600">{{ sch.endDate }}</span>
+              <span class="text-xs text-gray-500">{{ sch.timeSlot }}</span>
+              <span class="text-xs text-gray-400">{{ sch.room }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <button v-if="!isReadOnly && !isMentor" @click="editSchedule(sch)" class="p-1 rounded hover:bg-brand-400/20 transition-colors">
+                <Edit3 class="w-3.5 h-3.5 text-gray-400" />
+              </button>
+              <button v-if="!isReadOnly && !isMentor" @click="removeSchedule(sch.id)" class="p-1 rounded hover:bg-red-100 transition-colors">
+                <Trash2 class="w-3.5 h-3.5 text-red-400" />
+              </button>
+            </div>
+          </div>
+          <div class="text-xs text-gray-400 mt-1 pl-3">
+            <Clock class="w-3 h-3 inline mr-0.5" />
+            首次评价于第一节课 {{ sortedCourseSchedules.length > 0 ? sortedCourseSchedules[0].startDate : '设定日期' }} 开启
+            <template v-if="sortedCourseSchedules.length > 1">
+              ，末次评价于最后一节课结束时间后3天截止
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- 添加/编辑课程安排弹窗 -->
+      <Teleport to="body">
+        <div v-if="showScheduleModal" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40" @click.self="showScheduleModal = false">
+          <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-gray-900">{{ editingScheduleId ? '编辑课程' : '添加课程' }}</h3>
+              <button @click="showScheduleModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">上课日期</label>
+                <input v-model="scheduleForm.startDate" type="date"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">下课日期</label>
+                <input v-model="scheduleForm.endDate" type="date"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">时间段</label>
+                <input v-model="scheduleForm.timeSlot" type="text" placeholder="例如 09:00-11:00"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">教室</label>
+                <input v-model="scheduleForm.room" type="text" placeholder="例如 A101"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-blue-500" />
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+              <button @click="showScheduleModal = false"
+                class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                取消
+              </button>
+              <button @click="saveSchedule"
+                class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                {{ editingScheduleId ? '保存' : '添加' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- 评价管理（合并批量评价 + 逐次评价） -->
       <div v-if="!isReadOnly" class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <div class="flex items-center justify-between mb-4">
@@ -1069,8 +1162,8 @@ import {
   EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
   EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
-import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2 } from 'lucide-vue-next'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule } from '@/types'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, Edit3 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -1080,6 +1173,54 @@ const courseId = computed(() => route.params.id as string)
 const course = computed(() => store.courses.find((c) => c.id === courseId.value))
 const isReadOnly = computed(() => course.value?.status !== 'active')
 const isMentor = computed(() => store.currentRole === 'mentor')
+
+// ---- 课程安排管理 ----
+const showScheduleModal = ref(false)
+const editingScheduleId = ref('')
+const scheduleForm = ref({ startDate: '', endDate: '', timeSlot: '', room: '' })
+
+const showAddSchedule = computed({
+  get: () => showScheduleModal.value,
+  set: (v) => { showScheduleModal.value = v; if (!v) { editingScheduleId.value = ''; scheduleForm.value = { startDate: '', endDate: '', timeSlot: '', room: '' } } }
+})
+
+const courseSchedules = computed(() =>
+  store.schedules.filter((s) => s.courseId === courseId.value)
+)
+
+const sortedCourseSchedules = computed(() =>
+  [...courseSchedules.value].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+)
+
+function editSchedule(sch: Schedule) {
+  editingScheduleId.value = sch.id
+  scheduleForm.value = { startDate: sch.startDate, endDate: sch.endDate, timeSlot: sch.timeSlot, room: sch.room }
+  showScheduleModal.value = true
+}
+
+function saveSchedule() {
+  if (!scheduleForm.value.startDate) return
+  const teacherName = store.teachers.find((t) => t.courseIds.includes(courseId.value))?.name || store.currentUser
+  if (editingScheduleId.value) {
+    store.updateSchedule(editingScheduleId.value, { ...scheduleForm.value })
+  } else {
+    const newId = `sch-${Date.now()}`
+    store.addSchedule({
+      id: newId,
+      courseId: courseId.value,
+      title: course.value?.title || '',
+      teacher: teacherName,
+      ...scheduleForm.value,
+    })
+  }
+  showScheduleModal.value = false
+  editingScheduleId.value = ''
+  scheduleForm.value = { startDate: '', endDate: '', timeSlot: '', room: '' }
+}
+
+function removeSchedule(id: string) {
+  store.deleteSchedule(id)
+}
 
 // ---- Tab 配置 ----
 const tabList = [
