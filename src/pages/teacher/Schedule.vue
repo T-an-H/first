@@ -51,8 +51,9 @@
           </thead>
           <tbody>
             <tr v-for="slot in timeSlots" :key="slot.key" class="align-top">
-              <td class="w-16 p-2 text-[10px] text-gray-400 text-center bg-white border-r border-b border-brand-400/20 align-top pt-3">
-                {{ slot.label }}
+              <td class="w-16 p-2 text-center bg-white border-r border-b border-brand-400/20 align-top pt-2">
+                <div class="text-[11px] text-gray-400 font-medium">{{ slot.label }}</div>
+                <div class="text-[9px] text-gray-300 mt-0.5">{{ slot.periodLabel }}</div>
               </td>
               <td v-for="day in weekDays" :key="day.label"
                 class="p-1 border-r border-b border-brand-400/20 last:border-r-0 align-top"
@@ -151,19 +152,48 @@ const userSchedules = computed(() => {
   return store.schedules.filter((s) => s.teacher === store.currentUser)
 })
 
-// ---- 时间槽 ----
-interface ParsedSlot { key: string; label: string }
-function parseSlot(t: string): ParsedSlot {
-  const [s] = t.split('-')
-  const [h, m] = s.split(':').map(Number)
-  return { key: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, label: `${h}:${String(m).padStart(2, '0')}` }
+// ---- 提取课程的周规律 ----
+interface CoursePattern {
+  dayOfWeek: number   // 0=周一, 6=周日
+  timeSlot: string
+  title: string
+  teacher: string
+  room: string
 }
 
-const timeSlots = computed(() => {
-  const map = new Map<string, ParsedSlot>()
-  userSchedules.value.forEach((s) => { const p = parseSlot(s.timeSlot); if (!map.has(p.key)) map.set(p.key, p) })
-  return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key))
+const coursePatterns = computed(() => {
+  const map = new Map<string, CoursePattern[]>()
+  userSchedules.value.forEach((s) => {
+    const sd = new Date(s.startDate)
+    const day = sd.getDay()
+    const dow = day === 0 ? 6 : day - 1
+    if (!map.has(s.courseId)) map.set(s.courseId, [])
+    const list = map.get(s.courseId)!
+    if (!list.some(p => p.dayOfWeek === dow && p.timeSlot === s.timeSlot)) {
+      list.push({ dayOfWeek: dow, timeSlot: s.timeSlot, title: s.title, teacher: s.teacher, room: s.room })
+    }
+  })
+  return map
 })
+
+// ---- 标准时间段 ----
+interface ParsedSlot { key: string; label: string; periodLabel: string }
+
+const STANDARD_SLOTS: ParsedSlot[] = [
+  { key: '08:00', label: '08:00', periodLabel: '上午一' },
+  { key: '09:00', label: '09:00', periodLabel: '上午二' },
+  { key: '10:00', label: '10:00', periodLabel: '上午三' },
+  { key: '11:00', label: '11:00', periodLabel: '上午四' },
+  { key: '13:00', label: '13:00', periodLabel: '下午一' },
+  { key: '14:00', label: '14:00', periodLabel: '下午二' },
+  { key: '15:00', label: '15:00', periodLabel: '下午三' },
+  { key: '16:00', label: '16:00', periodLabel: '下午四' },
+  { key: '17:00', label: '17:00', periodLabel: '下午五' },
+  { key: '19:00', label: '19:00', periodLabel: '晚课一' },
+  { key: '20:00', label: '20:00', periodLabel: '晚课二' },
+]
+
+const timeSlots = computed(() => STANDARD_SLOTS)
 
 // ---- 颜色方案 ----
 interface CourseColor {
@@ -174,14 +204,18 @@ interface CourseColor {
 }
 
 const PALETTE: CourseColor[] = [
-  { cellBg: '#bac9bd', cardBg: '#5eb6b9', border: '#429fc4', text: '#0f5073' },
-  { cellBg: '#80b8d7', cardBg: '#429fc4', border: '#429fc4', text: '#0f5073' },
-  { cellBg: '#bac9bd', cardBg: '#5eb6b9', border: '#429fc4', text: '#155ea0' },
-  { cellBg: '#bac9bd', cardBg: '#429fc4', border: '#429fc4', text: '#0f5073' },
-  { cellBg: '#80b8d7', cardBg: '#5eb6b9', border: '#429fc4', text: '#155ea0' },
-  { cellBg: '#bac9bd', cardBg: '#429fc4', border: '#429fc4', text: '#0f5073' },
-  { cellBg: '#bac9bd', cardBg: '#5eb6b9', border: '#429fc4', text: '#155ea0' },
-  { cellBg: '#80b8d7', cardBg: '#429fc4', border: '#429fc4', text: '#0f5073' },
+  { cellBg: '#e8f5e9', cardBg: '#4caf50', border: '#388e3c', text: '#ffffff' },
+  { cellBg: '#e3f2fd', cardBg: '#2196f3', border: '#1565c0', text: '#ffffff' },
+  { cellBg: '#fff3e0', cardBg: '#ff9800', border: '#e65100', text: '#ffffff' },
+  { cellBg: '#fce4ec', cardBg: '#e91e63', border: '#c2185b', text: '#ffffff' },
+  { cellBg: '#f3e5f5', cardBg: '#9c27b0', border: '#7b1fa2', text: '#ffffff' },
+  { cellBg: '#e0f7fa', cardBg: '#00bcd4', border: '#00838f', text: '#ffffff' },
+  { cellBg: '#fffde7', cardBg: '#ffc107', border: '#ff8f00', text: '#ffffff' },
+  { cellBg: '#fbe9e7', cardBg: '#ff5722', border: '#bf360c', text: '#ffffff' },
+  { cellBg: '#e8eaf6', cardBg: '#3f51b5', border: '#1a237e', text: '#ffffff' },
+  { cellBg: '#e0f2f1', cardBg: '#009688', border: '#004d40', text: '#ffffff' },
+  { cellBg: '#f1f8e9', cardBg: '#8bc34a', border: '#558b2f', text: '#ffffff' },
+  { cellBg: '#ede7f6', cardBg: '#673ab7', border: '#4527a0', text: '#ffffff' },
 ]
 
 const courseColorMap = computed(() => {
@@ -204,17 +238,31 @@ interface CardItem extends CourseColor {
   timeSlot: string
 }
 
+function getSlotHour(t: string): number {
+  return parseInt(t.split(':')[0], 10)
+}
+
 function getCards(day: Date, slot: ParsedSlot): CardItem[] {
-  return userSchedules.value
-    .filter((s) => {
-      const sd = new Date(s.startDate)
-      const p = parseSlot(s.timeSlot)
-      return sd.getFullYear() === day.getFullYear() && sd.getMonth() === day.getMonth() && sd.getDate() === day.getDate() && p.key === slot.key
+  const dayOfWeek = day.getDay() === 0 ? 6 : day.getDay() - 1
+  const slotHour = parseInt(slot.key.split(':')[0], 10)
+  const result: CardItem[] = []
+  coursePatterns.value.forEach((patterns, courseId) => {
+    patterns.forEach((p) => {
+      const courseHour = getSlotHour(p.timeSlot)
+      if (p.dayOfWeek === dayOfWeek && courseHour === slotHour) {
+        const c = getCourseColor(courseId)
+        result.push({
+          id: `${courseId}-${p.dayOfWeek}-${slot.key}`,
+          courseName: p.title,
+          teacher: p.teacher,
+          room: p.room,
+          timeSlot: p.timeSlot,
+          ...c,
+        })
+      }
     })
-    .map((s) => {
-      const c = getCourseColor(s.courseId)
-      return { id: s.id, courseName: s.title, teacher: s.teacher, room: s.room, timeSlot: s.timeSlot, ...c }
-    })
+  })
+  return result
 }
 
 function getDayCellBg(day: Date, slot: ParsedSlot): string {
@@ -231,10 +279,10 @@ const allCards = computed(() => {
 // ---- 图例 ----
 const courseColors = computed(() => {
   const map = new Map<string, { label: string; cardBg: string; border: string; text: string }>()
-  userSchedules.value.forEach((s) => {
-    if (!map.has(s.courseId)) {
-      const c = getCourseColor(s.courseId)
-      map.set(s.courseId, { label: s.title, cardBg: c.cardBg, border: c.border, text: c.text })
+  coursePatterns.value.forEach((patterns, courseId) => {
+    if (!map.has(courseId)) {
+      const c = getCourseColor(courseId)
+      map.set(courseId, { label: patterns[0]?.title || '', cardBg: c.cardBg, border: c.border, text: c.text })
     }
   })
   return Array.from(map.values())

@@ -196,6 +196,7 @@ export const Icons = {
   briefcase: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
   trendingDown: '<polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/>',
   sparkles: '<path d="M12 3v4m0 10v4m-8-10h4m10 0h4m-7.5-6.5 2.5-1m-7.5 7.5-2.5 1m0-6 2.5 1m7.5 7.5 2.5-1"/><path d="M12 12h.01"/>',
+  mapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
 }
 
 /** 在 D3 Selection 中渲染图标 */

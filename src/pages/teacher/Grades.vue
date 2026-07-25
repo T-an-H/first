@@ -413,6 +413,8 @@ const knowledgePoints = computed(() => {
 // ====== Detail target helpers ======
 const detailTargetDetail = computed(() => {
   if (!detailTarget.value) return null
+  // 课程未开课时不展示评价成绩详情
+  if (!store.isFirstClassStarted(detailTarget.value.courseId)) return null
   return store.detailedGrades.find((d) => d.studentId === detailTarget.value!.studentId && d.courseId === detailTarget.value!.courseId) || null
 })
 
@@ -435,6 +437,8 @@ const detailTargetExamScores = computed(() => {
 
 /** 获取学生该课程的总分 */
 function getStudentTotal(enr: Enrollment): number | null {
+  // 课程未开课时不展示成绩
+  if (!store.isFirstClassStarted(enr.courseId)) return null
   const g = store.grades.find((g) => g.studentId === enr.studentId && g.courseId === enr.courseId)
   return g?.score ?? null
 }
@@ -556,7 +560,6 @@ const filteredGradeClassBlocks = computed(() => {
 
 watch(gradeFilterClass, () => { gradeFilterGroup.value = '' })
 
-const selectedGradeClass = ref('')
 const currentGradeClassSection = computed(() => {
   if (!selectedGradeClass.value) return null
   return filteredGradeClassBlocks.value.find(cb => cb.className === selectedGradeClass.value) || null
