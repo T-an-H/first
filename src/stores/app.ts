@@ -580,9 +580,10 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function submitExamScores(courseId: string, examName: string) {
+  function submitExamScores(courseId: string, examName: string, studentIds?: string[]) {
     examScores.value = examScores.value.map((s) => {
-      if (s.courseId === courseId && s.examName === examName && s.status === 'draft') {
+      if (s.courseId === courseId && s.examName === examName && s.status === 'draft'
+          && (!studentIds || studentIds.includes(s.studentId))) {
         return { ...s, status: 'submitted' as const, gradedAt: new Date().toISOString().split('T')[0] }
       }
       return s

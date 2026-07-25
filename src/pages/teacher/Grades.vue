@@ -43,6 +43,20 @@
       </span>
     </div>
 
+    <!-- 班级/分组过滤（仅具体课程时显示） -->
+    <div v-if="selectedCourse !== 'all'" class="flex flex-wrap gap-4 items-center">
+      <select v-model="gradeFilterClass"
+        class="px-4 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm bg-white min-w-[140px]">
+        <option value="">全部班级</option>
+        <option v-for="cn in gradeClassOptions" :key="cn" :value="cn">{{ cn }}</option>
+      </select>
+      <select v-model="gradeFilterGroup"
+        class="px-4 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm bg-white min-w-[140px]">
+        <option value="">全部分组</option>
+        <option v-for="gn in gradeGroupOptions" :key="gn" :value="gn">{{ gn }}</option>
+      </select>
+    </div>
+
     <!-- 统计概览 -->
     <div v-if="showStats" class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5 space-y-4">
       <!-- 关键指标 -->
@@ -103,59 +117,117 @@
       <span>平时 = 自评 {{ currentCfg.selfEvalWeight }}% + 组内互评 {{ currentCfg.peerReviewWeight }}% + 组间互评 {{ currentCfg.interGroupEvalWeight }}% + 教师 {{ currentCfg.teacherScoreWeight }}% + 企业导师 {{ currentCfg.mentorScoreWeight }}%</span>
     </div>
 
-    <!-- 成绩查询表 -->
-    <div class="bg-white rounded-xl border border-brand-400/20 shadow-sm overflow-hidden" ref="printRef">
-      <div class="overflow-x-auto">
-        <table class="w-full min-w-[600px]">
-          <thead>
-            <tr class="bg-brand-400/10 border-b border-brand-400/20">
-              <th class="text-left px-4 py-3 text-sm font-medium text-gray-400">学员</th>
-              <th class="text-left px-4 py-3 text-sm font-medium text-gray-400">课程</th>
-              <th class="text-center px-4 py-3 text-sm font-medium text-gray-400 min-w-[80px]">总分</th>
-              <th class="text-center px-4 py-3 text-sm font-medium text-gray-400 min-w-[70px]">等级</th>
-              <th class="text-center px-4 py-3 text-sm font-medium text-gray-400 min-w-[100px]">评阅时间</th>
-              <th class="text-center px-4 py-3 text-sm font-medium text-gray-400 min-w-[70px]">详情</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-brand-400/20">
-            <tr v-for="enr in filteredEnrollments" :key="enr.id" class="hover:bg-brand-400/10 transition-colors">
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-2">
-                  <div class="w-7 h-7 rounded-full bg-brand-600/15 flex items-center justify-center flex-shrink-0">
-                    <span class="text-xs font-medium text-gray-600">{{ getStudentName(enr.studentId).charAt(0) }}</span>
-                  </div>
-                  <span class="text-sm font-medium text-gray-900 whitespace-nowrap">{{ getStudentName(enr.studentId) }}</span>
-                </div>
-              </td>
-              <td class="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{{ getCourseTitle(enr.courseId) }}</td>
-              <td class="px-4 py-3 text-center">
-                <span v-if="getStudentTotal(enr)" class="font-semibold text-sm" :class="getTotalColorClass(getStudentTotal(enr)!)">
-                  {{ getStudentTotal(enr) }}
-                </span>
-                <span v-else class="text-gray-400/60">-</span>
-              </td>
-              <td class="px-4 py-3 text-center">
-                <span v-if="getStudentTotal(enr)" class="text-xs px-2 py-0.5 rounded-full" :class="getGradeLevel(getStudentTotal(enr)!).color">
-                  {{ getGradeLevel(getStudentTotal(enr)!).label }}
-                </span>
-                <span v-else class="text-gray-400/60">-</span>
-              </td>
-              <td class="px-4 py-3 text-center text-sm text-gray-400">
-                {{ getGradedAt(enr) || '-' }}
-              </td>
-              <td class="px-4 py-3 text-center">
-                <button v-if="getStudentTotal(enr) !== null"
-                  @click="openDetail(enr)"
-                  class="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-brand-600/10 transition-colors">
-                  查看详情
-                </button>
-                <span v-else class="text-gray-400/60">-</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- 成绩查询 - 卡片列表 -->
+    <div ref="printRef">
+      <div v-if="filteredEnrollments.length > 0">
+        <!-- 具体课程：按班级展示 -->
+        <template v-if="selectedCourse !== 'all'">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
+              @click="selectedGradeClass = classBlock.className; showGradePopup = true"
+              class="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-800">班级 {{ classBlock.className || '未分班' }}</span>
+                <ChevronRight class="w-4 h-4 text-gray-400" />
+              </div>
+              <div class="mt-1 flex items-center gap-2">
+                <span class="text-xs text-gray-500">{{ classBlock.groups.reduce((a, g) => a + g.items.length, 0) }}人</span>
+                <span v-for="(group, gi) in classBlock.groups" :key="gi" class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{{ group.groupName }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+        <!-- 全部课程：按课程展示 -->
+        <template v-else>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div v-for="courseId in myCourseIds" :key="courseId"
+              @click="selectedCourse = courseId"
+              class="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-semibold text-gray-800">{{ getCourseTitle(courseId) }}</span>
+                <ChevronRight class="w-4 h-4 text-gray-400" />
+              </div>
+              <div class="mt-1 text-xs text-gray-500">{{ getCourseEnrollmentsGrouped(courseId).reduce((a, g) => a + g.items.length, 0) }}人</div>
+            </div>
+          </div>
+        </template>
       </div>
-      <div v-if="filteredEnrollments.length === 0" class="text-center py-8 text-gray-400">暂无数据</div>
+      <div v-else class="text-center py-8 text-gray-400">暂无数据</div>
+    </div>
+
+    <!-- 成绩弹窗 -->
+    <div v-if="showGradePopup" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="closeGradePopup">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[85vh] flex flex-col">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-brand-400/20">
+          <h3 class="text-lg font-semibold text-gray-900">班级 {{ selectedGradeClass }} - 成绩查询</h3>
+          <button @click="closeGradePopup" class="p-1 rounded-lg hover:bg-brand-400/10 transition-colors">
+            <X class="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+          <template v-if="currentGradeClassSection">
+            <template v-for="(group, gi) in currentGradeClassSection.groups" :key="gi">
+              <div class="mb-2">
+                <span class="text-sm font-semibold text-gray-600">{{ group.groupName }}</span>
+                <span class="text-[10px] text-gray-400 ml-1">{{ group.items.length }}人</span>
+              </div>
+              <table class="w-full min-w-[600px] mb-6">
+                <thead>
+                  <tr class="bg-brand-400/10 border-b border-brand-400/20">
+                    <th class="text-left px-4 py-3 text-sm font-medium text-gray-400">学生</th>
+                    <th class="text-center px-4 py-3 text-sm font-medium text-gray-400">总分</th>
+                    <th class="text-center px-4 py-3 text-sm font-medium text-gray-400">等级</th>
+                    <th class="text-center px-4 py-3 text-sm font-medium text-gray-400">评阅时间</th>
+                    <th class="text-center px-4 py-3 text-sm font-medium text-gray-400">详情</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-brand-400/20">
+                  <tr v-for="enr in group.items" :key="enr.id" class="hover:bg-brand-400/10 transition-colors">
+                    <td class="px-4 py-3">
+                      <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-full bg-brand-600/15 flex items-center justify-center flex-shrink-0">
+                          <span class="text-xs font-medium text-gray-600">{{ getStudentName(enr.studentId).charAt(0) }}</span>
+                        </div>
+                        <span class="text-sm font-medium text-gray-900 whitespace-nowrap">{{ getStudentName(enr.studentId) }}</span>
+                      </div>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span v-if="getStudentTotal(enr)" class="font-semibold text-sm" :class="getTotalColorClass(getStudentTotal(enr)!)">
+                        {{ getStudentTotal(enr) }}
+                      </span>
+                      <span v-else class="text-gray-400/60">-</span>
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <span v-if="getStudentTotal(enr)" class="text-xs px-2 py-0.5 rounded-full" :class="getGradeLevel(getStudentTotal(enr)!).color">
+                        {{ getGradeLevel(getStudentTotal(enr)!).label }}
+                      </span>
+                      <span v-else class="text-gray-400/60">-</span>
+                    </td>
+                    <td class="px-4 py-3 text-center text-sm text-gray-400">
+                      {{ getGradedAt(enr) || '-' }}
+                    </td>
+                    <td class="px-4 py-3 text-center">
+                      <button v-if="getStudentTotal(enr) !== null"
+                        @click="openDetail(enr)"
+                        class="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-brand-600/10 transition-colors">
+                        查看详情
+                      </button>
+                      <span v-else class="text-gray-400/60">-</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+          </template>
+          <div v-else class="text-center py-8 text-gray-400">暂无数据</div>
+        </div>
+        <div class="flex justify-end px-6 py-4 border-t border-brand-400/20">
+          <button @click="closeGradePopup"
+            class="px-4 py-2 text-sm font-medium rounded-lg border border-brand-400/30 text-gray-600 hover:bg-brand-400/10 transition-colors">
+            关闭
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- ScoreDetail Modal -->
@@ -172,9 +244,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { BarChart3, ChevronDown, ChevronUp, Download, Printer } from 'lucide-vue-next'
+import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Printer, X } from 'lucide-vue-next'
 import ScoreDetail from '@/components/ScoreDetail.vue'
 import type { DetailedGrade, Enrollment } from '@/types'
 
@@ -200,6 +272,9 @@ const SEMESTERS = [
 const selectedCourse = ref('all')
 const showStats = ref(true)
 const selectedSemester = ref('all')
+const gradeFilterClass = ref('')
+const gradeFilterGroup = ref('')
+const showGradePopup = ref(false)
 const detailTarget = ref<{ studentName: string; courseTitle: string; courseId: string; studentId: string } | null>(null)
 const printRef = ref<HTMLElement | null>(null)
 
@@ -351,6 +426,149 @@ const openDetail = (enr: Enrollment) => {
     courseId: enr.courseId,
     studentId: enr.studentId,
   }
+}
+
+/** 按班级+分组组织成绩数据（用于具体课程视图） */
+const gradeClassBlocks = computed(() => {
+  if (selectedCourse.value === 'all') return []
+  const cId = selectedCourse.value
+  const enrolled = filteredEnrollments.value.filter(e => e.courseId === cId)
+
+  // 按班级分组
+  const classMap = new Map<string, Enrollment[]>()
+  for (const enr of enrolled) {
+    const student = store.students.find(s => s.id === enr.studentId)
+    const cn = student?.className || '未分班'
+    if (!classMap.has(cn)) classMap.set(cn, [])
+    classMap.get(cn)!.push(enr)
+  }
+
+  // 按分组组织
+  const result: { className: string; groups: { groupName: string; items: Enrollment[] }[] }[] = []
+  const groups = store.studentGroups.filter(g => g.courseId === cId)
+
+  for (const [className, items] of classMap) {
+    const memberToGroup = new Map<string, string>()
+    for (const g of groups) {
+      for (const mid of g.memberIds) {
+        const student = store.students.find(s => s.id === mid)
+        if (student && (student.className || '未分班') === className) {
+          memberToGroup.set(mid, g.name)
+        }
+      }
+    }
+
+    const groupedMap = new Map<string, Enrollment[]>()
+    const ungrouped: Enrollment[] = []
+    for (const enr of items) {
+      const groupName = memberToGroup.get(enr.studentId)
+      if (groupName) {
+        if (!groupedMap.has(groupName)) groupedMap.set(groupName, [])
+        groupedMap.get(groupName)!.push(enr)
+      } else {
+        ungrouped.push(enr)
+      }
+    }
+
+    const groupsArr: { groupName: string; items: Enrollment[] }[] = []
+    for (const [name, members] of groupedMap) {
+      groupsArr.push({ groupName: name, items: members })
+    }
+    if (ungrouped.length > 0) {
+      groupsArr.push({ groupName: '未分组', items: ungrouped })
+    }
+
+    result.push({ className, groups: groupsArr })
+  }
+  return result
+})
+
+const gradeClassOptions = computed(() => {
+  return [...new Set(gradeClassBlocks.value.map(b => b.className))]
+})
+
+const gradeGroupOptions = computed(() => {
+  const block = gradeClassBlocks.value.find(b => b.className === gradeFilterClass.value)
+  return block ? block.groups.map(g => g.groupName) : []
+})
+
+const filteredGradeClassBlocks = computed(() => {
+  let blocks = gradeClassBlocks.value
+  if (gradeFilterClass.value) {
+    blocks = blocks.filter(b => b.className === gradeFilterClass.value)
+  }
+  if (gradeFilterGroup.value) {
+    blocks = blocks.map(b => ({
+      ...b,
+      groups: b.groups.filter(g => g.groupName === gradeFilterGroup.value)
+    })).filter(b => b.groups.length > 0)
+  }
+  return blocks
+})
+
+watch(gradeFilterClass, () => { gradeFilterGroup.value = '' })
+
+const selectedGradeClass = ref('')
+const currentGradeClassSection = computed(() => {
+  if (!selectedGradeClass.value) return null
+  return filteredGradeClassBlocks.value.find(cb => cb.className === selectedGradeClass.value) || null
+})
+
+function closeGradePopup() {
+  showGradePopup.value = false
+  selectedGradeClass.value = ''
+}
+
+/** 按课程分组获取班级+分组数据（用于全部课程视图） */
+function getCourseEnrollmentsGrouped(courseId: string): { groupName: string; items: Enrollment[] }[] {
+  const enrolled = filteredEnrollments.value.filter(e => e.courseId === courseId)
+
+  // 按班级分组
+  const classMap = new Map<string, Enrollment[]>()
+  for (const enr of enrolled) {
+    const student = store.students.find(s => s.id === enr.studentId)
+    const cn = student?.className || '未分班'
+    if (!classMap.has(cn)) classMap.set(cn, [])
+    classMap.get(cn)!.push(enr)
+  }
+
+  // 按分组 + 班级前缀组织
+  const groups = store.studentGroups.filter(g => g.courseId === courseId)
+  const result: { groupName: string; items: Enrollment[] }[] = []
+
+  for (const [className, items] of classMap) {
+    const memberToGroup = new Map<string, string>()
+    for (const g of groups) {
+      for (const mid of g.memberIds) {
+        const student = store.students.find(s => s.id === mid)
+        if (student && (student.className || '未分班') === className) {
+          memberToGroup.set(mid, g.name)
+        }
+      }
+    }
+
+    const groupedMap = new Map<string, Enrollment[]>()
+    const ungrouped: Enrollment[] = []
+    for (const enr of items) {
+      const groupName = memberToGroup.get(enr.studentId)
+      if (groupName) {
+        if (!groupedMap.has(groupName)) groupedMap.set(groupName, [])
+        groupedMap.get(groupName)!.push(enr)
+      } else {
+        ungrouped.push(enr)
+      }
+    }
+
+    // 添加班级分组头
+    result.push({ groupName: `班级 ${className}`, items: [] })
+    for (const [name, members] of groupedMap) {
+      result.push({ groupName: `  ${name}`, items: members })
+    }
+    if (ungrouped.length > 0) {
+      result.push({ groupName: '  未分组', items: ungrouped })
+    }
+  }
+  return result
 }
 
 /** 导出 Excel */

@@ -19,7 +19,7 @@ const adminNavItems = [
 
 const teacherNavItems = [
   { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
-  { to: '/teacher/grades', icon: 'award' as const, label: '成绩管理' },
+  { to: '/teacher/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
@@ -27,13 +27,13 @@ const studentNavItems = [
   { to: '/student/profile', icon: 'user' as const, label: '个人画像' },
   { to: '/student/schedule', icon: 'calendar' as const, label: '我的课表' },
   { to: '/student/courses', icon: 'bookOpen' as const, label: '我的课程' },
-  { to: '/student/grades', icon: 'award' as const, label: '成绩管理' },
+  { to: '/student/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/student/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
 const mentorNavItems = [
   { to: '/mentor/courses', icon: 'bookOpen' as const, label: '我的课程' },
-  { to: '/mentor/grades', icon: 'award' as const, label: '成绩管理' },
+  { to: '/mentor/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/mentor/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
