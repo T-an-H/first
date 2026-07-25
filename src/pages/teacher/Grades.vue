@@ -287,8 +287,12 @@ const printRef = ref<HTMLElement | null>(null)
 
 // ====== Computed ======
 const isMentor = computed(() => store.currentRole === 'mentor')
+const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
 
 const myCourses = computed(() => {
+  if (isLeaderWithTeaching.value) {
+    return store.getLeaderCourses(store.currentUser || '')
+  }
   if (isMentor.value) {
     const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')
     return store.courses.filter((c) => mentorCourseIds.includes(c.id))

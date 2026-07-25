@@ -448,21 +448,26 @@ import {
   EvalTypeLabels, EvalTypeColors,
   EvalFrequencyLabels, EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, EvaluationConfig } from '@/types'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, EvaluationConfig, Course } from '@/types'
 
 
 const router = useRouter()
 const store = useAppStore()
 
 const isMentor = computed(() => store.currentRole === 'mentor')
+const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
 
 const searchQuery = ref('')
 
 const sortedAndFilteredCourses = computed(() => {
-  let list = store.courses.filter((c) => c.teacher === store.currentUser)
-  if (isMentor.value) {
+  let list: Course[]
+  if (isLeaderWithTeaching.value) {
+    list = store.getLeaderCourses(store.currentUser || '')
+  } else if (isMentor.value) {
     const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')
     list = store.courses.filter((c) => mentorCourseIds.includes(c.id))
+  } else {
+    list = store.courses.filter((c) => c.teacher === store.currentUser)
   }
   // 按名称搜索
   const q = searchQuery.value.trim().toLowerCase()
@@ -478,6 +483,9 @@ const sortedAndFilteredCourses = computed(() => {
 })
 
 const myCourses = computed(() => {
+  if (isLeaderWithTeaching.value) {
+    return store.getLeaderCourses(store.currentUser || '')
+  }
   return store.courses.filter((c) => c.teacher === store.currentUser)
 })
 

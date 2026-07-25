@@ -131,9 +131,15 @@ const weekNumber = computed(() => {
   return Math.ceil(((s.getTime() - y.getTime()) / 86400000 + y.getDay() + 1) / 7)
 })
 
+const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
+
 // ---- 课表数据 ----
-/** 根据角色获取当前用户的课程安排：教师按 teacher 字段，导师按 mentor 的 courseIds */
+/** 根据角色获取当前用户的课程安排：教师按 teacher 字段，导师按 mentor 的 courseIds，有教学权限的院长按课程分类 */
 const userSchedules = computed(() => {
+  if (isLeaderWithTeaching.value) {
+    const leaderCourseIds = store.getLeaderCourses(store.currentUser || '').map((c) => c.id)
+    return store.schedules.filter((s) => leaderCourseIds.includes(s.courseId))
+  }
   if (store.currentRole === 'teacher') {
     return store.schedules.filter((s) => s.teacher === store.currentUser)
   }

@@ -27,7 +27,10 @@ import {
   todoItems as mockTodos,
   cloudFiles as mockCloudFiles,
   homework as mockHomework,
-  homeworkSubmissions as mockHomeworkSubmissions
+  homeworkSubmissions as mockHomeworkSubmissions,
+  examScores as mockExamScores,
+  supplementaryGrades as mockSupplementaryGrades,
+  supplementaryAll
 } from '@/data/mockData'
 
 type UserRole = 'admin' | 'teacher' | 'student' | 'mentor' | 'leader' | null
@@ -54,22 +57,22 @@ export const useAppStore = defineStore('app', () => {
   const courses = ref<Course[]>(loadFromStorage('courses', mockCourses))
   const categories = ref<Category[]>(loadFromStorage('categories', mockCategories))
   const students = ref<Student[]>(loadFromStorage('students', mockStudents))
-  const schedules = ref<Schedule[]>(loadFromStorage('schedules', mockSchedules))
-  const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', mockEnrollments))
+  const schedules = ref<Schedule[]>(loadFromStorage('schedules', [...mockSchedules, ...supplementaryAll.supplementarySchedules]))
+  const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', [...mockEnrollments, ...supplementaryAll.supplementaryEnrollments]))
   const teachers = ref<Teacher[]>(loadFromStorage('teachers', mockTeachers))
-  const grades = ref<Grade[]>(loadFromStorage('grades', mockGrades))
-  const cloudFiles = ref<CloudFile[]>(loadFromStorage<CloudFile[]>('cloudFiles', mockCloudFiles))
-  const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', mockTodos))
-  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', mockOnlineDocs))
-  const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', mockNotes))
-  const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', mockEvaluations))
+  const grades = ref<Grade[]>(loadFromStorage('grades', [...mockGrades, ...mockSupplementaryGrades]))
+  const cloudFiles = ref<CloudFile[]>(loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles]))
+  const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', [...mockTodos, ...supplementaryAll.supplementaryTodos]))
+  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', [...mockOnlineDocs, ...supplementaryAll.supplementaryOnlineDocs]))
+  const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', [...mockNotes, ...supplementaryAll.supplementaryNotes]))
+  const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', [...mockEvaluations, ...supplementaryAll.supplementaryEvaluations]))
   const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', mockEvalConfigs))
-  const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', mockStudentGroups))
-  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', []))
+  const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', [...mockStudentGroups, ...supplementaryAll.supplementaryStudentGroups]))
+  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', supplementaryAll.supplementaryEvalReminders))
   const gradeConfigs = ref<Record<string, GradeWeightConfig>>(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {}))
-  const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', mockDetailedGrades))
-  const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', mockHomework))
-  const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', mockHomeworkSubmissions))
+  const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', [...mockDetailedGrades, ...supplementaryAll.supplementaryDetailedGrades]))
+  const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', [...mockHomework, ...supplementaryAll.supplementaryHomework]))
+  const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', [...mockHomeworkSubmissions, ...supplementaryAll.supplementaryHomeworkSubmissions]))
   const isLoggedIn = ref<boolean>(loadFromStorage<boolean>('isLoggedIn', false))
   const currentUser = ref<string | null>(loadFromStorage<string | null>('currentUser', null))
   const currentRole = ref<UserRole>(loadFromStorage<UserRole>('currentRole', null))
@@ -89,7 +92,7 @@ export const useAppStore = defineStore('app', () => {
 
   // 考试/项目成绩
   const examScores = ref<import('@/types').ExamScore[]>(
-    loadFromStorage<import('@/types').ExamScore[]>('examScores', [])
+    loadFromStorage<import('@/types').ExamScore[]>('examScores', mockExamScores)
   )
 
   // 考试/项目权重配置 (courseId → examName → weight)
@@ -1285,7 +1288,14 @@ export const useAppStore = defineStore('app', () => {
     const mentor = mentors.value.find((m) => m.name === mentorName)
     if (mentor) return mentor.courseIds
     // 也检查课程 mentor 字段
-    return courses.value.filter((c) => c.mentor === mentorName).map((c) => c.id)
+    const byMentorField = courses.value.filter((c) => c.mentor === mentorName).map((c) => c.id)
+    if (byMentorField.length > 0) return byMentorField
+    // 如果是领导以 asMentor 身份访问，按分类获取课程
+    const leader = leaders.value.find((l) => l.name === mentorName)
+    if (leader?.asMentor) {
+      return courses.value.filter((c) => leader.categoryIds.includes(c.categoryId)).map((c) => c.id)
+    }
+    return []
   }
 
   // ====== 学院领导相关 ======
