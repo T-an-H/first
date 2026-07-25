@@ -609,9 +609,9 @@
                         <td class="py-2 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
                         <td class="py-2 px-3">
                           <div v-if="!isExamSubmitted(student!.id)" class="flex items-center gap-1">
-                            <input type="number" min="0" :max="currentExamFullScore"
+                            <input type="number" min="0" :max="currentExamFullScore" step="0.5"
                               :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
-                              @input="(e) => { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(currentExamFullScore, Math.max(0, v)); else delete examInputs[student!.id] }"
+                              @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(currentExamFullScore, Math.max(0, v)); else delete examInputs[student!.id] }"
                               :placeholder="getStudentExamScore(student!.id) !== null ? String(getStudentExamScore(student!.id)) : '分数'"
                               class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                             <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
@@ -709,7 +709,7 @@
       <div v-if="classBlocks.length > 0" class="flex flex-nowrap gap-5 overflow-x-auto pb-2" style="scrollbar-width: thin;">
         <div
           v-for="(classData, clsIdx) in classBlocks" :key="clsIdx"
-          class="flex-1 min-w-[320px] bg-white rounded-xl border border-gray-100 shadow-sm p-5"
+          class="flex-1 min-w-[320px] bg-white rounded-xl border border-gray-100 shadow-sm p-5 group"
         >
           <!-- 班级标题 + 人数 + 操作 -->
           <div class="flex items-center justify-between mb-4">
@@ -718,6 +718,14 @@
               {{ classData.className || '未分班' }}
               <span class="text-xs text-gray-400 font-normal">（{{ classData.students.length }}人）</span>
             </h3>
+            <div v-if="classData.className" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button @click.stop="openEditClassModal(classData.className)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="编辑班级">
+                <Pencil class="w-3.5 h-3.5" />
+              </button>
+              <button @click.stop="handleDeleteClass(classData.className)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="删除班级">
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <!-- 该班级的分组列表 -->
@@ -756,7 +764,10 @@
           <div v-else class="border border-dashed border-gray-200 rounded-lg p-6 text-center">
             <Users class="w-8 h-8 mx-auto mb-2 text-gray-200" />
             <p class="text-xs text-gray-400">该班级暂无分组</p>
-            <p class="text-[10px] text-gray-300 mt-1">使用顶部"新建分组"或"一键分组"</p>
+            <button @click="openNewGroupForClass(classData.className)"
+              class="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+              <Plus class="w-3 h-3" />新建分组
+            </button>
           </div>
         </div>
       </div>
@@ -890,6 +901,31 @@
         </div>
       </Teleport>
 
+      <!-- ====== 编辑班级弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showEditClassModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showEditClassModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-gray-900 text-lg">编辑班级</h3>
+              <button @click="showEditClassModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">班级名称</label>
+                <input v-model="editClassName" placeholder="输入班级名称"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-400 outline-none" />
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="showEditClassModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="handleSaveEditClass" :disabled="!editClassName.trim()"
+                  class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
       <!-- ====== 新建/编辑分组弹窗（选班级 + 选成员） ====== -->
       <Teleport to="body">
         <div v-if="showGroupModal" class="fixed inset-0 z-50 flex items-center justify-center">
@@ -987,7 +1023,7 @@ import {
   EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
-import { AlertTriangle, ChevronRight, Search, X } from 'lucide-vue-next'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -1082,6 +1118,35 @@ function saveAddClass() {
   addClassForm.value = { className: '', studentIds: [] }
   showAddClass.value = false
   alert(`已创建班级"${className}"，并分配了 ${assignedCount} 名学生`)
+}
+// 编辑班级
+const showEditClassModal = ref(false)
+const editingOldClassName = ref('')
+const editClassName = ref('')
+function openEditClassModal(className: string) {
+  editingOldClassName.value = className
+  editClassName.value = className
+  showEditClassModal.value = true
+}
+function handleSaveEditClass() {
+  if (!editingOldClassName.value || !editClassName.value.trim()) return
+  const newName = editClassName.value.trim()
+  // 更新该班级所有学生的 className
+  for (const stu of store.students) {
+    if (stu.className === editingOldClassName.value) {
+      store.updateStudent(stu.id, { className: newName })
+    }
+  }
+  showEditClassModal.value = false
+  alert(`班级"${editingOldClassName.value}"已重命名为"${newName}"`)
+}
+function handleDeleteClass(className: string) {
+  if (!confirm(`确定删除班级"${className}"？该操作只会清空学生的班级信息，不会删除学生。`)) return
+  for (const stu of store.students) {
+    if (stu.className === className) {
+      store.updateStudent(stu.id, { className: '' })
+    }
+  }
 }
 /** Excel 导入班级信息 */
 async function handleImportClassDetail() {
@@ -1813,6 +1878,7 @@ async function handleDownloadTemplate() {
     const data = enrolledStudents.value.map(({ student }) => ({
       '学生姓名': student!.name,
       '学生学号': student!.id,
+      '班级': student!.className || '',
       [selectedExam.value]: '',
     }))
     const ws = XLSX.utils.json_to_sheet(data)
@@ -1964,7 +2030,10 @@ function getClassStudents(className: string) {
 /** 点击班级内的"新建分组" */
 function openNewGroupForClass(className: string) {
   groupFormClassName.value = className
-  groupFormName.value = ''
+  // 自动建议该班级的下一个组号
+  const existingGroups = getGroupsForClassBlock(className)
+  const nextNum = existingGroups.length + 1
+  groupFormName.value = `第${nextNum}组`
   groupFormMembers.value = []
   editingGroup.value = null
   showGroupModal.value = true
