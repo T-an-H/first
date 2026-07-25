@@ -391,6 +391,11 @@
               <FileSpreadsheet class="w-3.5 h-3.5" />
               下载模板
             </button>
+            <label class="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+              <input type="checkbox" v-model="includeClassInTemplate"
+                class="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              含班级列
+            </label>
           </div>
           <span v-if="isMentor" class="text-xs text-gray-400 italic">导师仅可查看，如需操作请联系授课教师</span>
         </div>
@@ -586,7 +591,7 @@
                       <tr class="bg-gray-50 border-b border-gray-200">
                         <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs">学生</th>
                         <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">满分</th>
-                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">成绩</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-32">成绩</th>
                         <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-24">折合百分制</th>
                         <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">状态</th>
                       </tr>
@@ -613,7 +618,7 @@
                               :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
                               @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(currentExamFullScore, Math.max(0, v)); else delete examInputs[student!.id] }"
                               :placeholder="getStudentExamScore(student!.id) !== null ? String(getStudentExamScore(student!.id)) : '分数'"
-                              class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                              class="w-full max-w-[100px] px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                             <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
                           </div>
                           <span v-else class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
@@ -1210,6 +1215,8 @@ const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_exam' | 'midterm_project' | 'final_exam' | 'final_project' | 'quiz' | 'assignment'>('midterm_exam')
 const selectedExam = ref('')
 const gradeSearch = ref('')
+/** 下载模板时是否包含班级列 */
+const includeClassInTemplate = ref(false)
 const showWeightReminderModal = ref(false)
 const pendingFinalExamSelect = ref('')
 
@@ -1875,12 +1882,17 @@ async function handleDownloadTemplate() {
   }
   try {
     const XLSX = await import('xlsx')
-    const data = enrolledStudents.value.map(({ student }) => ({
-      '学生姓名': student!.name,
-      '学生学号': student!.id,
-      '班级': student!.className || '',
-      [selectedExam.value]: '',
-    }))
+    const data = enrolledStudents.value.map(({ student }) => {
+      const row: Record<string, string | number> = {
+        '学生姓名': student!.name,
+        '学生学号': student!.id,
+        [selectedExam.value]: '',
+      }
+      if (includeClassInTemplate.value) {
+        row['班级'] = student!.className || ''
+      }
+      return row
+    })
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '成绩')
@@ -2628,8 +2640,14 @@ function openEditGroupModal(group: import('@/types').StudentGroup) {
   editingGroup.value = group
   groupFormName.value = group.name
   groupFormMembers.value = [...group.memberIds]
+  // 从成员推断所属班级
+  if (group.memberIds.length > 0) {
+    const firstMember = store.students.find(s => s.id === group.memberIds[0])
+    groupFormClassName.value = firstMember?.className || ''
+  } else {
+    groupFormClassName.value = ''
+  }
   showGroupModal.value = true
-
 }
 
 function handleSaveGroup() {
