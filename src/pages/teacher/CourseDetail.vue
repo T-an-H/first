@@ -1151,15 +1151,16 @@ const sortedCourseSchedules = computed(() =>
 )
 
 const schedulesWithStatus = computed(() => {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
   const sorted = [...courseSchedules.value].sort(
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   )
+  // 以第一节课开课时间作为参考基准，学期前所有课程均显示为"待上课"
+  const referenceDate = sorted.length > 0 ? new Date(sorted[0].startDate) : new Date()
+  referenceDate.setHours(0, 0, 0, 0)
   const completed: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
   const upcoming: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
   sorted.forEach((sch, i) => {
-    if (new Date(sch.endDate) < now) {
+    if (new Date(sch.endDate) < referenceDate) {
       completed.push({ ...sch, isCompleted: true, originalIndex: i })
     } else {
       upcoming.push({ ...sch, isCompleted: false, originalIndex: i })
