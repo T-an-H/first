@@ -12,6 +12,24 @@
         </button>
       </div>
 
+      <!-- ====== Sync Bar ====== -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm text-gray-500">
+          <span>最近一次同步时间：</span>
+          <span class="font-medium text-gray-700">{{ lastSyncTime || '暂无同步记录' }}</span>
+        </div>
+        <button
+          @click="handleSync"
+          :disabled="isSyncing"
+          class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+          :class="isSyncing ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'"
+        >
+          <Loader2 v-if="isSyncing" class="w-4 h-4 animate-spin" />
+          <RefreshCw v-else class="w-4 h-4" />
+          {{ isSyncing ? '同步中...' : '立即同步教务数据' }}
+        </button>
+      </div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
           v-for="cat in store.categories"
@@ -180,13 +198,44 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- ====== Sync Result Modal ====== -->
+    <Teleport to="body">
+      <div v-if="showSyncResult" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="closeSyncResult" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+          <div class="w-14 h-14 mx-auto mb-4 rounded-full bg-green-50 flex items-center justify-center">
+            <CheckCircle class="w-7 h-7 text-green-500" />
+          </div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-1">同步完成</h3>
+          <p class="text-xs text-gray-400 mb-5">{{ lastSyncTime }}</p>
+          <div class="bg-gray-50 rounded-lg p-4 space-y-2 text-sm mb-5">
+            <div class="flex justify-between">
+              <span class="text-gray-500">新增</span>
+              <span class="font-medium text-green-600">+{{ syncResult.added }} 条</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">更新</span>
+              <span class="font-medium text-blue-600">{{ syncResult.updated }} 条</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-500">失败</span>
+              <span class="font-medium text-red-500">{{ syncResult.failed }} 条</span>
+            </div>
+          </div>
+          <button @click="closeSyncResult" class="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">
+            知道了
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2 } from 'lucide-vue-next'
+import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2, RefreshCw, Loader2, CheckCircle } from 'lucide-vue-next'
 import type { Category, Course } from '@/types'
 
 const store = useAppStore()
@@ -216,6 +265,49 @@ const filteredCourses = computed(() => {
 })
 
 const getCourseCount = (catId: string) => store.courses.filter((c) => c.categoryId === catId).length
+
+// ====== Sync state ======
+/*
+ * 【真实业务同步规则 - 后端实现参考】
+ * 1. 后端请求第三方教务系统获取学生、教师信息；
+ * 2. 使用学号作为学生唯一匹配键，教工号作为教师唯一匹配键；
+ * 3. 数据库不存在对应人员则自动新增账号；已存在相同编号人员则更新信息；
+ * 4. 缺失学号/教工号、字段格式异常的数据判定为失败数据，不予入库；
+ * 5. 常态依靠后端定时任务自动同步，该按钮仅作为管理员应急手动触发入口。
+ */
+const isSyncing = ref(false)
+const showSyncResult = ref(false)
+const syncResult = ref({ added: 0, updated: 0, failed: 0 })
+const lastSyncTime = ref(localStorage.getItem('lastSyncTime') || '')
+
+function formatNow(): string {
+  const d = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+function handleSync() {
+  if (isSyncing.value) return
+  isSyncing.value = true
+
+  // Simulate 1.2s request delay
+  setTimeout(() => {
+    // Generate mock result
+    syncResult.value = {
+      added: Math.floor(Math.random() * 8) + 3,
+      updated: Math.floor(Math.random() * 10) + 5,
+      failed: Math.floor(Math.random() * 3),
+    }
+    isSyncing.value = false
+    showSyncResult.value = true
+  }, 1200)
+}
+
+function closeSyncResult() {
+  showSyncResult.value = false
+  lastSyncTime.value = formatNow()
+  localStorage.setItem('lastSyncTime', lastSyncTime.value)
+}
 
 // ====== Category actions ======
 function selectCategory(cat: Category) {
