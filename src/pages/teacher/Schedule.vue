@@ -56,11 +56,19 @@
                 <div class="text-[9px] text-gray-300 mt-0.5">{{ slot.periodLabel }}</div>
               </td>
               <td v-for="day in weekDays" :key="day.label"
-                class="p-1 border-r border-b border-brand-400/20 last:border-r-0 align-top"
+                class="p-1 border-r border-b border-brand-400/20 last:border-r-0 align-top relative"
                 :style="{ background: getDayCellBg(day.date, slot) }">
+                <!-- 冲突警示条 -->
+                <div v-if="hasCellConflict(getCards(day.date, slot))"
+                  class="absolute inset-x-0 top-0 h-1 bg-red-500 rounded-t-sm" />
                 <div v-for="card in getCards(day.date, slot)" :key="card.id"
-                  class="rounded-lg px-2.5 py-2 text-[11px] leading-tight cursor-pointer transition-all duration-150 border hover:shadow-md"
+                  class="rounded-lg px-2.5 py-2 text-[11px] leading-tight cursor-pointer transition-all duration-150 border hover:shadow-md relative"
+                  :class="hasCellConflict(getCards(day.date, slot)) ? 'ring-1 ring-red-300' : ''"
                   :style="{ background: card.cardBg, borderColor: card.border }">
+                  <!-- 冲突标记 -->
+                  <span v-if="hasCellConflict(getCards(day.date, slot))"
+                    class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-sm"
+                    style="line-height: 16px">!</span>
                   <p class="font-semibold truncate text-[12px]" :style="{ color: card.text }">{{ card.courseName }}</p>
                   <p class="text-[10px] mt-0.5 font-medium" :style="{ color: card.text, opacity: 0.75 }">{{ card.teacher }}</p>
                   <p class="text-[9px] mt-0.5" :style="{ color: card.text, opacity: 0.55 }">{{ card.room }} · {{ card.timeSlot }}</p>
@@ -242,6 +250,21 @@ function getSlotHour(t: string): number {
   return parseInt(t.split(':')[0], 10)
 }
 
+/** 判断两个时间段是否有重叠 */
+function timesOverlap(a: string, b: string): boolean {
+  const parse = (t: string) => t.split('-').map(s => { const [h, m] = s.split(':').map(Number); return h * 60 + m })
+  const [a1, a2] = parse(a)
+  const [b1, b2] = parse(b)
+  return a1 < b2 && b1 < a2
+}
+
+/** 检测某格内是否有排课冲突（时间重叠） */
+function hasCellConflict(cards: CardItem[]): boolean {
+  return cards.length > 1 && cards.some((c1, i) =>
+    cards.slice(i + 1).some(c2 => timesOverlap(c1.timeSlot, c2.timeSlot))
+  )
+}
+
 function getCards(day: Date, slot: ParsedSlot): CardItem[] {
   const dayOfWeek = day.getDay() === 0 ? 6 : day.getDay() - 1
   const slotHour = parseInt(slot.key.split(':')[0], 10)
@@ -267,6 +290,7 @@ function getCards(day: Date, slot: ParsedSlot): CardItem[] {
 
 function getDayCellBg(day: Date, slot: ParsedSlot): string {
   const cards = getCards(day, slot)
+  if (hasCellConflict(cards)) return '#fef2f2'
   return cards.length > 0 ? cards[0].cellBg : '#ffffff'
 }
 

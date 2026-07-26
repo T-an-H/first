@@ -34,6 +34,8 @@ const getProgress = (courseId: string) => {
 }
 
 const getRegularScore = (courseId: string) => {
+  // 课程未开课时不展示评价成绩
+  if (!store.isFirstClassStarted(courseId)) return 0
   const detail = store.detailedGrades.find((d) => d.studentId === student.value?.id && d.courseId === courseId)
   if (!detail) return 0
   const cfg = store.gradeConfigs[courseId]

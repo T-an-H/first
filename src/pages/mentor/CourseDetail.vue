@@ -78,6 +78,8 @@ function getSubmittedScore(studentId: string): number | string {
 
 function handleSubmitEval(studentId: string) {
   if (!courseId.value) return
+  // 评价轮次未到开启时间不允许提交
+  if (!store.isSessionTime(courseId.value, 1)) return
   const score = scoreInputs.value[studentId]
   if (score === undefined || score === null || score < 0 || score > 100) return
 
@@ -209,11 +211,14 @@ function renderCourseDetail(root: HTMLElement) {
     const evalHeader = evalDiv.append('div').attr('class', 'flex items-center gap-2 mb-4')
     renderIcon(evalHeader, 'clipboardCheck').attr('class', 'w-5 h-5 text-gray-400')
     evalHeader.append('h2').attr('class', 'font-semibold text-gray-900').text('企业导师评价')
-    evalHeader.append('span').attr('class', 'text-xs text-gray-400').text(`${students.length}名学生`)
 
-    if (students.length === 0) {
+    // 第一节课尚未开始时不展示评价
+    if (courseId.value && !store.isSessionTime(courseId.value, 1)) {
+      evalDiv.append('div').attr('class', 'text-center py-8 text-gray-400').text('第一节课尚未开始，评价暂未开放')
+    } else if (students.length === 0) {
       evalDiv.append('div').attr('class', 'text-center py-8 text-gray-400').text('该课程暂无学生')
     } else {
+      evalHeader.append('span').attr('class', 'text-xs text-gray-400').text(`${students.length}名学生`)
       const tableWrapper = evalDiv.append('div').attr('class', 'overflow-x-auto')
       const table = tableWrapper.append('table').attr('class', 'w-full text-sm')
 

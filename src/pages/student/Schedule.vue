@@ -152,6 +152,14 @@ function getSlotHour(t: string): number {
   return parseInt(t.split(':')[0], 10)
 }
 
+/** 判断两个时间段（如 "09:00-11:00" 与 "09:00-10:30"）是否有重叠 */
+function timesOverlap(a: string, b: string): boolean {
+  const parse = (t: string) => t.split('-').map(s => { const [h, m] = s.split(':').map(Number); return h * 60 + m })
+  const [a1, a2] = parse(a)
+  const [b1, b2] = parse(b)
+  return a1 < b2 && b1 < a2
+}
+
 function getCards(day: Date, slot: ParsedSlot): CardItem[] {
   const dayOfWeek = day.getDay() === 0 ? 6 : day.getDay() - 1
   const slotHour = parseInt(slot.key.split(':')[0], 10)
@@ -271,15 +279,33 @@ function renderSchedule(root: HTMLElement) {
 
     days.forEach((day) => {
       const dayCards = getCards(day.date, slot)
+      // 检测同一格内是否有时间重叠的课程（即排课冲突）
+      const hasConflict = dayCards.length > 1 && dayCards.some((c1, i) =>
+        dayCards.slice(i + 1).some(c2 => timesOverlap(c1.timeSlot, c2.timeSlot))
+      )
       const td = row.append('td')
-        .attr('class', 'p-1.5 border-r border-b border-gray-200 last:border-r-0 align-top')
-        .style('background', dayCards.length > 0 ? dayCards[0].cellBg : '#ffffff')
+        .attr('class', 'p-1.5 border-r border-b border-gray-200 last:border-r-0 align-top relative')
+        .style('background', hasConflict ? '#fef2f2' : (dayCards.length > 0 ? dayCards[0].cellBg : '#ffffff'))
+
+      // 冲突警示条
+      if (hasConflict) {
+        td.append('div')
+          .attr('class', 'absolute inset-x-0 top-0 h-1 bg-red-500 rounded-t-sm')
+      }
 
       dayCards.forEach((card) => {
         const cardDiv = td.append('div')
-          .attr('class', 'relative rounded-lg px-3 py-2.5 text-[11px] leading-tight cursor-pointer transition-all duration-150 border hover:shadow-md hover:-translate-y-0.5')
+          .attr('class', `relative rounded-lg px-3 py-2.5 text-[11px] leading-tight cursor-pointer transition-all duration-150 border hover:shadow-md hover:-translate-y-0.5 ${hasConflict ? 'ring-1 ring-red-300' : ''}`)
           .style('background', card.cardBg)
           .style('border-color', card.border)
+
+        // 冲突标记
+        if (hasConflict) {
+          cardDiv.append('span')
+            .attr('class', 'absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center shadow-sm')
+            .style('line-height', '16px')
+            .text('!')
+        }
 
         // 课程名称
         cardDiv.append('p')

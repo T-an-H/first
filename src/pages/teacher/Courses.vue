@@ -802,6 +802,8 @@ const LEVEL_OPTIONS = [
 
 async function handleBatchEval(type: string, levelLabel: string) {
   if (!selectedCourseId.value) return
+  // 评价轮次未到开启时间不允许批量评价
+  if (!store.isSessionTime(selectedCourseId.value, 1)) return
   const level = LEVEL_OPTIONS.find((l) => l.label === levelLabel)
   if (!level) return
   const score = Math.round((level.range[0] + level.range[1]) / 2)
@@ -830,6 +832,8 @@ async function handleBatchEval(type: string, levelLabel: string) {
 }
 
 function getScoreClass(studentId: string, sessionNum: number, type: string) {
+  // 评价轮次未到开启时间不展示样式
+  if (selectedCourseId.value && !store.isSessionTime(selectedCourseId.value, sessionNum)) return 'text-gray-400/60'
   const ev = store.evaluations.find(
     (e) => e.courseId === selectedCourseId.value && e.studentId === studentId && e.sessionNumber === sessionNum && e.type === type
   )
@@ -842,6 +846,8 @@ function getScoreClass(studentId: string, sessionNum: number, type: string) {
 }
 
 function getScoreDisplay(studentId: string, sessionNum: number, type: string) {
+  // 评价轮次未到开启时间不展示成绩
+  if (selectedCourseId.value && !store.isSessionTime(selectedCourseId.value, sessionNum)) return '-'
   const ev = store.evaluations.find(
     (e) => e.courseId === selectedCourseId.value && e.studentId === studentId && e.sessionNumber === sessionNum && e.type === type
   )
@@ -850,6 +856,8 @@ function getScoreDisplay(studentId: string, sessionNum: number, type: string) {
 
 function showAnomalyIcon(studentId: string, sessionNum: number, type: string) {
   if (!selectedCourseId.value) return false
+  // 评价轮次未到开启时间不展示异常图标
+  if (!store.isSessionTime(selectedCourseId.value, sessionNum)) return false
   const anomaly = store.detectAnomalies(selectedCourseId.value, sessionNum)
     .find((a) => a.studentId === studentId && a.type === type)
   return !!anomaly

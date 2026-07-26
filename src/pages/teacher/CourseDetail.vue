@@ -239,7 +239,7 @@
         </div>
         <div v-else-if="!isSessionTime(selectedBatchSession)" class="flex items-center gap-2 px-3 py-2 mb-3 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-700">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <span>{{ selectedBatchSession === 1 ? '第一节课已开始，评价已开启' : '该轮次尚未到开启时间' }}</span>
+          <span>{{ selectedBatchSession === 1 ? '第一节课尚未开始，评价暂未开启' : '该轮次尚未到开启时间' }}</span>
         </div>
         <div v-else-if="isFinalSessionExpired" class="flex items-center gap-2 px-3 py-2 mb-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-500">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
@@ -315,8 +315,8 @@
                       <tr class="bg-gray-50 border-b border-gray-200">
                         <th class="w-10 py-2 px-2">
                           <input type="checkbox"
-                            :checked="isAllSelected"
-                            @change="toggleAll"
+                            :checked="isAllSelected(gi)"
+                            @change="toggleAll(gi)"
                             class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                         </th>
                         <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs">学生</th>
@@ -1418,6 +1418,15 @@ const evalTableSections = computed(() => {
   }
 
   function buildRow(student: typeof filtered[number]) {
+    // 评价轮次未到开启时间不展示数据
+    if (courseId.value && !store.isSessionTime(courseId.value, session)) {
+      return {
+        student,
+        selfScore: null, intraScore: null, interScore: null,
+        teacherScore: null, mentorScore: null,
+        submitted: false, hasDraft: false, finalScore: '-',
+      }
+    }
     const evals = store.evaluations.filter(
       (e) => e.courseId === courseId.value && e.studentId === student.id && e.sessionNumber === session
     )
@@ -1513,12 +1522,14 @@ const filteredEvalTableSections = computed(() => {
 
 const hasEvalInputs = computed(() => Object.keys(evalScoreInputs.value).length > 0)
 
-const isAllSelected = computed(() => {
-  const all = currentEvalClassSection.value
-    ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
-    : []
+function isAllSelected(groupIdx?: number): boolean {
+  const section = currentEvalClassSection.value
+  if (!section) return false
+  const all = groupIdx !== undefined
+    ? (section.groups[groupIdx]?.students.filter(s => !s.submitted).map(s => s.student.id) ?? [])
+    : section.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
   return all.length > 0 && all.every(id => selectedStudentIds.value.includes(id))
-})
+}
 
 // ---- 成绩管理 computed ----
 const examNames = computed(() => {
@@ -2306,10 +2317,19 @@ function getStudentEvals(studentId: string, sessionNumber?: number, type?: EvalT
 }
 
 function getStudentEvalCount(studentId: string): number {
-  return store.evaluations.filter((e) => e.courseId === courseId.value && e.studentId === studentId && e.type === 'self').length
+  // 只统计已开始轮次的评价
+  if (!courseId.value) return 0
+  const totalSessions = store.getEvalSessions(courseId.value)
+  let count = 0
+  for (let s = 1; s <= totalSessions; s++) {
+    if (!store.isSessionTime(courseId.value, s)) continue
+    count += store.evaluations.filter((e) => e.courseId === courseId.value && e.studentId === studentId && e.type === 'self' && e.sessionNumber === s).length
+  }
+  return count
 }
 
 function getAvgScore(studentId: string, sessionNumber: number, type: EvalType): number | null {
+  if (courseId.value && !store.isSessionTime(courseId.value, sessionNumber)) return null
   const evals = getStudentEvals(studentId, sessionNumber, type)
   if (evals.length === 0) return null
   return Math.round(evals.reduce((a, e) => a + e.score, 0) / evals.length)
@@ -2468,11 +2488,13 @@ function handleSubmitAll() {
 
 }
 
-const toggleAll = () => {
-  const all = currentEvalClassSection.value
-    ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
-    : []
-  if (isAllSelected.value) {
+const toggleAll = (groupIdx?: number) => {
+  const section = currentEvalClassSection.value
+  if (!section) return
+  const all = groupIdx !== undefined
+    ? (section.groups[groupIdx]?.students.filter(s => !s.submitted).map(s => s.student.id) ?? [])
+    : section.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
+  if (isAllSelected(groupIdx)) {
     selectedStudentIds.value = selectedStudentIds.value.filter(id => !all.includes(id))
   } else {
     all.forEach(id => { if (!selectedStudentIds.value.includes(id)) selectedStudentIds.value.push(id) })

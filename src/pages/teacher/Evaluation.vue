@@ -350,6 +350,8 @@ const handleSetConfig = (updates: Partial<import('@/types').EvaluationConfig>) =
 
 const handleBatchEval = (type: EvalType, level: string) => {
   if (!selectedCourse.value) return
+  // 评价轮次未到开启时间不允许批量评价
+  if (!store.isSessionTime(selectedCourse.value, 1)) return
   const range = LEVEL_OPTIONS.find((o) => o.label === level)?.range
   if (!range) return
   const score = Math.round((range[0] + range[1]) / 2)
@@ -392,7 +394,17 @@ const handleProcessOverdue = () => {
   }
 }
 
+const getScoreDisplay = (studentId: string, sessionNumber: number, type: EvalType) => {
+  // 评价轮次未到开启时间不展示成绩
+  if (selectedCourse.value && !store.isSessionTime(selectedCourse.value, sessionNumber)) return '-'
+  const evals = getStudentEvals(studentId, sessionNumber, type)
+  const avgScore = evals.length > 0 ? Math.round(evals.reduce((a, e) => a + e.score, 0) / evals.length) : null
+  return avgScore !== null ? `${avgScore}分` : '-'
+}
+
 const getScoreClass = (studentId: string, sessionNumber: number, type: EvalType) => {
+  // 评价轮次未到开启时间不展示样式
+  if (selectedCourse.value && !store.isSessionTime(selectedCourse.value, sessionNumber)) return 'text-gray-400/60'
   const evals = getStudentEvals(studentId, sessionNumber, type)
   const avgScore = evals.length > 0 ? Math.round(evals.reduce((a, e) => a + e.score, 0) / evals.length) : null
   const isSelf = type === 'self'
@@ -407,13 +419,9 @@ const getScoreClass = (studentId: string, sessionNumber: number, type: EvalType)
   return 'text-gray-400/60'
 }
 
-const getScoreDisplay = (studentId: string, sessionNumber: number, type: EvalType) => {
-  const evals = getStudentEvals(studentId, sessionNumber, type)
-  const avgScore = evals.length > 0 ? Math.round(evals.reduce((a, e) => a + e.score, 0) / evals.length) : null
-  return avgScore !== null ? `${avgScore}分` : '-'
-}
-
 const showAnomalyIcon = (studentId: string, sessionNumber: number, type: EvalType) => {
+  // 评价轮次未到开启时间不展示异常图标
+  if (selectedCourse.value && !store.isSessionTime(selectedCourse.value, sessionNumber)) return false
   if (type !== 'self') return false
   const evals = getStudentEvals(studentId, sessionNumber, type)
   const avgScore = evals.length > 0 ? Math.round(evals.reduce((a, e) => a + e.score, 0) / evals.length) : null

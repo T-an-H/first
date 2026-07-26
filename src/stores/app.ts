@@ -116,6 +116,11 @@ export const useAppStore = defineStore('app', () => {
     loadFromStorage<Record<string, StudentTierRecord>>('studentTiers', {})
   )
 
+  // 全局模拟参考日期（用于前端时间模拟，为空时按课程课表第一节课开课时间计算）
+  const effectiveReferenceDate = ref<string>(
+    loadFromStorage<string>('effectiveReferenceDate', '2026-06-24')
+  )
+
   // ====== Actions ======
 
   function login(username: string, role: UserRole) {
@@ -699,8 +704,8 @@ export const useAppStore = defineStore('app', () => {
 
   /**
    * 判断某评价轮次是否已到开启时间
-   * 第1次评价从第一节课上课就开启
-   * 第k次评价从该轮次对应第一节课上课时开启
+   * 第1次评价从第一节课上课后开启
+   * 第k次评价从该轮次对应第一节课上课后开启
    */
   function isSessionTime(courseId: string, sessionNumber: number): boolean {
     const totalSessions = getEvalSessions(courseId)
@@ -711,15 +716,17 @@ export const useAppStore = defineStore('app', () => {
 
     if (courseSchedules.length === 0) return true
 
-    // 第1次评价从第一节课上课就开启
+    const ref = getCourseReferenceDate(courseId)
+
+    // 第1次评价从第一节课上课后开启
     if (sessionNumber === 1) {
-      return new Date() >= new Date(courseSchedules[0].startDate)
+      return ref > new Date(courseSchedules[0].startDate)
     }
 
-    // 其他轮次：从对应轮次第一节课上课开始
+    // 其他轮次：从对应轮次第一节课上课后开始
     const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions)
     if (!range) return true
-    return new Date() >= new Date(courseSchedules[range.startIdx].startDate)
+    return ref > new Date(courseSchedules[range.startIdx].startDate)
   }
 
   /**
@@ -733,10 +740,12 @@ export const useAppStore = defineStore('app', () => {
 
     if (courseSchedules.length === 0) return false
 
+    const ref = getCourseReferenceDate(courseId)
+
     // 最终评价截止时间：最后一节课结束时间 + 3天
     const lastEndDate = new Date(courseSchedules[courseSchedules.length - 1].endDate)
     lastEndDate.setDate(lastEndDate.getDate() + 3)
-    return new Date() > lastEndDate
+    return ref > lastEndDate
   }
 
   /**
@@ -1134,12 +1143,13 @@ export const useAppStore = defineStore('app', () => {
     const courseSchedules = schedules.value
       .filter((s) => s.courseId === courseId)
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    const now = new Date()
     const totalSchedules = courseSchedules.length
     if (totalSchedules === 0) return
 
-    // 已开始的课程数（startDate < now）
-    const startedSchedules = courseSchedules.filter((s) => new Date(s.startDate) < now).length
+    // 以统一参考日期计算已上课数
+    const ref = getCourseReferenceDate(courseId)
+    // 已开始的课程数（startDate < ref）
+    const startedSchedules = courseSchedules.filter((s) => new Date(s.startDate) < ref).length
     // 进度 = 已上课数 / 总课数（百分比）
     const newProgress = Math.round((startedSchedules / totalSchedules) * 100)
 
@@ -1194,12 +1204,38 @@ export const useAppStore = defineStore('app', () => {
   // ====== 配置提醒 ======
 
   /** 第一节课是否已经开始（配置锁定期） */
+  /**
+   * 获取课程时间参考基准（以第一节课开课时间作为参考点）
+   * 使所有时间判定与"学期前第一节课开始前"视图一致
+   */
+  function getCourseReferenceDate(courseId: string): Date {
+    // 优先使用全局模拟参考日期
+    if (effectiveReferenceDate.value) {
+      const ref = new Date(effectiveReferenceDate.value)
+      ref.setHours(0, 0, 0, 0)
+      return ref
+    }
+    const courseSchedules = schedules.value
+      .filter((s) => s.courseId === courseId)
+      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    const ref = courseSchedules.length > 0 ? new Date(courseSchedules[0].startDate) : new Date()
+    ref.setHours(0, 0, 0, 0)
+    return ref
+  }
+
+  /** 设置全局模拟参考日期 */
+  function setEffectiveReferenceDate(dateStr: string) {
+    effectiveReferenceDate.value = dateStr
+    saveToStorage('effectiveReferenceDate', dateStr)
+  }
+
   function isFirstClassStarted(courseId: string): boolean {
     const courseSchedules = schedules.value
       .filter((s) => s.courseId === courseId)
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     if (courseSchedules.length === 0) return false
-    return new Date() >= new Date(courseSchedules[0].endDate)
+    const ref = getCourseReferenceDate(courseId)
+    return ref >= new Date(courseSchedules[0].endDate)
   }
 
   /** 第二节课是否已经开始（AI 分层测试截止点） */
@@ -1209,7 +1245,8 @@ export const useAppStore = defineStore('app', () => {
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     // 有至少两节课才判定第二节课开始
     if (courseSchedules.length < 2) return false
-    return new Date() >= new Date(courseSchedules[1].startDate)
+    const ref = getCourseReferenceDate(courseId)
+    return ref >= new Date(courseSchedules[1].startDate)
   }
 
   /** 获取某学生所有未完成的 AI 分层测试（测试窗口已开但未超时） */
@@ -1398,6 +1435,7 @@ export const useAppStore = defineStore('app', () => {
     generateEvalReminders, pushNearDeadlineEvalReminders, processSessionOverdue,
     markEvalReminderCompleted, markSessionEvalRemindersCompleted,
     isFirstClassStarted, markConfigCompleted, getPendingConfigCourses,
+    setEffectiveReferenceDate,
     checkEvalReminders,
     recalculateProgress,
     saveGradeConfig, getGradeConfig,

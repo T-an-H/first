@@ -167,6 +167,8 @@ interface GradeEntry {
 
 function getDetail(courseId: string): DetailedGrade | undefined {
   if (!student.value) return undefined
+  // 课程未开课时不展示评价成绩
+  if (!store.isFirstClassStarted(courseId)) return undefined
   return store.detailedGrades.find((d) => d.studentId === student.value!.id && d.courseId === courseId)
 }
 

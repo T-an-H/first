@@ -88,6 +88,10 @@ export const schedules: Schedule[] = [
   { id: 'sch-27', courseId: 'course-18', title: 'Docker 容器化部署', startDate: '2026-07-17', endDate: '2026-07-17', timeSlot: '09:00-11:00', room: 'D401', teacher: '郑老师' },
   { id: 'sch-28', courseId: 'course-19', title: '微服务架构设计', startDate: '2026-07-18', endDate: '2026-07-18', timeSlot: '14:00-17:00', room: 'D402', teacher: '郑老师' },
   { id: 'sch-29', courseId: 'course-20', title: '产品经理实战', startDate: '2026-07-19', endDate: '2026-07-19', timeSlot: '09:00-11:00', room: 'B203', teacher: '吴老师' },
+  // 排课冲突演示数据：王老师在周四09:00同时上React和TypeScript
+  { id: 'sch-30', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-06-25', endDate: '2026-06-25', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-31', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-02', endDate: '2026-07-02', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-32', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-09', endDate: '2026-07-09', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
 ];
 
 export const enrollments: Enrollment[] = [

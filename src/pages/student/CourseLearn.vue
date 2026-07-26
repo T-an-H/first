@@ -1109,9 +1109,15 @@ function relationChipClass(relation: string): string {
 }
 
 // ===== 综合评价 =====
-const totalScore = computed(() => myGrade.value?.score ?? null)
+const totalScore = computed(() => {
+  // 课程未开课时不展示成绩
+  if (!store.isFirstClassStarted(courseId)) return null
+  return myGrade.value?.score ?? null
+})
 
 const classAvgScore = computed(() => {
+  // 课程未开课时不展示班级平均分
+  if (!store.isFirstClassStarted(courseId)) return 0
   const courseGrades = store.grades.filter((g) => g.courseId === courseId)
   if (courseGrades.length === 0) return 0
   return Math.round(courseGrades.reduce((s, g) => s + g.score, 0) / courseGrades.length)
@@ -1120,6 +1126,8 @@ const classAvgScore = computed(() => {
 const currentCfg = computed(() => store.getGradeConfig(courseId))
 
 const evalDimensions = computed(() => {
+  // 课程未开课时不展示评价维度
+  if (!store.isFirstClassStarted(courseId)) return []
   const evals = store.evaluations.filter(
     (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
   )

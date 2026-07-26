@@ -25,6 +25,11 @@ const router = createRouter({
           component: () => import('@/pages/admin/Students.vue'),
         },
         {
+          path: 'schedules',
+          name: 'AdminSchedules',
+          component: () => import('@/pages/admin/Schedules.vue'),
+        },
+        {
           path: 'students/:id',
           name: 'AdminStudentDetail',
           component: () => import('@/pages/admin/StudentDetail.vue'),

@@ -44,6 +44,8 @@ const radarData = computed(() => {
       (dg) => dg.studentId === student.value!.id && dg.courseId === enr.courseId
     )
     if (!detailedGrade) continue
+    // 课程未开课时不展示评价成绩
+    if (!store.isFirstClassStarted(enr.courseId)) continue
     const cfg = store.getGradeConfig(enr.courseId)
     const selfEval = detailedGrade.selfEvalScore ?? 0
     const peerReview = detailedGrade.peerReviewScore ?? 0

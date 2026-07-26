@@ -26,7 +26,7 @@
             <span v-else :class="`text-xs px-1.5 py-0.5 rounded-full ${sessionReminders[session]?.status === 'overdue' ? 'bg-brand-600/15 text-brand-600' : sessionReminders[session]?.status === 'pending' ? 'bg-brand-600/15 text-brand-600' : 'text-gray-400'}`">
               {{ sessionReminders[session]?.status === 'overdue' ? '已逾期' : sessionReminders[session]?.status === 'pending' ? '待评价' : '' }}
             </span>
-            <span class="text-xs" :class="sessionState(session).disabled ? 'text-gray-400/60' : 'text-gray-400'">{{ getSessionEvals(session).filter(e => e.record).length }}/{{ enabledTypes.length }} 项已评</span>
+            <span v-if="!sessionState(session).disabled" class="text-xs text-gray-400">{{ getSessionEvals(session).filter(e => e.record).length }}/{{ enabledTypes.length }} 项已评</span>
           </div>
           <div class="flex items-center gap-2">
             <CheckCircle v-if="!sessionState(session).disabled && getSessionEvals(session).filter(e => e.record).length === enabledTypes.length" class="w-3.5 h-3.5 text-brand-600" />
