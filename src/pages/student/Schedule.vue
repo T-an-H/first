@@ -60,7 +60,7 @@ const mySchedules = computed(() => {
   return store.schedules.filter((s) => ids.includes(s.courseId))
 })
 
-// ---- 提取课程的周规律：每门课在每周的哪几天、哪个时间段上课 ----
+// ---- 提取课程的周规律 ----
 interface CoursePattern {
   dayOfWeek: number   // 0=周一, 6=周日
   timeSlot: string
@@ -73,8 +73,8 @@ const coursePatterns = computed(() => {
   const map = new Map<string, CoursePattern[]>()
   mySchedules.value.forEach((s) => {
     const sd = new Date(s.startDate)
-    const day = sd.getDay()       // 0=周日, 1=周一, ..., 6=周六
-    const dow = day === 0 ? 6 : day - 1  // 转为 0=周一, 6=周日
+    const day = sd.getDay()
+    const dow = day === 0 ? 6 : day - 1
     if (!map.has(s.courseId)) map.set(s.courseId, [])
     const list = map.get(s.courseId)!
     if (!list.some(p => p.dayOfWeek === dow && p.timeSlot === s.timeSlot)) {
@@ -84,10 +84,9 @@ const coursePatterns = computed(() => {
   return map
 })
 
-// ---- 标准时间段：覆盖全天（从早自习到晚课） ----
+// ---- 标准时间段 ----
 interface ParsedSlot { key: string; label: string; periodLabel: string }
 
-/** 标准大学课程时间段 */
 const STANDARD_SLOTS: ParsedSlot[] = [
   { key: '08:00', label: '08:00', periodLabel: '上午一' },
   { key: '09:00', label: '09:00', periodLabel: '上午二' },
@@ -103,6 +102,13 @@ const STANDARD_SLOTS: ParsedSlot[] = [
 ]
 
 const timeSlots = computed(() => STANDARD_SLOTS)
+
+// ---- 块状布局参数 ----
+const HOUR_HEIGHT = 56
+const SCHEDULE_START = 8
+const SCHEDULE_END = 21
+
+const totalHeight = computed(() => (SCHEDULE_END - SCHEDULE_START) * HOUR_HEIGHT)
 
 // ---- 配色方案 ----
 interface CourseColor {
@@ -138,7 +144,7 @@ function getCourseColor(courseId: string): CourseColor {
   return courseColorMap.value.get(courseId) ?? PALETTE[0]
 }
 
-// ---- 获取某天某时间段的课程卡片 ----
+// ---- 课程卡片 ----
 interface CardItem extends CourseColor {
   id: string
   courseName: string
@@ -147,22 +153,32 @@ interface CardItem extends CourseColor {
   timeSlot: string
 }
 
-/** 获取课程时间段的起始小时数 */
-function getSlotHour(t: string): number {
-  return parseInt(t.split(':')[0], 10)
+/** 解析时间段 "09:00-11:00" 或 "09:00-10:30" */
+function parseTimeSlotToRange(timeSlot: string): { start: number; end: number; startMin: number; endMin: number } | null {
+  const parts = timeSlot.split('-')
+  if (parts.length !== 2) return null
+  const startParts = parts[0].split(':')
+  const endParts = parts[1].split(':')
+  return {
+    start: parseInt(startParts[0], 10),
+    end: parseInt(endParts[0], 10),
+    startMin: parseInt(startParts[1] || '0', 10),
+    endMin: parseInt(endParts[1] || '0', 10),
+  }
 }
 
-function getCards(day: Date, slot: ParsedSlot): CardItem[] {
+/** 获取某天的所有课程卡片（去重） */
+function getDayCourseCards(day: Date): CardItem[] {
   const dayOfWeek = day.getDay() === 0 ? 6 : day.getDay() - 1
-  const slotHour = parseInt(slot.key.split(':')[0], 10)
   const result: CardItem[] = []
+  const added = new Set<string>()
   coursePatterns.value.forEach((patterns, courseId) => {
-    patterns.forEach((p) => {
-      const courseHour = getSlotHour(p.timeSlot)
-      if (p.dayOfWeek === dayOfWeek && courseHour === slotHour) {
+    for (const p of patterns) {
+      if (p.dayOfWeek === dayOfWeek && !added.has(courseId)) {
+        added.add(courseId)
         const c = getCourseColor(courseId)
         result.push({
-          id: `${courseId}-${p.dayOfWeek}-${slot.key}`,
+          id: `${courseId}-${p.dayOfWeek}`,
           courseName: p.title,
           teacher: p.teacher,
           room: p.room,
@@ -170,16 +186,32 @@ function getCards(day: Date, slot: ParsedSlot): CardItem[] {
           ...c,
         })
       }
-    })
+    }
   })
   return result
 }
 
-const allCards = computed(() => {
-  const r: CardItem[] = []
-  weekDays.value.forEach((d) => timeSlots.value.forEach((s) => r.push(...getCards(d.date, s))))
-  return r
-})
+/** 获取标准时间标签在时间轴上的 top (px) */
+function getTimeLabelTop(slotKey: string): number {
+  const hour = parseInt(slotKey.split(':')[0], 10)
+  return (hour - SCHEDULE_START) * HOUR_HEIGHT
+}
+
+/** 获取课程块在列中的 top (px)，精确到分钟 */
+function getBlockTop(timeSlot: string): number {
+  const r = parseTimeSlotToRange(timeSlot)
+  if (!r) return 0
+  const totalMin = (r.start - SCHEDULE_START) * 60 + r.startMin
+  return totalMin / 60 * HOUR_HEIGHT
+}
+
+/** 获取课程块的高度 (px)，精确到分钟 */
+function getBlockHeight(timeSlot: string): number {
+  const r = parseTimeSlotToRange(timeSlot)
+  if (!r) return 0
+  const durationMin = (r.end - r.start) * 60 + (r.endMin - r.startMin)
+  return Math.max(durationMin / 60 * HOUR_HEIGHT, 24)
+}
 
 // ---- 图例 ----
 const courseColorsMap = computed(() => {
@@ -193,7 +225,7 @@ const courseColorsMap = computed(() => {
   return Array.from(map.values())
 })
 
-// ---- D3 渲染 ----
+// ---- D3 渲染（块状布局） ----
 function reRender() {
   const el = document.getElementById('student-schedule-root')
   if (el) renderSchedule(el)
@@ -204,8 +236,6 @@ function renderSchedule(root: HTMLElement) {
   container.selectAll('*').remove()
 
   const days = weekDays.value
-  const slots = timeSlots.value
-  const cards = allCards.value
   const legends = courseColorsMap.value
 
   // ---- 头部：周导航 ----
@@ -220,12 +250,15 @@ function renderSchedule(root: HTMLElement) {
   const navDiv = headerDiv.append('div').attr('class', 'flex items-center gap-1 bg-white rounded-lg border border-gray-200 shadow-sm p-0.5')
   const prevBtn = navDiv.append('button').attr('class', 'p-2 rounded-md hover:bg-indigo-50 transition-colors').attr('title', '上一周').on('click', prevWeek)
   renderIcon(prevBtn, 'chevronLeft').attr('class', 'w-4 h-4 text-gray-400')
-  const todayBtn = navDiv.append('button').attr('class', 'px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-indigo-50 rounded-md transition-colors').on('click', todayFn).text('今天')
+  navDiv.append('button').attr('class', 'px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-indigo-50 rounded-md transition-colors').on('click', todayFn).text('今天')
   const nextBtn = navDiv.append('button').attr('class', 'p-2 rounded-md hover:bg-indigo-50 transition-colors').attr('title', '下一周').on('click', nextWeek)
   renderIcon(nextBtn, 'chevronRight').attr('class', 'w-4 h-4 text-gray-400')
 
+  // 统计本周是否有课
+  const hasCards = days.some(d => getDayCourseCards(d.date).length > 0)
+
   // ---- 空状态 ----
-  if (cards.length === 0) {
+  if (!hasCards) {
     const emptyDiv = container.append('div').attr('class', 'bg-white rounded-xl border border-gray-200 shadow-sm py-20 text-center')
     const iconWrap = emptyDiv.append('div').attr('class', 'inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4')
     renderIcon(iconWrap, 'calendarDays').attr('class', 'w-8 h-8 text-gray-300')
@@ -238,73 +271,79 @@ function renderSchedule(root: HTMLElement) {
   }
 
   // ---- 课表主体 ----
-  const tableWrap = container.append('div').attr('class', 'bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden')
-  const scrollDiv = tableWrap.append('div').attr('class', 'overflow-x-auto')
-  const table = scrollDiv.append('table').attr('class', 'w-full border-collapse').style('table-layout', 'fixed').style('min-width', '820px')
+  const wrap = container.append('div').attr('class', 'bg-white rounded-xl border border-gray-200 shadow-sm')
+  const scrollDiv = wrap.append('div').attr('class', 'overflow-x-auto')
+  const outer = scrollDiv.append('div').style('min-width', '820px')
 
-  // ---- thead ----
-  const thead = table.append('thead')
-  const headRow = thead.append('tr')
-  headRow.append('th')
-    .attr('class', 'w-[64px] p-2 text-xs text-gray-400 font-normal text-center bg-gray-50 border-r border-b border-gray-200')
+  // ---- 表头：日期列 ----
+  const headerRow = outer.append('div').attr('class', 'flex border-b border-gray-200')
+  headerRow.append('div').attr('class', 'flex-shrink-0 w-16 bg-indigo-50')
+
   days.forEach((day) => {
-    const th = headRow.append('th')
-      .attr('class', `p-2 text-center border-r border-b border-gray-200 last:border-r-0 ${day.isToday ? 'bg-indigo-50' : 'bg-gray-50'}`)
-    const innerDiv = th.append('div').attr('class', 'relative inline-flex flex-col items-center')
+    const dayHeader = headerRow.append('div')
+      .attr('class', `flex-1 p-2 text-center ${day.isToday ? 'bg-indigo-50' : 'bg-indigo-50'}`)
+    const innerDiv = dayHeader.append('div').attr('class', 'relative inline-flex flex-col items-center')
     if (day.isToday) {
-      innerDiv.append('span').attr('class', 'text-[9px] font-bold text-white bg-indigo-600 px-1.5 rounded-b-sm leading-4 absolute -top-3').text('今')
+      innerDiv.append('span').attr('class', 'text-[9px] font-bold text-white bg-indigo-600 px-1.5 rounded-b-sm leading-4 -mt-2 mb-0.5').text('今')
     }
-    innerDiv.append('span').attr('class', `text-xs font-semibold ${day.isToday ? 'text-indigo-700' : 'text-gray-700'}`).text(day.label)
+    innerDiv.append('span').attr('class', `text-xs font-semibold ${day.isToday ? 'text-indigo-700' : 'text-gray-600'}`).text(day.label)
     innerDiv.append('span').attr('class', `text-[11px] mt-0.5 ${day.isToday ? 'text-indigo-600 font-semibold' : 'text-gray-400'}`).text(day.dateStr)
   })
 
-  // ---- tbody ----
-  const tbody = table.append('tbody')
-  slots.forEach((slot) => {
-    const row = tbody.append('tr').attr('class', 'align-top')
+  // ---- 时间轴 + 课程块 ----
+  const body = outer.append('div').attr('class', 'flex relative').style('height', totalHeight.value + 'px')
 
-    // 时间标签列
-    const timeTd = row.append('td')
-      .attr('class', 'w-[64px] p-2 text-center bg-gray-50/50 border-r border-b border-gray-200 align-top pt-2')
-    timeTd.append('div').attr('class', 'text-[11px] text-gray-400 font-medium').text(slot.label)
-    timeTd.append('div').attr('class', 'text-[9px] text-gray-300 mt-0.5').text(slot.periodLabel)
+  // 时间轴（左侧）
+  const timeAxis = body.append('div').attr('class', 'flex-shrink-0 w-16 relative')
+  STANDARD_SLOTS.forEach((slot) => {
+    const top = getTimeLabelTop(slot.key) - 10
+    const g = timeAxis.append('div')
+      .attr('class', 'absolute left-0 w-full text-center')
+      .style('top', top + 'px')
+    g.append('div').attr('class', 'text-[11px] text-gray-400 font-medium leading-none').text(slot.label)
+    g.append('div').attr('class', 'text-[9px] text-gray-300 mt-0.5 leading-none').text(slot.periodLabel)
+  })
 
-    days.forEach((day) => {
-      const dayCards = getCards(day.date, slot)
-      const td = row.append('td')
-        .attr('class', 'p-1.5 border-r border-b border-gray-200 last:border-r-0 align-top')
-        .style('background', dayCards.length > 0 ? dayCards[0].cellBg : '#ffffff')
+  // 每日课程列
+  days.forEach((day) => {
+    const col = body.append('div')
+      .attr('class', 'flex-1 relative border-l border-gray-200 last:border-r-0')
 
-      dayCards.forEach((card) => {
-        const cardDiv = td.append('div')
-          .attr('class', 'relative rounded-lg px-3 py-2.5 text-[11px] leading-tight cursor-pointer transition-all duration-150 border hover:shadow-md hover:-translate-y-0.5')
-          .style('background', card.cardBg)
-          .style('border-color', card.border)
+    // 小时分隔线
+    STANDARD_SLOTS.forEach((slot) => {
+      col.append('div')
+        .attr('class', 'absolute left-0 right-0 border-t border-gray-100')
+        .style('top', getTimeLabelTop(slot.key) + 'px')
+    })
+    // 底部边界线
+    col.append('div').attr('class', 'absolute left-0 right-0 bottom-0 border-t border-gray-100')
 
-        // 课程名称
-        cardDiv.append('p')
-          .attr('class', 'font-semibold truncate text-[12px]')
-          .style('color', card.text)
-          .text(card.courseName)
+    // 课程块（绝对定位）
+    const cards = getDayCourseCards(day.date)
+    cards.forEach((card) => {
+      const block = col.append('div')
+        .attr('class', 'absolute left-0.5 right-0.5 rounded-lg px-2.5 py-1.5 overflow-hidden cursor-pointer transition-all duration-150 border hover:shadow-lg flex flex-col')
+        .style('top', getBlockTop(card.timeSlot) + 'px')
+        .style('height', getBlockHeight(card.timeSlot) + 'px')
+        .style('background', card.cardBg)
+        .style('border-color', card.border)
 
-        // 教师（带图标）
-        const teacherP = cardDiv.append('p')
-          .attr('class', 'text-[10px] mt-1 font-medium flex items-center gap-1')
-          .style('color', card.text)
-          .style('opacity', 0.75)
-        const teacherIcon = teacherP.append('span').attr('class', 'inline-flex items-center')
-        renderIcon(teacherIcon, 'user').attr('class', 'w-3 h-3')
-        teacherP.append('span').text(card.teacher)
+      block.append('p')
+        .attr('class', 'font-semibold truncate text-[12px] leading-tight')
+        .style('color', card.text)
+        .text(card.courseName)
 
-        // 教室（带图标）
-        const roomP = cardDiv.append('p')
-          .attr('class', 'text-[9px] mt-1 flex items-center gap-1')
-          .style('color', card.text)
-          .style('opacity', 0.55)
-        const roomIcon = roomP.append('span').attr('class', 'inline-flex items-center')
-        renderIcon(roomIcon, 'mapPin').attr('class', 'w-3 h-3')
-        roomP.append('span').text(`${card.room} · ${card.timeSlot}`)
-      })
+      block.append('p')
+        .attr('class', 'text-[10px] mt-0.5 font-medium truncate')
+        .style('color', card.text)
+        .style('opacity', 0.8)
+        .text(card.teacher)
+
+      block.append('p')
+        .attr('class', 'text-[9px] mt-0.5 truncate')
+        .style('color', card.text)
+        .style('opacity', 0.6)
+        .text(`${card.room} · ${card.timeSlot}`)
     })
   })
 
