@@ -59,35 +59,28 @@ export const students: Student[] = [
 ];
 
 export const schedules: Schedule[] = [
-  { id: 'sch-1', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-06-25', endDate: '2026-06-25', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-2', courseId: 'course-2', title: 'Python 数据分析入门', startDate: '2026-06-26', endDate: '2026-06-26', timeSlot: '14:00-16:00', room: 'A102', teacher: '李老师' },
-  { id: 'sch-3', courseId: 'course-3', title: 'UI/UX 设计思维', startDate: '2026-06-27', endDate: '2026-06-27', timeSlot: '09:00-12:00', room: 'B201', teacher: '陈老师' },
-  { id: 'sch-4', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-06-28', endDate: '2026-06-28', timeSlot: '14:00-17:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-5', courseId: 'course-5', title: '机器学习基础', startDate: '2026-06-29', endDate: '2026-06-29', timeSlot: '09:00-12:00', room: 'C301', teacher: '张老师' },
-  { id: 'sch-6', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-06-29', endDate: '2026-06-29', timeSlot: '14:00-16:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-7', courseId: 'course-6', title: '项目管理实战', startDate: '2026-06-30', endDate: '2026-06-30', timeSlot: '09:00-11:00', room: 'B202', teacher: '刘老师' },
-  { id: 'sch-8', courseId: 'course-9', title: 'Photoshop 图像处理', startDate: '2026-06-30', endDate: '2026-06-30', timeSlot: '14:00-17:00', room: 'B201', teacher: '陈老师' },
-  { id: 'sch-9', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-01', endDate: '2026-07-01', timeSlot: '09:00-11:00', room: 'A102', teacher: '赵老师' },
-  { id: 'sch-10', courseId: 'course-11', title: 'Vue 3 组合式 API', startDate: '2026-07-02', endDate: '2026-07-02', timeSlot: '14:00-16:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-11', courseId: 'course-12', title: '日语初级入门', startDate: '2026-07-03', endDate: '2026-07-03', timeSlot: '09:00-11:00', room: 'A102', teacher: '孙老师' },
-  { id: 'sch-12', courseId: 'course-5', title: '机器学习基础', startDate: '2026-07-03', endDate: '2026-07-03', timeSlot: '14:00-17:00', room: 'C301', teacher: '张老师' },
-  { id: 'sch-13', courseId: 'course-2', title: 'Python 数据分析入门', startDate: '2026-07-04', endDate: '2026-07-04', timeSlot: '09:00-11:00', room: 'A102', teacher: '李老师' },
-  { id: 'sch-14', courseId: 'course-3', title: 'UI/UX 设计思维', startDate: '2026-07-05', endDate: '2026-07-05', timeSlot: '14:00-17:00', room: 'B201', teacher: '陈老师' },
-  { id: 'sch-15', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-06', endDate: '2026-07-06', timeSlot: '09:00-12:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-16', courseId: 'course-6', title: '项目管理实战', startDate: '2026-07-06', endDate: '2026-07-06', timeSlot: '14:00-16:00', room: 'B202', teacher: '刘老师' },
-  { id: 'sch-17', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-07-07', endDate: '2026-07-07', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-18', courseId: 'course-9', title: 'Photoshop 图像处理', startDate: '2026-07-08', endDate: '2026-07-08', timeSlot: '09:00-12:00', room: 'B201', teacher: '陈老师' },
-  { id: 'sch-19', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-09', endDate: '2026-07-09', timeSlot: '14:00-16:00', room: 'A102', teacher: '赵老师' },
-  { id: 'sch-20', courseId: 'course-11', title: 'Vue 3 组合式 API', startDate: '2026-07-10', endDate: '2026-07-10', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-21', courseId: 'course-12', title: '日语初级入门', startDate: '2026-07-11', endDate: '2026-07-11', timeSlot: '14:00-16:00', room: 'A102', teacher: '孙老师' },
-  { id: 'sch-22', courseId: 'course-5', title: '机器学习基础', startDate: '2026-07-12', endDate: '2026-07-12', timeSlot: '09:00-12:00', room: 'C301', teacher: '张老师' },
-  { id: 'sch-23', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-07-13', endDate: '2026-07-13', timeSlot: '09:00-11:00', room: 'D401', teacher: '郑老师' },
-  { id: 'sch-24', courseId: 'course-15', title: '数据可视化与商业分析', startDate: '2026-07-14', endDate: '2026-07-14', timeSlot: '14:00-16:00', room: 'C302', teacher: '钱老师' },
-  { id: 'sch-25', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-07-15', endDate: '2026-07-15', timeSlot: '09:00-10:30', room: 'B203', teacher: '吴老师' },
-  { id: 'sch-26', courseId: 'course-17', title: '英语口语进阶训练', startDate: '2026-07-16', endDate: '2026-07-16', timeSlot: '13:30-15:00', room: 'A103', teacher: '孙老师' },
-  { id: 'sch-27', courseId: 'course-18', title: 'Docker 容器化部署', startDate: '2026-07-17', endDate: '2026-07-17', timeSlot: '09:00-11:00', room: 'D401', teacher: '郑老师' },
-  { id: 'sch-28', courseId: 'course-19', title: '微服务架构设计', startDate: '2026-07-18', endDate: '2026-07-18', timeSlot: '14:00-17:00', room: 'D402', teacher: '郑老师' },
-  { id: 'sch-29', courseId: 'course-20', title: '产品经理实战', startDate: '2026-07-19', endDate: '2026-07-19', timeSlot: '09:00-11:00', room: 'B203', teacher: '吴老师' },
+  // 周一 · 2026-07-27
+  { id: 'sch-1', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-07-27', endDate: '2026-07-27', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-9', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-27', endDate: '2026-07-27', timeSlot: '09:00-11:00', room: 'A103', teacher: '赵老师' },
+  { id: 'sch-3', courseId: 'course-3', title: 'UI/UX 设计思维', startDate: '2026-07-27', endDate: '2026-07-27', timeSlot: '14:00-17:00', room: 'B201', teacher: '陈老师' },
+  // 周二 · 2026-07-28
+  { id: 'sch-2', courseId: 'course-2', title: 'Python 数据分析入门', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '09:00-11:00', room: 'A102', teacher: '李老师' },
+  { id: 'sch-27', courseId: 'course-18', title: 'Docker 容器化部署', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '09:00-11:00', room: 'D401', teacher: '周老师' },
+  { id: 'sch-28', courseId: 'course-19', title: '微服务架构设计', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '14:00-17:00', room: 'D402', teacher: '钱老师' },
+  // 周三 · 2026-07-29
+  { id: 'sch-4', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-5', courseId: 'course-5', title: '机器学习基础', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '09:00-12:00', room: 'C301', teacher: '张老师' },
+  { id: 'sch-11', courseId: 'course-12', title: '日语初级入门', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '09:00-11:00', room: 'A102', teacher: '孙老师' },
+  { id: 'sch-26', courseId: 'course-17', title: '英语口语进阶训练', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '13:30-15:00', room: 'A103', teacher: '孙老师' },
+  { id: 'sch-7', courseId: 'course-6', title: '项目管理实战', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '14:00-16:00', room: 'B202', teacher: '刘老师' },
+  // 周四 · 2026-07-30
+  { id: 'sch-25', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-07-30', endDate: '2026-07-30', timeSlot: '09:00-10:30', room: 'B203', teacher: '吴老师' },
+  { id: 'sch-8', courseId: 'course-9', title: 'Photoshop 图像处理', startDate: '2026-07-30', endDate: '2026-07-30', timeSlot: '09:00-12:00', room: 'B201', teacher: '陈老师' },
+  { id: 'sch-23', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-07-30', endDate: '2026-07-30', timeSlot: '14:00-16:00', room: 'D401', teacher: '周老师' },
+  // 周五 · 2026-07-31
+  { id: 'sch-10', courseId: 'course-11', title: 'Vue 3 组合式 API', startDate: '2026-07-31', endDate: '2026-07-31', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-29', courseId: 'course-20', title: '产品经理实战', startDate: '2026-07-31', endDate: '2026-07-31', timeSlot: '09:00-11:00', room: 'B203', teacher: '吴老师' },
+  { id: 'sch-24', courseId: 'course-15', title: '数据可视化与商业分析', startDate: '2026-07-31', endDate: '2026-07-31', timeSlot: '14:00-16:00', room: 'C302', teacher: '钱老师' },
 ];
 
 export const enrollments: Enrollment[] = [
@@ -151,7 +144,7 @@ export const teachers: Teacher[] = [
   { id: 't-8', name: '周老师', phone: '138****1008', email: 'zhou@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhou', courseIds: ['course-14', 'course-18'] },
   { id: 't-9', name: '钱老师', phone: '138****1009', email: 'qian@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qian', courseIds: ['course-15', 'course-19'] },
   { id: 't-10', name: '吴老师', phone: '138****1010', email: 'wu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wu', courseIds: ['course-16', 'course-20'] },
-  { id: 't-11', name: '郑老师', phone: '137****2011', email: 'zheng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zheng', courseIds: ['course-14', 'course-18', 'course-19'] },
+  { id: 't-11', name: '郑老师', phone: '137****2011', email: 'zheng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zheng', courseIds: [] },
 ];
 
 /** 企业导师 */
@@ -520,8 +513,8 @@ export const supplementaryGrades: import('@/types').Grade[] = [
 // ========== 补充排课数据（每个活跃课程至少4-6次课，sch-30起） ==========
 
 export const supplementarySchedules: Schedule[] = [
-  // course-1（React，王老师）已有 sch-1, sch-6, sch-17，补充3次
-  { id: 'sch-30', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-07-14', endDate: '2026-07-14', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
+  // course-1（React，王老师）已有 sch-1，补充3次
+  { id: 'sch-30', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-07-13', endDate: '2026-07-13', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
   { id: 'sch-31', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-07-21', endDate: '2026-07-21', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
   { id: 'sch-32', courseId: 'course-1', title: 'React 前端开发实战', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
 
@@ -537,11 +530,10 @@ export const supplementarySchedules: Schedule[] = [
   { id: 'sch-39', courseId: 'course-3', title: 'UI/UX 设计思维', startDate: '2026-07-26', endDate: '2026-07-26', timeSlot: '09:00-12:00', room: 'B201', teacher: '陈老师' },
   { id: 'sch-40', courseId: 'course-3', title: 'UI/UX 设计思维', startDate: '2026-08-02', endDate: '2026-08-02', timeSlot: '14:00-17:00', room: 'B201', teacher: '陈老师' },
 
-  // course-4（TypeScript，王老师）已有 sch-4, sch-15，补充4次
-  { id: 'sch-41', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-13', endDate: '2026-07-13', timeSlot: '14:00-17:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-42', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-20', endDate: '2026-07-20', timeSlot: '09:00-12:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-43', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-27', endDate: '2026-07-27', timeSlot: '14:00-17:00', room: 'A101', teacher: '王老师' },
-  { id: 'sch-44', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-08-03', endDate: '2026-08-03', timeSlot: '09:00-12:00', room: 'A101', teacher: '王老师' },
+  // course-4（TypeScript，王老师）已有 sch-4（周三），补充3次（与主课表同周三）
+  { id: 'sch-41', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-15', endDate: '2026-07-15', timeSlot: '14:00-17:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-42', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-07-22', endDate: '2026-07-22', timeSlot: '09:00-12:00', room: 'A101', teacher: '王老师' },
+  { id: 'sch-44', courseId: 'course-4', title: 'TypeScript 高级编程', startDate: '2026-08-05', endDate: '2026-08-05', timeSlot: '09:00-12:00', room: 'A101', teacher: '王老师' },
 
   // course-5（机器学习，张老师）已有 sch-5, sch-12, sch-22，补充3次
   { id: 'sch-45', courseId: 'course-5', title: '机器学习基础', startDate: '2026-07-19', endDate: '2026-07-19', timeSlot: '09:00-12:00', room: 'C301', teacher: '张老师' },
@@ -560,13 +552,13 @@ export const supplementarySchedules: Schedule[] = [
   { id: 'sch-54', courseId: 'course-9', title: 'Photoshop 图像处理', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '09:00-12:00', room: 'B201', teacher: '陈老师' },
   { id: 'sch-55', courseId: 'course-9', title: 'Photoshop 图像处理', startDate: '2026-08-05', endDate: '2026-08-05', timeSlot: '14:00-17:00', room: 'B201', teacher: '陈老师' },
 
-  // course-10（商务英语，赵老师）已有 sch-9, sch-19，补充4次
-  { id: 'sch-56', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-16', endDate: '2026-07-16', timeSlot: '09:00-11:00', room: 'A102', teacher: '赵老师' },
-  { id: 'sch-57', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-23', endDate: '2026-07-23', timeSlot: '14:00-16:00', room: 'A102', teacher: '赵老师' },
-  { id: 'sch-58', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-30', endDate: '2026-07-30', timeSlot: '09:00-11:00', room: 'A102', teacher: '赵老师' },
-  { id: 'sch-59', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-08-06', endDate: '2026-08-06', timeSlot: '14:00-16:00', room: 'A102', teacher: '赵老师' },
+  // course-10（商务英语，赵老师）已有 sch-9（周一），补充4次
+  { id: 'sch-56', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-13', endDate: '2026-07-13', timeSlot: '09:00-11:00', room: 'A102', teacher: '赵老师' },
+  { id: 'sch-57', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-07-20', endDate: '2026-07-20', timeSlot: '14:00-16:00', room: 'A102', teacher: '赵老师' },
+  { id: 'sch-58', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-08-03', endDate: '2026-08-03', timeSlot: '09:00-11:00', room: 'A102', teacher: '赵老师' },
+  { id: 'sch-59', courseId: 'course-10', title: '商务英语沟通', startDate: '2026-08-10', endDate: '2026-08-10', timeSlot: '14:00-16:00', room: 'A102', teacher: '赵老师' },
 
-  // course-11（Vue3，王老师）已有 sch-10, sch-20，补充4次
+  // course-11（Vue3，王老师）已有 sch-10，补充4次
   { id: 'sch-60', courseId: 'course-11', title: 'Vue 3 组合式 API', startDate: '2026-07-17', endDate: '2026-07-17', timeSlot: '14:00-16:00', room: 'A101', teacher: '王老师' },
   { id: 'sch-61', courseId: 'course-11', title: 'Vue 3 组合式 API', startDate: '2026-07-24', endDate: '2026-07-24', timeSlot: '09:00-11:00', room: 'A101', teacher: '王老师' },
   { id: 'sch-62', courseId: 'course-11', title: 'Vue 3 组合式 API', startDate: '2026-07-31', endDate: '2026-07-31', timeSlot: '14:00-16:00', room: 'A101', teacher: '王老师' },
@@ -578,23 +570,23 @@ export const supplementarySchedules: Schedule[] = [
   { id: 'sch-66', courseId: 'course-12', title: '日语初级入门', startDate: '2026-08-01', endDate: '2026-08-01', timeSlot: '09:00-11:00', room: 'A102', teacher: '孙老师' },
   { id: 'sch-67', courseId: 'course-12', title: '日语初级入门', startDate: '2026-08-08', endDate: '2026-08-08', timeSlot: '14:00-16:00', room: 'A102', teacher: '孙老师' },
 
-  // course-14（AI生成式，周老师）已有 sch-23，补充4次
-  { id: 'sch-68', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-07-20', endDate: '2026-07-20', timeSlot: '09:00-11:00', room: 'D401', teacher: '周老师' },
-  { id: 'sch-69', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-07-27', endDate: '2026-07-27', timeSlot: '14:00-16:00', room: 'D401', teacher: '周老师' },
-  { id: 'sch-70', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-08-03', endDate: '2026-08-03', timeSlot: '09:00-11:00', room: 'D401', teacher: '周老师' },
-  { id: 'sch-71', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-08-10', endDate: '2026-08-10', timeSlot: '14:00-16:00', room: 'D401', teacher: '周老师' },
+  // course-14（AI生成式，周老师）已有 sch-23（周四），补充4次（同周四）
+  { id: 'sch-68', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-07-16', endDate: '2026-07-16', timeSlot: '09:00-11:00', room: 'D401', teacher: '周老师' },
+  { id: 'sch-69', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-07-23', endDate: '2026-07-23', timeSlot: '14:00-16:00', room: 'D401', teacher: '周老师' },
+  { id: 'sch-70', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-08-06', endDate: '2026-08-06', timeSlot: '09:00-11:00', room: 'D401', teacher: '周老师' },
+  { id: 'sch-71', courseId: 'course-14', title: 'AI 生成式应用开发', startDate: '2026-08-13', endDate: '2026-08-13', timeSlot: '14:00-16:00', room: 'D401', teacher: '周老师' },
 
-  // course-15（数据可视化，钱老师）已有 sch-24，补充4次
+  // course-15（数据可视化，钱老师）已有 sch-24（周五），补充4次
   { id: 'sch-72', courseId: 'course-15', title: '数据可视化与商业分析', startDate: '2026-07-21', endDate: '2026-07-21', timeSlot: '14:00-16:00', room: 'C302', teacher: '钱老师' },
   { id: 'sch-73', courseId: 'course-15', title: '数据可视化与商业分析', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '09:00-11:00', room: 'C302', teacher: '钱老师' },
   { id: 'sch-74', courseId: 'course-15', title: '数据可视化与商业分析', startDate: '2026-08-04', endDate: '2026-08-04', timeSlot: '14:00-16:00', room: 'C302', teacher: '钱老师' },
   { id: 'sch-75', courseId: 'course-15', title: '数据可视化与商业分析', startDate: '2026-08-11', endDate: '2026-08-11', timeSlot: '09:00-11:00', room: 'C302', teacher: '钱老师' },
 
-  // course-16（高效沟通，吴老师）已有 sch-25，补充4次
-  { id: 'sch-76', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-07-22', endDate: '2026-07-22', timeSlot: '09:00-10:30', room: 'B203', teacher: '吴老师' },
-  { id: 'sch-77', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '14:00-15:30', room: 'B203', teacher: '吴老师' },
-  { id: 'sch-78', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-08-05', endDate: '2026-08-05', timeSlot: '09:00-10:30', room: 'B203', teacher: '吴老师' },
-  { id: 'sch-79', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-08-12', endDate: '2026-08-12', timeSlot: '14:00-15:30', room: 'B203', teacher: '吴老师' },
+  // course-16（高效沟通，吴老师）已有 sch-25（周四），补充4次（同周四）
+  { id: 'sch-76', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-07-16', endDate: '2026-07-16', timeSlot: '09:00-10:30', room: 'B203', teacher: '吴老师' },
+  { id: 'sch-77', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-07-23', endDate: '2026-07-23', timeSlot: '14:00-15:30', room: 'B203', teacher: '吴老师' },
+  { id: 'sch-78', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-08-06', endDate: '2026-08-06', timeSlot: '09:00-10:30', room: 'B203', teacher: '吴老师' },
+  { id: 'sch-79', courseId: 'course-16', title: '高效沟通与表达训练', startDate: '2026-08-13', endDate: '2026-08-13', timeSlot: '14:00-15:30', room: 'B203', teacher: '吴老师' },
 
   // course-17（英语口语，孙老师）已有 sch-26，补充4次
   { id: 'sch-80', courseId: 'course-17', title: '英语口语进阶训练', startDate: '2026-07-23', endDate: '2026-07-23', timeSlot: '13:30-15:00', room: 'A103', teacher: '孙老师' },
