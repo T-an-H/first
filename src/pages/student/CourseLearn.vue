@@ -506,6 +506,7 @@ import {
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
 import type { AITierQuestion, LearningTier, CloudFile } from '@/types'
 import Modal from '@/components/Modal.vue'
+import { getNow } from '@/lib/date'
 
 const route = useRoute()
 const router = useRouter()
@@ -1204,7 +1205,7 @@ function submitHomework(hw: typeof courseHomework.value[0]) {
     homeworkId: hw.id,
     courseId: courseId,
     studentId: myStudent.value.id,
-    submittedAt: new Date().toISOString().split('T')[0],
+    submittedAt: getNow().toISOString().split('T')[0],
     fileName: file.name,
     fileDataUrl: 'https://example.com/submissions/' + file.name,
     fileSize: file.size,

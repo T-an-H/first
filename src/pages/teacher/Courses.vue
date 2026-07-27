@@ -449,6 +449,7 @@ import {
   EvalFrequencyLabels, EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, EvaluationConfig, Course } from '@/types'
+import { getNow } from '@/lib/date'
 
 
 const router = useRouter()
@@ -713,7 +714,7 @@ const handleFileUpload = (event: Event) => {
     size: file.size,
     type: file.type,
     dataUrl: 'https://example.com/files/' + file.name,
-    uploadedAt: new Date().toISOString().split('T')[0],
+    uploadedAt: getNow().toISOString().split('T')[0],
     uploadedBy: store.currentUser || '教师',
     courseId: selectedCourseId.value,
   })
@@ -823,7 +824,7 @@ async function handleBatchEval(type: string, levelLabel: string) {
         evaluatorId: store.currentUser || '',
         evaluatorName: store.currentUser || '',
         comment: `批量评价：${levelLabel}`,
-        createdAt: new Date().toISOString(),
+        createdAt: getNow().toISOString(),
       })
     }
   }
@@ -1123,7 +1124,7 @@ async function handleImportStudents() {
           phone: row['手机号'] || row['phone'] || '',
           email: row['邮箱'] || row['email'] || '',
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-          joinDate: new Date().toISOString().split('T')[0],
+          joinDate: getNow().toISOString().split('T')[0],
           status: 'active',
         })
         stu = store.students.find(s => s.id === newId)!
@@ -1136,7 +1137,7 @@ async function handleImportStudents() {
           studentId: stu.id,
           courseId: selectedCourseId.value,
           scheduleId: '',
-          enrollDate: new Date().toISOString().split('T')[0],
+          enrollDate: getNow().toISOString().split('T')[0],
           progress: 0,
           status: 'in_progress',
         })

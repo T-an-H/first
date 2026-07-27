@@ -169,13 +169,22 @@
             <div class="flex items-center gap-2">
               <ClipboardCheck class="w-5 h-5 text-gray-400" />
               <h2 class="font-semibold text-gray-900">一键等级批量评价</h2>
-              <span class="text-xs text-gray-400">（为所有学生第1次评价生成教师/导师评价）</span>
+              <span class="text-xs text-gray-400">
+                为所有学生第
+                <select v-model.number="batchSession" class="inline border-b border-brand-400/30 bg-transparent text-center w-6">
+                  <option v-for="s in totalSessions" :key="s" :value="s">{{ s }}</option>
+                </select>
+                次评价生成教师/导师评价
+              </span>
             </div>
-            <button @click="handleProcessOverdue"
-              class="text-xs flex items-center gap-1 px-3 py-1.5 bg-brand-400/10 text-brand-600 border border-brand-400 rounded-lg hover:bg-brand-600/15">
-              <RefreshCw class="w-3 h-3" />
-              处理逾期自评
-            </button>
+            <div class="flex items-center gap-2">
+              <button @click="handleProcessOverdue"
+                class="text-xs flex items-center gap-1 px-3 py-1.5 bg-brand-400/10 text-brand-600 border border-brand-400 rounded-lg hover:bg-brand-600/15">
+                <RefreshCw class="w-3 h-3" />
+                处理逾期评价
+              </button>
+              <span v-if="overdueMsg" class="text-xs text-brand-600 font-medium">{{ overdueMsg }}</span>
+            </div>
           </div>
 
           <div class="flex flex-wrap gap-4">
@@ -267,6 +276,7 @@ import {
 import { EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES, EvalTypeLabels, EvalTypeColors,
   EvalFrequencyLabels, EvalFrequencyDescs, OverdueRuleLabels } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 
@@ -285,6 +295,8 @@ const OVERDUE_RULE_KEYS = Object.keys(OverdueRuleLabels) as OverdueRule[]
 const selectedCourse = ref<string | null>(null)
 const showSettings = ref(false)
 const evalTypeFilter = ref<EvalType | 'all'>('all')
+const batchSession = ref(1)
+const overdueMsg = ref('')
 
 const myCourses = computed(() => {
   if (store.leaders.some((l) => l.name === store.currentUser && l.asTeacher)) {
@@ -307,8 +319,7 @@ const enabledTypes = computed(() => baseEnabledTypes.value.filter((t) => {
 const filteredEvalTypes = computed(() => enabledTypes.value.filter((t) => evalTypeFilter.value === 'all' || t === evalTypeFilter.value))
 
 const displaySessions = computed(() => {
-  const count = Math.min(totalSessions.value, 3)
-  return Array.from({ length: count }, (_, i) => i + 1)
+  return Array.from({ length: totalSessions.value }, (_, i) => i + 1)
 })
 
 const getCourseConfig = (courseId: string) => store.evalConfigs.find((c) => c.courseId === courseId)
@@ -353,23 +364,24 @@ const handleBatchEval = (type: EvalType, level: string) => {
   const range = LEVEL_OPTIONS.find((o) => o.label === level)?.range
   if (!range) return
   const score = Math.round((range[0] + range[1]) / 2)
+  const session = batchSession.value
 
   enrolledStudents.value.forEach(({ student }) => {
     if (!student) return
     const existing = store.evaluations.find(
-      (e) => e.courseId === selectedCourse.value && e.studentId === student.id && e.type === type && e.sessionNumber === 1 && e.evaluatorId.includes('t-')
+      (e) => e.courseId === selectedCourse.value && e.studentId === student.id && e.type === type && e.sessionNumber === session
     )
     const ev: Evaluation = {
       id: existing ? existing.id : `ev-batch-${Date.now()}-${student.id}-${type}`,
       courseId: selectedCourse.value,
       studentId: student.id,
-      sessionNumber: 1,
+      sessionNumber: session,
       type,
       score,
       evaluatorId: store.currentUser || 'teacher',
       evaluatorName: store.currentUser || '教师',
       comment: level,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {
       store.updateEvaluation(ev.id, { score, comment: level, createdAt: ev.createdAt })
@@ -387,9 +399,15 @@ const getStudentEvals = (studentId: string, sessionNumber: number, type: EvalTyp
 
 const handleProcessOverdue = () => {
   if (!selectedCourse.value) return
+  let count = 0
   for (let s = 1; s <= totalSessions.value; s++) {
-    store.processSessionOverdue(selectedCourse.value, s)
+    if (!store.isSessionLocked(selectedCourse.value, s)) {
+      store.processSessionOverdue(selectedCourse.value, s)
+      count++
+    }
   }
+  overdueMsg.value = count > 0 ? `已处理 ${count} 轮次逾期评价` : '没有待处理的逾期评价'
+  setTimeout(() => { overdueMsg.value = '' }, 3000)
 }
 
 const getScoreClass = (studentId: string, sessionNumber: number, type: EvalType) => {

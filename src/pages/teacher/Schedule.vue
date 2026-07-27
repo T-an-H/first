@@ -106,11 +106,12 @@
 import { computed, ref } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-vue-next'
+import { getNow, isVirtualToday, getVirtualMonday } from '@/lib/date'
 
 const store = useAppStore()
 
 // ---- 周导航 ----
-const weekStart = ref(getMonday(new Date()))
+const weekStart = ref(getVirtualMonday())
 
 function getMonday(d: Date): Date {
   const date = new Date(d)
@@ -125,13 +126,12 @@ function fmtDate(d: Date): string {
 }
 
 function isToday(d: Date): boolean {
-  const t = new Date()
-  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate()
+  return isVirtualToday(d)
 }
 
 function prevWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() - 7); weekStart.value = d }
 function nextWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() + 7); weekStart.value = d }
-function goToday() { weekStart.value = getMonday(new Date()) }
+function goToday() { weekStart.value = getVirtualMonday() }
 
 const weekDays = computed(() => {
   const labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']

@@ -105,7 +105,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="course in filteredCourses" :key="course.id" class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+            <tr v-for="course in filteredCourses" :key="course.id" class="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer" @click="openCourseDetail(course)">
               <td class="px-4 py-3">
                 <div class="flex items-center gap-3">
                   <div :class="'w-8 h-8 rounded-lg flex items-center justify-center'" :style="{ backgroundColor: selectedCategory.color }">
@@ -119,13 +119,13 @@
               </td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ course.teacher }}</td>
               <td class="px-4 py-3">
-                <span :class="'text-xs px-2 py-1 rounded-full ' + (course.status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500')">
-                  {{ course.status === 'active' ? '进行中' : '已结束' }}
+                <span class="text-xs px-2 py-1 rounded-full" :class="statusClass(course.status)">
+                  {{ statusLabel(course.status) }}
                 </span>
               </td>
               <td class="px-4 py-3 text-right">
-                <button @click="openCourseModal(course)" class="text-xs text-blue-500 hover:underline mr-3">编辑</button>
-                <button @click="store.deleteCourse(course.id)" class="text-xs text-red-400 hover:underline">删除</button>
+                <button @click.stop="openCourseModal(course)" class="text-xs text-blue-500 hover:underline mr-3">编辑</button>
+                <button @click.stop="store.deleteCourse(course.id)" class="text-xs text-red-400 hover:underline">删除</button>
               </td>
             </tr>
             <tr v-if="filteredCourses.length === 0">
@@ -135,6 +135,65 @@
         </table>
       </div>
     </template>
+
+    <!-- ====== Course Detail Modal ====== -->
+    <Modal :is-open="showCourseDetail" :on-close="closeCourseDetail" :title="detailCourse?.title || '课程详情'" max-width="max-w-2xl">
+      <div v-if="detailCourse" class="space-y-5">
+        <!-- 状态 + 描述 -->
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="statusClass(detailCourse.status)">{{ statusLabel(detailCourse.status) }}</span>
+          <span v-if="detailCourse.credits" class="text-xs text-gray-400">{{ detailCourse.credits }} 学分</span>
+          <span v-if="detailCourse.duration" class="text-xs text-gray-400">{{ detailCourse.duration }} 课时</span>
+        </div>
+        <p v-if="detailCourse.description" class="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-3">{{ detailCourse.description }}</p>
+
+        <!-- 信息网格 -->
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <div class="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+            <BookOpen class="w-4 h-4 text-blue-500 flex-shrink-0" />
+            <div>
+              <p class="text-xs text-gray-400">分类</p>
+              <p class="font-medium text-gray-800">{{ getCategoryName(detailCourse.categoryId) }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
+            <GraduationCap class="w-4 h-4 text-purple-500 flex-shrink-0" />
+            <div>
+              <p class="text-xs text-gray-400">授课教师</p>
+              <p class="font-medium text-gray-800">{{ detailCourse.teacher }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 p-3 bg-amber-50 rounded-lg">
+            <Award class="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <div>
+              <p class="text-xs text-gray-400">企业导师</p>
+              <p class="font-medium text-gray-800">{{ detailCourse.mentor || '无' }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+            <Users class="w-4 h-4 text-green-500 flex-shrink-0" />
+            <div>
+              <p class="text-xs text-gray-400">选课学生</p>
+              <p class="font-medium text-gray-800">{{ getStudentCount(detailCourse.id) }} 人</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 p-3 bg-cyan-50 rounded-lg">
+            <Clock class="w-4 h-4 text-cyan-500 flex-shrink-0" />
+            <div>
+              <p class="text-xs text-gray-400">创建时间</p>
+              <p class="font-medium text-gray-800">{{ detailCourse.createdAt }}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 p-3 bg-indigo-50 rounded-lg">
+            <BookOpen class="w-4 h-4 text-indigo-500 flex-shrink-0" />
+            <div>
+              <p class="text-xs text-gray-400">课程编号</p>
+              <p class="font-medium text-gray-800">{{ detailCourse.id }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Modal>
 
     <!-- ====== Category Create/Edit Modal ====== -->
     <Teleport to="body">
@@ -235,7 +294,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2, RefreshCw, Loader2, CheckCircle } from 'lucide-vue-next'
+import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2, RefreshCw, Loader2, CheckCircle, Users, Clock, GraduationCap, Award } from 'lucide-vue-next'
 import type { Category, Course } from '@/types'
 import { fetchCategories, fetchCourses, syncCategoriesFromSchedules } from '@/api'
 
@@ -305,7 +364,7 @@ const syncResult = ref({ added: 0, updated: 0, failed: 0 })
 const lastSyncTime = ref(localStorage.getItem('lastSyncTime') || '')
 
 function formatNow(): string {
-  const d = new Date()
+  const d = getNow()
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
@@ -375,6 +434,36 @@ function handleDeleteCategory(cat: Category) {
   }
 }
 
+// ====== Course detail modal ======
+const showCourseDetail = ref(false)
+const detailCourse = ref<Course | null>(null)
+
+function openCourseDetail(course: Course) {
+  detailCourse.value = course
+  showCourseDetail.value = true
+}
+
+function closeCourseDetail() {
+  showCourseDetail.value = false
+  detailCourse.value = null
+}
+
+const getCategoryName = (catId: string) => store.categories.find((c) => c.id === catId)?.name || '未知分类'
+
+const getStudentCount = (courseId: string) => store.enrollments.filter((e) => e.courseId === courseId).length
+
+const statusLabel = (status: string) => {
+  if (status === 'active') return '进行中'
+  if (status === 'inactive') return '已结束'
+  return '草稿'
+}
+
+const statusClass = (status: string) => {
+  if (status === 'active') return 'bg-green-50 text-green-600'
+  if (status === 'inactive') return 'bg-gray-100 text-gray-500'
+  return 'bg-yellow-50 text-yellow-600'
+}
+
 // ====== Course actions ======
 function openCourseModal(course: Course | null) {
   editingCourse.value = course
@@ -405,7 +494,7 @@ function handleSaveCourse() {
       credits: 0,
       duration: 0,
       status: 'active',
-      createdAt: new Date().toISOString(),
+      createdAt: getNow().toISOString(),
     })
   }
   showCourseModal.value = false
