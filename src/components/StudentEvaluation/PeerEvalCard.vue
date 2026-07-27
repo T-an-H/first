@@ -71,6 +71,7 @@ import { ref, computed, type Component } from 'vue'
 import { useAppStore } from '@/stores/app'
 import type { Evaluation, EvalType } from '@/types'
 import { EvalTypeLabels } from '@/types'
+import { getNow } from '@/lib/date'
 
 const props = defineProps<{
   record: Evaluation | undefined
@@ -185,7 +186,7 @@ const handleSubmitPeerEval = (targetId: string) => {
     score,
     evaluatorId: props.studentId,
     evaluatorName: props.studentName,
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: getNow().toISOString().split('T')[0],
   }
   if (existing) {
     store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })
@@ -212,7 +213,7 @@ const handleSubmitGroupEval = (groupId: string, groupName: string) => {
       score,
       evaluatorId: props.studentId,
       evaluatorName: props.studentName,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {
       store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })

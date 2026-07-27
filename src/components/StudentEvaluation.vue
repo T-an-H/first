@@ -117,6 +117,7 @@ import {
 import type { EvalType, EvalAnomaly } from '@/types'
 import { EvalTypeLabels, EvalTypeColors, EvalTemplateLabels, EvalFrequencyLabels, TEMPLATE_EVAL_TYPES } from '@/types'
 import Modal from './Modal.vue'
+import { getNow } from '@/lib/date'
 
 const props = defineProps<{
   courseId: string
@@ -407,7 +408,7 @@ function handleSelfSubmit(sessionNumber: number, score: number) {
     score,
     evaluatorId: props.studentId,
     evaluatorName: props.studentName,
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: getNow().toISOString().split('T')[0],
   }
   if (existing) {
     store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })
@@ -431,7 +432,7 @@ function submitPeerEval(targetId: string, session: number, type: EvalType, score
     score,
     evaluatorId: props.studentId,
     evaluatorName: props.studentName,
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: getNow().toISOString().split('T')[0],
   }
   if (existing) {
     store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })
@@ -455,7 +456,7 @@ function submitGroupEval(target: PeerTarget, session: number, score: number) {
       score,
       evaluatorId: props.studentId,
       evaluatorName: props.studentName,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {
       store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })

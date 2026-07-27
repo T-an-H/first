@@ -37,6 +37,7 @@ import { ref, computed } from 'vue'
 import { Cloud, Upload, Download, Trash2, File, Image, FileSpreadsheet, FileArchive } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import type { CloudFile } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -77,7 +78,7 @@ const handleUpload = (e: Event) => {
       size: file.size,
       type: file.type,
       dataUrl: reader.result as string,
-      uploadedAt: new Date().toISOString(),
+      uploadedAt: getNow().toISOString(),
       uploadedBy: store.currentUser || '未知',
     })
   }

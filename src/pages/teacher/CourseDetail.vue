@@ -1132,6 +1132,7 @@ import {
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock } from 'lucide-vue-next'
+import { getNow } from '@/lib/date'
 
 const route = useRoute()
 const router = useRouter()
@@ -1155,7 +1156,7 @@ const schedulesWithStatus = computed(() => {
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   )
   // 以第一节课开课时间作为参考基准，学期前所有课程均显示为"待上课"
-  const referenceDate = sorted.length > 0 ? new Date(sorted[0].startDate) : new Date()
+  const referenceDate = getNow()
   referenceDate.setHours(0, 0, 0, 0)
   const completed: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
   const upcoming: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
@@ -1823,7 +1824,7 @@ function handleAddExam() {
       weight: 0,
       type,
       status: 'draft',
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
       gradedAt: '',
     })
   }
@@ -1863,7 +1864,7 @@ function handleSaveExamScores() {
   inputsToSave.forEach(([studentId, score]) => {
     const existing = existingScores.find((s) => s.studentId === studentId)
     if (existing && existing.status !== 'submitted') {
-      store.updateExamScore(existing.id, { score, gradedAt: new Date().toISOString().split('T')[0] })
+      store.updateExamScore(existing.id, { score, gradedAt: getNow().toISOString().split('T')[0] })
     } else if (!existing) {
       const id = `exam-${courseId.value}-${studentId}-${selectedExam.value}-${Date.now()}`
       store.addExamScore({
@@ -1876,7 +1877,7 @@ function handleSaveExamScores() {
         weight: examWeight,
         type: examType,
         status: 'draft',
-        createdAt: new Date().toISOString().split('T')[0],
+        createdAt: getNow().toISOString().split('T')[0],
         gradedAt: '',
       })
     }
@@ -1997,7 +1998,7 @@ async function handleExcelImport(event: Event) {
       const existing = existingScores.find((s) => s.studentId === student.id)
       const score = Math.min(currentExamFullScore.value, Math.max(0, rawScore))
       if (existing && existing.status !== 'submitted') {
-        store.updateExamScore(existing.id, { score, gradedAt: new Date().toISOString().split('T')[0] })
+        store.updateExamScore(existing.id, { score, gradedAt: getNow().toISOString().split('T')[0] })
       } else if (!existing) {
         store.addExamScore({
           id: `exam-${courseId.value}-${student.id}-${selectedExam.value}-${Date.now()}`,
@@ -2009,7 +2010,7 @@ async function handleExcelImport(event: Event) {
           weight: currentExamWeight.value,
           type: examType,
           status: 'draft',
-          createdAt: new Date().toISOString().split('T')[0],
+          createdAt: getNow().toISOString().split('T')[0],
           gradedAt: '',
         })
       }
@@ -2399,7 +2400,7 @@ const handleBatchEval = (level: string) => {
       evaluatorId: store.currentUser || '',
       evaluatorName: store.currentUser || (isMentor.value ? '企业导师' : '教师'),
       comment: level,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {
       store.updateEvaluation(ev.id, { score, comment: level, createdAt: ev.createdAt })
@@ -2431,7 +2432,7 @@ function handleSaveEvalScores() {
       score,
       evaluatorId: store.currentUser || '',
       evaluatorName: store.currentUser || (isMentor.value ? '企业导师' : '教师'),
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {
       store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })
@@ -2698,7 +2699,7 @@ function handleAddSingleStudent() {
   let student = store.students.find((s) => s.name === name || (newStudentId.value.trim() && s.id === newStudentId.value.trim()))
   if (!student) {
     const id = newStudentId.value.trim() || `stu-${Date.now()}`
-    store.addStudent({ id, name, phone: '', email: '', avatar: '', joinDate: new Date().toISOString().split('T')[0], status: 'active' })
+    store.addStudent({ id, name, phone: '', email: '', avatar: '', joinDate: getNow().toISOString().split('T')[0], status: 'active' })
     student = store.students.find((s) => s.id === id)!
   }
   const exists = store.enrollments.some(
@@ -2715,7 +2716,7 @@ function handleAddSingleStudent() {
     scheduleId: '',
     status: 'enrolled',
     progress: 0,
-    enrollDate: new Date().toISOString().split('T')[0],
+    enrollDate: getNow().toISOString().split('T')[0],
   })
   // 如果当前在某个班级中，自动将学生加入该班级
   if (selectedGroupId.value && selectedGroupId.value !== '__ungrouped__') {
@@ -2758,7 +2759,7 @@ async function handleImportStudentsExcel(event: Event) {
         : store.students.find((s) => s.name === name)
       if (!student) {
         const id = rawId || `stu-${Date.now()}-${imported}`
-        store.addStudent({ id, name, phone: '', email: '', avatar: '', joinDate: new Date().toISOString().split('T')[0], status: 'active' })
+        store.addStudent({ id, name, phone: '', email: '', avatar: '', joinDate: getNow().toISOString().split('T')[0], status: 'active' })
         student = store.students.find((s) => s.id === id)!
       }
       const exists = store.enrollments.some(
@@ -2772,7 +2773,7 @@ async function handleImportStudentsExcel(event: Event) {
         scheduleId: '',
         status: 'enrolled',
         progress: 0,
-        enrollDate: new Date().toISOString().split('T')[0],
+        enrollDate: getNow().toISOString().split('T')[0],
       })
       imported++
     }

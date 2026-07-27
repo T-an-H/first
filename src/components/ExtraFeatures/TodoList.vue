@@ -120,6 +120,7 @@ import { useRouter } from 'vue-router'
 import { Plus, Circle, CheckCircle, X, ClipboardCheck, ArrowRight, Settings, Layers } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import { EvalTypeLabels } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const router = useRouter()
@@ -189,7 +190,7 @@ const handleAdd = () => {
     id: Date.now().toString(),
     title: title.value.trim(),
     completed: false,
-    createdAt: new Date().toISOString(),
+    createdAt: getNow().toISOString(),
     dueDate: dueDate.value || undefined,
     createdBy: store.currentUser || '未知',
   })

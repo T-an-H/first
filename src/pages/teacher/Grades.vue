@@ -272,6 +272,7 @@ import { useAppStore } from '@/stores/app'
 import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Upload, Loader2, CheckCircle, Search, X } from 'lucide-vue-next'
 import ScoreDetail from '@/components/ScoreDetail.vue'
 import type { DetailedGrade, Enrollment } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 
@@ -670,7 +671,7 @@ async function handleExportGradesToSystem() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `成绩导出-${selectedCourseTitle.value}-${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `成绩导出-${selectedCourseTitle.value}-${getNow().toISOString().slice(0, 10)}.csv`
   a.click()
   URL.revokeObjectURL(url)
 

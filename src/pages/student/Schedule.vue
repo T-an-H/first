@@ -7,11 +7,12 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
+import { isVirtualToday, getVirtualMonday } from '@/lib/date'
 
 const store = useAppStore()
 
 // ---- 周导航 ----
-const weekStart = ref(getMonday(new Date()))
+const weekStart = ref(getVirtualMonday())
 
 function getMonday(d: Date): Date {
   const date = new Date(d)
@@ -26,8 +27,7 @@ function fmtDate(d: Date): string {
 }
 
 function isToday(d: Date): boolean {
-  const t = new Date()
-  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate()
+  return isVirtualToday(d)
 }
 
 const weekDays = computed(() => {
@@ -49,7 +49,7 @@ const weekNumber = computed(() => {
 
 function prevWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() - 7); weekStart.value = d; reRender() }
 function nextWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() + 7); weekStart.value = d; reRender() }
-function todayFn() { weekStart.value = getMonday(new Date()); reRender() }
+function todayFn() { weekStart.value = getVirtualMonday(); reRender() }
 
 // ---- 学生课表数据 ----
 const student = computed(() => store.students.find((s) => s.name === store.currentUser) ?? store.students[0])

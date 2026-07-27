@@ -237,6 +237,7 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2, RefreshCw, Loader2, CheckCircle } from 'lucide-vue-next'
 import type { Category, Course } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 
@@ -281,7 +282,7 @@ const syncResult = ref({ added: 0, updated: 0, failed: 0 })
 const lastSyncTime = ref(localStorage.getItem('lastSyncTime') || '')
 
 function formatNow(): string {
-  const d = new Date()
+  const d = getNow()
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
@@ -377,7 +378,7 @@ function handleSaveCourse() {
       credits: 0,
       duration: 0,
       status: 'active',
-      createdAt: new Date().toISOString(),
+      createdAt: getNow().toISOString(),
     })
   }
   showCourseModal.value = false

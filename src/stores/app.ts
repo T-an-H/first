@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
+import { getNow } from '@/lib/date'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
@@ -587,7 +588,7 @@ export const useAppStore = defineStore('app', () => {
     examScores.value = examScores.value.map((s) => {
       if (s.courseId === courseId && s.examName === examName && s.status === 'draft'
           && (!studentIds || studentIds.includes(s.studentId))) {
-        return { ...s, status: 'submitted' as const, gradedAt: new Date().toISOString().split('T')[0] }
+        return { ...s, status: 'submitted' as const, gradedAt: getNow().toISOString().split('T')[0] }
       }
       return s
     })
@@ -713,18 +714,19 @@ export const useAppStore = defineStore('app', () => {
 
     // 第1次评价从第一节课上课就开启
     if (sessionNumber === 1) {
-      return new Date() >= new Date(courseSchedules[0].startDate)
+      return getNow() >= new Date(courseSchedules[0].startDate)
     }
 
     // 其他轮次：从对应轮次第一节课上课开始
     const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions)
-    if (!range) return true
-    return new Date() >= new Date(courseSchedules[range.startIdx].startDate)
+    // 无对应排课（幻影场次）→ 永不开启，避免提前锁定真实场次
+    if (!range) return false
+    return getNow() >= new Date(courseSchedules[range.startIdx].startDate)
   }
 
   /**
    * 判断最终评价轮次是否已过截止期
-   * 最终评价截止时间为最后一节课结束时间后第三天
+   * 最终评价截止时间为该轮次开启后第三天
    */
   function isFinalSessionDeadlinePassed(courseId: string, totalSessions: number): boolean {
     const courseSchedules = schedules.value
@@ -733,10 +735,14 @@ export const useAppStore = defineStore('app', () => {
 
     if (courseSchedules.length === 0) return false
 
-    // 最终评价截止时间：最后一节课结束时间 + 3天
-    const lastEndDate = new Date(courseSchedules[courseSchedules.length - 1].endDate)
-    lastEndDate.setDate(lastEndDate.getDate() + 3)
-    return new Date() > lastEndDate
+    // 最终评价轮次的第一节课开始时间
+    const range = getSessionScheduleRangeIndex(courseId, totalSessions, totalSessions)
+    if (!range) return false
+
+    // 最终评价截止时间：评价开启时间 + 3天
+    const deadline = new Date(courseSchedules[range.startIdx].startDate)
+    deadline.setDate(deadline.getDate() + 3)
+    return getNow() > deadline
   }
 
   /**
@@ -856,7 +862,7 @@ export const useAppStore = defineStore('app', () => {
    * 当截止日期已过且仍为 pending 状态时，标记为 overdue
    */
   function checkAndMarkOverdueReminders() {
-    const now = new Date()
+    const now = getNow()
     let changed = false
     evalReminders.value = evalReminders.value.map((r) => {
       if (r.status !== 'pending') return r
@@ -894,22 +900,38 @@ export const useAppStore = defineStore('app', () => {
     checkAndMarkOverdueReminders()
   }
 
+  /**
+   * 获取某课程的评价次数 — 基于实际排课数量计算
+   * 每 2 节课对应 1 次评价，确保不会产生无对应排课的幻影场次
+   */
   function getEvalSessions(courseId: string): number {
     const course = courses.value.find((c) => c.id === courseId)
     if (!course) return 1
+
+    const scheduleCount = schedules.value
+      .filter((s) => s.courseId === courseId)
+      .length
+
+    // 无排课 → 1 次默认评价
+    if (scheduleCount === 0) return 1
+
+    // 每 2 节课对应 1 次评价轮次
+    const sessionsBySchedule = Math.max(1, Math.ceil(scheduleCount / 2))
+
     const config = evalConfigs.value.find((c) => c.courseId === courseId)
-    if (!config) return Math.max(1, Math.floor(course.duration / 2))
+    if (!config) return sessionsBySchedule
+
     switch (config.frequency) {
       case 'biweekly':
-        return Math.max(1, Math.ceil(course.duration / 4))
+        return sessionsBySchedule
       case 'per_unit':
-        return 3
+        return Math.min(sessionsBySchedule, 3)
       case 'project_milestone':
-        return 3
+        return Math.min(sessionsBySchedule, 3)
       case 'custom':
-        return config.customSessions || 3
+        return Math.min(config.customSessions || 3, scheduleCount, sessionsBySchedule)
       default:
-        return Math.max(1, Math.floor(course.duration / 2))
+        return sessionsBySchedule
     }
   }
 
@@ -925,7 +947,7 @@ export const useAppStore = defineStore('app', () => {
     const courseEnrollments = enrollments.value.filter(
       (e) => e.courseId === courseId && e.status !== 'dropped'
     )
-    const startDate = new Date(course.createdAt || new Date())
+    const startDate = new Date(course.createdAt || getNow())
     const reminders: EvalReminder[] = []
 
     const enabledTypes = TEMPLATE_EVAL_TYPES[config.template] || ['self', 'teacher']
@@ -957,7 +979,7 @@ export const useAppStore = defineStore('app', () => {
             studentId: targetId,
             sessionNumber: s,
             deadline: deadlineStr,
-            status: new Date(deadlineStr) < new Date() ? 'overdue' : 'pending',
+            status: new Date(deadlineStr) < getNow() ? 'overdue' : 'pending',
           })
         }
       }
@@ -969,7 +991,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function pushNearDeadlineEvalReminders() {
-    const now = new Date()
+    const now = getNow()
     const oneWeekLater = new Date(now)
     oneWeekLater.setDate(oneWeekLater.getDate() + 7)
 
@@ -1088,7 +1110,7 @@ export const useAppStore = defineStore('app', () => {
           evaluatorId,
           evaluatorName,
           comment,
-          createdAt: new Date().toISOString().split('T')[0],
+          createdAt: getNow().toISOString().split('T')[0],
         })
       }
     }
@@ -1121,7 +1143,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function checkEvalReminders() {
-    const now = new Date()
+    const now = getNow()
     const hasUpcoming = evalReminders.value.some((r) => {
       if (r.status === 'completed') return false
       const deadline = new Date(r.deadline)
@@ -1134,7 +1156,7 @@ export const useAppStore = defineStore('app', () => {
     const courseSchedules = schedules.value
       .filter((s) => s.courseId === courseId)
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    const now = new Date()
+    const now = getNow()
     const totalSchedules = courseSchedules.length
     if (totalSchedules === 0) return
 
@@ -1199,7 +1221,7 @@ export const useAppStore = defineStore('app', () => {
       .filter((s) => s.courseId === courseId)
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     if (courseSchedules.length === 0) return false
-    return new Date() >= new Date(courseSchedules[0].endDate)
+    return getNow() >= new Date(courseSchedules[0].endDate)
   }
 
   /** 第二节课是否已经开始（AI 分层测试截止点） */
@@ -1209,7 +1231,7 @@ export const useAppStore = defineStore('app', () => {
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
     // 有至少两节课才判定第二节课开始
     if (courseSchedules.length < 2) return false
-    return new Date() >= new Date(courseSchedules[1].startDate)
+    return getNow() >= new Date(courseSchedules[1].startDate)
   }
 
   /** 获取某学生所有未完成的 AI 分层测试（测试窗口已开但未超时） */
@@ -1244,7 +1266,7 @@ export const useAppStore = defineStore('app', () => {
       studentId,
       tier: 'basic',
       score: 0,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     studentTiers.value = { ...studentTiers.value, [key]: record }
     saveToStorage('studentTiers', studentTiers.value)
@@ -1346,7 +1368,7 @@ export const useAppStore = defineStore('app', () => {
       studentId,
       tier,
       score,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: getNow().toISOString().split('T')[0],
     }
     studentTiers.value = { ...studentTiers.value, [resultKey]: record }
     saveToStorage('studentTiers', studentTiers.value)
