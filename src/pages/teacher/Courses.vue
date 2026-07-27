@@ -434,7 +434,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
@@ -450,6 +450,7 @@ import {
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, EvaluationConfig, Course } from '@/types'
 import { getNow } from '@/lib/date'
+import { fetchTeacherCourses } from '@/api'
 
 
 const router = useRouter()
@@ -459,10 +460,40 @@ const isMentor = computed(() => store.currentRole === 'mentor')
 const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
 
 const searchQuery = ref('')
+const dbCourses = ref<any[]>([])
+const loading = ref(true)
+
+onMounted(async () => {
+  // 清理可能被覆盖的 localStorage 课程缓存
+  const stored = localStorage.getItem('courses')
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored)
+      // 如果存的是没有 title 的脏数据，清掉
+      if (Array.isArray(parsed) && parsed.length > 0 && !parsed[0].title) {
+        localStorage.removeItem('courses')
+      }
+    } catch { /* ignore */ }
+  }
+  try {
+    const res = await fetchTeacherCourses(store.currentUser || '')
+    if (res.success) {
+      dbCourses.value = res.courses
+      // 更新 store 让其他部分也能使用
+      store.courses = res.courses
+    }
+  } catch (e) {
+    console.error('加载课程失败:', e)
+  } finally {
+    loading.value = false
+  }
+})
 
 const sortedAndFilteredCourses = computed(() => {
   let list: Course[]
-  if (isLeaderWithTeaching.value) {
+  if (dbCourses.value.length > 0) {
+    list = dbCourses.value as any
+  } else if (isLeaderWithTeaching.value) {
     list = store.getLeaderCourses(store.currentUser || '')
   } else if (isMentor.value) {
     const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')

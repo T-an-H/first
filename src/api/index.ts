@@ -106,6 +106,43 @@ export async function fetchSchedules() {
   return request('/schedules');
 }
 
+/** 获取某教师的课程列表 */
+export async function fetchTeacherCourses(teacherName) {
+  return request(`/courses/teacher/${encodeURIComponent(teacherName)}`);
+}
+
+/** 批量导入选课 */
+export async function bulkImportEnrollments(enrollments) {
+  return request('/teaching/enrollments/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ enrollments }),
+  });
+}
+
+/** 更新学生信息（如设置班级） */
+export async function updateStudent(studentId, data) {
+  return request(`/teaching/students/${studentId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/** 批量导入成绩 */
+export async function bulkImportScores(scores) {
+  return request('/teaching/scores/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ scores }),
+  });
+}
+
+/** 批量导入分组 */
+export async function bulkImportGroups(groups) {
+  return request('/teaching/groups/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ groups }),
+  });
+}
+
 /** 更新一条排课 */
 export async function updateSchedule(id, data) {
   return request(`/schedules/${id}`, {

@@ -121,7 +121,7 @@ const MOCK_USERS: Record<string, { password: string; name: string; role: string;
 
 /** Mock 跳转地址 */
 function mockPortal(role: string, subRole?: string): string {
-  if (role === 'admin') return '/admin/categories'
+  if (role === 'admin') return '/admin/schedules'
   if (role === 'teacher') {
     if (subRole === 'mentor') return '/mentor/courses'
     if (subRole === 'leader') return '/leader/courses'

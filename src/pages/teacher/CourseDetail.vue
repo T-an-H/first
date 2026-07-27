@@ -1143,6 +1143,42 @@ const course = computed(() => store.courses.find((c) => c.id === courseId.value)
 const isReadOnly = computed(() => course.value?.status !== 'active')
 const isMentor = computed(() => store.currentRole === 'mentor')
 
+// 从数据库加载课程学员
+onMounted(async () => {
+  try {
+    const res = await fetch(`http://localhost:3000/api/courses/${courseId.value}/students`)
+    const data = await res.json()
+    if (data.success && data.students.length > 0) {
+      // 更新 store.students 为数据库数据
+      for (const s of data.students) {
+        const existing = store.students.findIndex((x) => x.studentId === s.studentId)
+        if (existing >= 0) {
+          store.students[existing] = { ...store.students[existing], ...s }
+        } else {
+          store.students.push({ ...s, avatar: '', joinDate: '', enrollmentScore: 0 })
+        }
+      }
+      // 同步 enrollments（避免重复）
+      const existingIds = new Set(store.enrollments.map((e) => e.studentId))
+      for (const s of data.students) {
+        if (!existingIds.has(s.id)) {
+          store.enrollments.push({
+            id: `enr-db-${s.id}-${courseId.value}`,
+            studentId: s.id,
+            courseId: courseId.value,
+            scheduleId: '',
+            enrollDate: '',
+            progress: 0,
+            status: 'enrolled',
+          })
+        }
+      }
+    }
+  } catch (e) {
+    console.error('加载课程学员失败:', e)
+  }
+})
+
 const courseSchedules = computed(() =>
   store.schedules.filter((s) => s.courseId === courseId.value)
 )
@@ -1263,7 +1299,25 @@ function saveAddClass() {
   const assignedCount = addClassForm.value.studentIds.length
   addClassForm.value = { className: '', studentIds: [] }
   showAddClass.value = false
-  alert(`已创建班级"${className}"，并分配了 ${assignedCount} 名学生`)
+  // 同步到课程管理：为该课程+班级创建一条排课记录
+  const course = store.courses.find((c) => c.id === courseId.value)
+  if (course) {
+    const scheduleData = {
+      courseId: courseId.value,
+      title: course.title,
+      teacher: course.teacher || '',
+      className,
+      room: '待定',
+      startDate: new Date().toISOString().split('T')[0],
+      timeSlot: '09:00-11:00',
+    }
+    fetch('http://localhost:3000/api/schedules/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ schedules: [scheduleData] }),
+    }).catch(() => {})
+  }
+  alert(`已创建班级"${className}"，并分配了 ${assignedCount} 名学生（已同步到课程管理）`)
 }
 // 编辑班级
 const showEditClassModal = ref(false)
@@ -1307,8 +1361,8 @@ async function handleImportClassDetail() {
     const workbook = XLSX.read(data, { type: 'array' })
     const sheet = workbook.Sheets[workbook.SheetNames[0]]
     const rows: any[] = XLSX.utils.sheet_to_json(sheet)
-    let classCount = 0
-    let assignedCount = 0
+    let classCount = 0, assignedCount = 0
+    const addedClasses = new Set<string>()
     for (const row of rows) {
       const className = (row['班级名称'] || row['className'] || '').toString().trim()
       if (!className) continue
@@ -1322,11 +1376,32 @@ async function handleImportClassDetail() {
         )
         if (match) {
           store.updateStudent(match.id, { className })
+          try { await fetch(`http://localhost:3000/api/teaching/students/${match.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ className }) }) } catch {}
           assignedCount++
         }
       }
+      addedClasses.add(className)
     }
-    alert(`导入完成：共 ${classCount} 个班级，已分配 ${assignedCount} 名学生`)
+    // 同步到课程管理：为每个班级创建排课记录
+    const course = store.courses.find((c: any) => c.id === courseId.value)
+    if (course) {
+      const schedules: any[] = []
+      for (const cn of addedClasses) {
+        schedules.push({
+          courseId: courseId.value,
+          title: course.title,
+          teacher: course.teacher || '',
+          className: cn,
+          room: '待定',
+          startDate: new Date().toISOString().split('T')[0],
+          timeSlot: '09:00-11:00',
+        })
+      }
+      if (schedules.length > 0) {
+        try { await fetch('http://localhost:3000/api/schedules/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ schedules }) }) } catch {}
+      }
+    }
+    alert(`导入完成：共 ${classCount} 个班级，已分配 ${assignedCount} 名学生（已同步到课程管理）`)
   }
   input.click()
 }
@@ -1987,6 +2062,7 @@ async function handleExcelImport(event: Event) {
     const nameKey = keys[0]
     const scoreKey = keys[1]
     let imported = 0
+    const scores: any[] = []
     for (const row of data) {
       const name = String(row[nameKey] || '').trim().toLowerCase()
       const rawScore = parseFloat(String(row[scoreKey] || '').trim())
@@ -2000,8 +2076,9 @@ async function handleExcelImport(event: Event) {
       if (existing && existing.status !== 'submitted') {
         store.updateExamScore(existing.id, { score, gradedAt: getNow().toISOString().split('T')[0] })
       } else if (!existing) {
+        const sid = `exam-${courseId.value}-${student.id}-${selectedExam.value}-${Date.now()}`
         store.addExamScore({
-          id: `exam-${courseId.value}-${student.id}-${selectedExam.value}-${Date.now()}`,
+          id: sid,
           courseId: courseId.value,
           studentId: student.id,
           examName: selectedExam.value,
@@ -2013,8 +2090,13 @@ async function handleExcelImport(event: Event) {
           createdAt: getNow().toISOString().split('T')[0],
           gradedAt: '',
         })
+        scores.push({ id: sid, courseId: courseId.value, studentId: student.id, examName: selectedExam.value, score, fullScore: currentExamFullScore.value, weight: currentExamWeight.value, type: examType })
       }
       imported++
+    }
+    // 同步到 MySQL
+    if (scores.length > 0) {
+      try { await fetch('http://localhost:3000/api/teaching/scores/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ scores }) }) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生的成绩`)
     input.value = ''
@@ -2750,6 +2832,7 @@ async function handleImportStudentsExcel(event: Event) {
     const nameKey = keys[0]
     const idKey = keys.length >= 2 ? keys[1] : null
     let imported = 0
+    const enrollments: any[] = []
     for (const row of data) {
       const name = String(row[nameKey] || '').trim()
       if (!name) continue
@@ -2766,8 +2849,9 @@ async function handleImportStudentsExcel(event: Event) {
         (e) => e.courseId === courseId.value && e.studentId === student!.id && e.status !== 'dropped'
       )
       if (exists) continue
+      const enrId = `enr-${courseId.value}-${student!.id}-${Date.now()}-${imported}`
       store.addEnrollment({
-        id: `enr-${courseId.value}-${student!.id}-${Date.now()}-${imported}`,
+        id: enrId,
         courseId: courseId.value,
         studentId: student!.id,
         scheduleId: '',
@@ -2775,7 +2859,12 @@ async function handleImportStudentsExcel(event: Event) {
         progress: 0,
         enrollDate: getNow().toISOString().split('T')[0],
       })
+      enrollments.push({ id: enrId, studentId: student!.id, courseId: courseId.value })
       imported++
+    }
+    // 同步到 MySQL
+    if (enrollments.length > 0) {
+      try { await fetch('http://localhost:3000/api/teaching/enrollments/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ enrollments }) }) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生`)
   } catch (err) {
@@ -2873,6 +2962,7 @@ async function handleImportGroupsExcel(event: Event) {
       }
     }
     let imported = 0
+    const groups: any[] = []
     for (const [name, memberIds] of groupMap) {
       const existing = store.studentGroups.find(
         (g) => g.courseId === courseId.value && g.name === name
@@ -2881,14 +2971,20 @@ async function handleImportGroupsExcel(event: Event) {
         const merged = Array.from(new Set([...existing.memberIds, ...memberIds]))
         store.updateStudentGroup(existing.id, { memberIds: merged })
       } else {
+        const gid = `group-${courseId.value}-${Date.now()}-${imported}`
         store.addStudentGroup({
-          id: `group-${courseId.value}-${Date.now()}-${imported}`,
+          id: gid,
           courseId: courseId.value,
           name,
           memberIds: Array.from(new Set(memberIds)),
         })
+        groups.push({ id: gid, courseId: courseId.value, name, memberIds: Array.from(new Set(memberIds)) })
       }
       imported++
+    }
+    // 同步到 MySQL
+    if (groups.length > 0) {
+      try { await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ groups }) }) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 个分组`)
   } catch (err) {

@@ -18,7 +18,7 @@ const JWT_EXPIRES = '7d';
  * 根据角色和子角色获取跳转地址
  */
 function getPortal(role, subRole) {
-  if (role === 'admin') return '/admin/categories';
+  if (role === 'admin') return '/admin/schedules';
   if (role === 'teacher') {
     if (subRole === 'mentor') return '/mentor/courses';
     if (subRole === 'leader') return '/leader/courses';

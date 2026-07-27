@@ -316,7 +316,7 @@ async function loadData() {
     }
     if (courseRes.success) {
       apiCourses.value = courseRes.courses
-      store.courses = courseRes.courses
+      // 不要覆盖 store.courses（它包含 status/cover 等完整的课程信息）
     }
   } catch (e) {
     console.error('加载分类数据失败:', e)

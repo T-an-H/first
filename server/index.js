@@ -10,6 +10,8 @@ import userRoutes from './routes/user.js';
 import studentRoutes from './routes/students.js';
 import scheduleRoutes from './routes/schedules.js';
 import categoryRoutes from './routes/categories.js';
+import courseRoutes from './routes/courses.js';
+import teachingRoutes from './routes/teaching.js';
 
 const app = express();
 const PORT = 3000;
@@ -46,6 +48,12 @@ app.use('/api/schedules', scheduleRoutes);
 
 // 分类管理路由
 app.use('/api/categories', categoryRoutes);
+
+// 课程数据路由
+app.use('/api/courses', courseRoutes);
+
+// 教学数据路由（选课/成绩/分组）
+app.use('/api/teaching', teachingRoutes);
 
 // ====== 启动服务器 ======
 app.listen(PORT, () => {
