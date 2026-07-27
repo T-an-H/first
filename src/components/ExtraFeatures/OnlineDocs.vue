@@ -54,6 +54,7 @@ import { ref, computed } from 'vue'
 import { Plus, FileText, Edit3, Save, Trash2, Upload } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import type { OnlineDoc } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const editingId = ref<string | null>(null)
@@ -75,8 +76,8 @@ const handleCreate = () => {
     title: newTitle.value.trim(),
     content: '',
     createdBy: store.currentUser || '未知',
-    createdAt: new Date().toISOString(),
-    lastEditedAt: new Date().toISOString(),
+    createdAt: getNow().toISOString(),
+    lastEditedAt: getNow().toISOString(),
     lastEditedBy: store.currentUser || '未知',
   })
   newTitle.value = ''
@@ -95,8 +96,8 @@ const handleImport = (event: Event) => {
       title: file.name.replace(/\.[^/.]+$/, ''),
       content: content,
       createdBy: store.currentUser || '未知',
-      createdAt: new Date().toISOString(),
-      lastEditedAt: new Date().toISOString(),
+      createdAt: getNow().toISOString(),
+      lastEditedAt: getNow().toISOString(),
       lastEditedBy: store.currentUser || '未知',
     })
     alert(`文档 "${file.name}" 导入成功！`)
@@ -113,7 +114,7 @@ const handleSave = (id: string) => {
   store.updateOnlineDoc(id, {
     title: editTitle.value,
     content: editContent.value,
-    lastEditedAt: new Date().toISOString(),
+    lastEditedAt: getNow().toISOString(),
     lastEditedBy: store.currentUser || '未知',
   })
   editingId.value = null

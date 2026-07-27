@@ -9,6 +9,7 @@ import { useAppStore } from '@/stores/app'
 import type { Schedule } from '@/types'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
+import { getNow } from '@/lib/date'
 
 const route = useRoute()
 const store = useAppStore()
@@ -33,7 +34,7 @@ const schedulesWithStatus = computed(() => {
     (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
   )
   // 以第一节课开课时间作为参考基准，学期前所有课程均显示为"待上课"
-  const referenceDate = sorted.length > 0 ? new Date(sorted[0].startDate) : new Date()
+  const referenceDate = getNow()
   referenceDate.setHours(0, 0, 0, 0)
   const completed: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
   const upcoming: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
@@ -94,7 +95,7 @@ function handleSubmitEval(studentId: string) {
     score,
     evaluatorId: store.currentUser || '',
     evaluatorName: store.currentUser || '企业导师',
-    createdAt: new Date().toISOString().split('T')[0],
+    createdAt: getNow().toISOString().split('T')[0],
   }
 
   if (existing) {

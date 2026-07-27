@@ -68,6 +68,7 @@ import { ref, computed } from 'vue'
 import { Plus, Edit3, Save, Trash2, Upload, FileText, X, Paperclip } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import type { Note } from '@/types'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const editingId = ref<string | null>(null)
@@ -89,8 +90,8 @@ const handleCreate = () => {
     id: Date.now().toString(),
     title: newTitle.value.trim(),
     content: '',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: getNow().toISOString(),
+    updatedAt: getNow().toISOString(),
     createdBy: store.currentUser || '未知',
     attachments: [],
   })
@@ -110,8 +111,8 @@ const handleUpload = (event: Event) => {
         id: Date.now().toString(),
         title: file.name.replace(/\.[^/.]+$/, ''),
         content: content,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: getNow().toISOString(),
+        updatedAt: getNow().toISOString(),
         createdBy: store.currentUser || '未知',
         attachments: [],
       })
@@ -129,8 +130,8 @@ const handleUpload = (event: Event) => {
         id: Date.now().toString(),
         title: file.name.replace(/\.[^/.]+$/, ''),
         content: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: getNow().toISOString(),
+        updatedAt: getNow().toISOString(),
         createdBy: store.currentUser || '未知',
         attachments: [{
           fileName: file.name,
@@ -177,7 +178,7 @@ const handleSave = (id: string) => {
   store.updateNote(id, {
     title: editTitle.value,
     content: editContent.value,
-    updatedAt: new Date().toISOString(),
+    updatedAt: getNow().toISOString(),
     attachments: editAttachments.value,
   })
   editingId.value = null
