@@ -12,13 +12,8 @@ const router = createRouter({
     {
       path: '/admin',
       component: Layout,
-      redirect: 'categories',
+      redirect: 'schedules',
       children: [
-        {
-          path: 'categories',
-          name: 'AdminCategories',
-          component: () => import('@/pages/admin/Categories.vue'),
-        },
         {
           path: 'schedules',
           name: 'AdminSchedules',

@@ -32,7 +32,7 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          v-for="cat in store.categories"
+          v-for="cat in apiCategories"
           :key="cat.id"
           class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer group"
           @click="selectCategory(cat)"
@@ -49,7 +49,7 @@
           <h3 class="font-semibold text-gray-900">{{ cat.name }}</h3>
           <p class="text-xs text-gray-400 mt-1">{{ getCourseCount(cat.id) }} 门课程</p>
         </div>
-        <div v-if="store.categories.length === 0" class="col-span-full text-center py-20 text-gray-400">
+        <div v-if="apiCategories.length === 0" class="col-span-full text-center py-20 text-gray-400">
           <BookOpen class="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>暂无分类，点击上方按钮新建</p>
         </div>
@@ -233,12 +233,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2, RefreshCw, Loader2, CheckCircle } from 'lucide-vue-next'
 import type { Category, Course } from '@/types'
+import { fetchCategories, fetchCourses, syncCategoriesFromSchedules } from '@/api'
 
 const store = useAppStore()
+
+// 从 API 加载的分类和课程数据
+const apiCategories = ref<any[]>([])
+const apiCourses = ref<any[]>([])
+
+onMounted(() => loadData())
+
+async function loadData() {
+  try {
+    const [catRes, courseRes] = await Promise.all([fetchCategories(), fetchCourses()])
+    if (catRes.success) {
+      apiCategories.value = catRes.categories
+      // 同时更新 store 让其他页面也能用
+      store.categories = catRes.categories
+    }
+    if (courseRes.success) {
+      apiCourses.value = courseRes.courses
+      store.courses = courseRes.courses
+    }
+  } catch (e) {
+    console.error('加载分类数据失败:', e)
+  }
+}
 
 // ====== Level state ======
 const selectedCategory = ref<Category | null>(null)
@@ -257,14 +281,14 @@ const courseForm = ref({ title: '', description: '', categoryId: '', teacher: ''
 // ====== Computed ======
 const filteredCourses = computed(() => {
   if (!selectedCategory.value) return []
-  return store.courses.filter((c) => {
+  return apiCourses.value.filter((c: any) => {
     if (c.categoryId !== selectedCategory.value!.id) return false
     if (searchText.value && !c.title.includes(searchText.value)) return false
     return true
   })
 })
 
-const getCourseCount = (catId: string) => store.courses.filter((c) => c.categoryId === catId).length
+const getCourseCount = (catId: string) => apiCourses.value.filter((c: any) => c.categoryId === catId).length
 
 // ====== Sync state ======
 /*
@@ -290,17 +314,21 @@ function handleSync() {
   if (isSyncing.value) return
   isSyncing.value = true
 
-  // Simulate 1.2s request delay
-  setTimeout(() => {
-    // Generate mock result
+  syncCategoriesFromSchedules().then((res) => {
     syncResult.value = {
-      added: Math.floor(Math.random() * 8) + 3,
-      updated: Math.floor(Math.random() * 10) + 5,
-      failed: Math.floor(Math.random() * 3),
+      added: res.added ?? 0,
+      updated: res.updated ?? 0,
+      failed: res.failed ?? 0,
     }
     isSyncing.value = false
     showSyncResult.value = true
-  }, 1200)
+    // 同步后刷新数据
+    loadData()
+  }).catch((e) => {
+    isSyncing.value = false
+    syncResult.value = { added: 0, updated: 0, failed: 1 }
+    showSyncResult.value = true
+  })
 }
 
 function closeSyncResult() {

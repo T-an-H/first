@@ -72,3 +72,51 @@ export async function fetchStudents(params = {}) {
   const query = new URLSearchParams(params).toString();
   return request(`/students${query ? '?' + query : ''}`);
 }
+
+/** 获取班级列表 */
+export async function fetchClasses() {
+  return request('/students/classes');
+}
+
+/** 获取分类列表 */
+export async function fetchCategories() {
+  return request('/categories');
+}
+
+/** 获取课程列表 */
+export async function fetchCourses() {
+  return request('/categories/courses');
+}
+
+/** 从排课同步分类和课程 */
+export async function syncCategoriesFromSchedules() {
+  return request('/categories/sync', { method: 'POST' });
+}
+
+/** 批量导入排课 */
+export async function bulkImportSchedules(schedules) {
+  return request('/schedules/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ schedules }),
+  });
+}
+
+/** 获取排课列表 */
+export async function fetchSchedules() {
+  return request('/schedules');
+}
+
+/** 更新一条排课 */
+export async function updateSchedule(id, data) {
+  return request(`/schedules/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+/** 删除一条排课 */
+export async function deleteSchedule(id) {
+  return request(`/schedules/${id}`, {
+    method: 'DELETE',
+  });
+}

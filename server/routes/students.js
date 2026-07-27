@@ -8,24 +8,58 @@ import pool from '../db.js';
 
 const router = Router();
 
+/** 格式化 MySQL 日期，避免 toISOString 时区偏移 */
+function fmtDate(d) {
+  if (!d) return '';
+  if (typeof d === 'string') return d;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * GET /api/students/classes - 获取所有班级及人数
+ * 返回: { success, classes: [{ name, count }] }
+ */
+router.get('/classes', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT class_name AS name, COUNT(*) AS count FROM students WHERE class_name IS NOT NULL AND class_name != "" GROUP BY class_name ORDER BY class_name'
+    );
+    res.json({ success: true, classes: rows });
+  } catch (error) {
+    console.error('获取班级列表失败:', error);
+    res.status(500).json({ success: false, message: '获取班级列表失败' });
+  }
+});
+
 /**
  * GET /api/students - 获取所有学生
- * 返回: { success, students }
+ * 支持 ?class=xxx 按班级筛选，支持 ?search=xxx 搜索
+ * 返回: { success, students, total }
  */
 router.get('/', async (req, res) => {
   try {
-    const { search, page = 1, pageSize = 100 } = req.query;
+    const { search, class: className, page = 1, pageSize = 100 } = req.query;
     const offset = (Number(page) - 1) * Number(pageSize);
     const limit = Number(pageSize);
 
-    let whereClause = '';
+    const conditions = [];
     const params = [];
 
     if (search) {
-      whereClause = 'WHERE name LIKE ? OR student_id LIKE ? OR class_name LIKE ?';
+      conditions.push('(name LIKE ? OR student_id LIKE ? OR class_name LIKE ?)');
       const keyword = `%${search}%`;
       params.push(keyword, keyword, keyword);
     }
+
+    if (className) {
+      conditions.push('class_name = ?');
+      params.push(className);
+    }
+
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     // 查总数
     const [countRows] = await pool.execute(
@@ -51,7 +85,7 @@ router.get('/', async (req, res) => {
       email: s.email,
       className: s.class_name,
       status: s.status,
-      joinDate: s.created_at?.toISOString?.().split('T')[0] || s.created_at,
+      joinDate: fmtDate(s.created_at),
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.name)}`,
     }));
 
@@ -89,7 +123,7 @@ router.get('/:id', async (req, res) => {
       email: s.email,
       className: s.class_name,
       status: s.status,
-      joinDate: s.created_at?.toISOString?.().split('T')[0] || s.created_at,
+      joinDate: fmtDate(s.created_at),
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.name)}`,
     };
 

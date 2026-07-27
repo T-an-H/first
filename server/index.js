@@ -8,6 +8,8 @@ import cors from 'cors';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import studentRoutes from './routes/students.js';
+import scheduleRoutes from './routes/schedules.js';
+import categoryRoutes from './routes/categories.js';
 
 const app = express();
 const PORT = 3000;
@@ -38,6 +40,12 @@ app.use('/api/user', userRoutes);
 
 // 学生管理路由（管理员用）
 app.use('/api/students', studentRoutes);
+
+// 排课管理路由
+app.use('/api/schedules', scheduleRoutes);
+
+// 分类管理路由
+app.use('/api/categories', categoryRoutes);
 
 // ====== 启动服务器 ======
 app.listen(PORT, () => {

@@ -10,6 +10,42 @@ import { renderIcon } from '@/utils/d3-renderer'
 
 const store = useAppStore()
 
+// ---- 从数据库加载学生课表 ----
+const dbSchedules = ref<any[]>([])
+const loading = ref(true)
+
+onMounted(async () => {
+  await loadMySchedules()
+  const el = document.getElementById('student-schedule-root')
+  if (el) renderSchedule(el)
+})
+
+async function loadMySchedules() {
+  loading.value = true
+  try {
+    // 1. 找当前学生的班级
+    const studentName = store.currentUser
+    if (!studentName) return
+
+    // 从 students API 查询学生信息
+    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
+    const stuData = await stuRes.json()
+    const myInfo = stuData.students?.[0]
+    if (!myInfo?.className) return
+
+    // 2. 按班级加载排课
+    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
+    const schData = await schRes.json()
+    if (schData.success) {
+      dbSchedules.value = schData.schedules
+    }
+  } catch (e) {
+    console.error('加载课表失败:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
 // ---- 周导航 ----
 const weekStart = ref(getMonday(new Date()))
 
@@ -51,14 +87,8 @@ function prevWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate()
 function nextWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() + 7); weekStart.value = d; reRender() }
 function todayFn() { weekStart.value = getMonday(new Date()); reRender() }
 
-// ---- 学生课表数据 ----
-const student = computed(() => store.students.find((s) => s.name === store.currentUser) ?? store.students[0])
-
-const mySchedules = computed(() => {
-  if (!student.value) return []
-  const ids = store.enrollments.filter((e) => e.studentId === student.value.id).map((e) => e.courseId)
-  return store.schedules.filter((s) => ids.includes(s.courseId))
-})
+// ---- 学生课表数据（从数据库按班级加载） ----
+const mySchedules = computed(() => dbSchedules.value)
 
 // ---- 提取课程的周规律 ----
 interface CoursePattern {
@@ -361,11 +391,6 @@ function renderSchedule(root: HTMLElement) {
     })
   }
 }
-
-onMounted(() => {
-  const el = document.getElementById('student-schedule-root')
-  if (el) renderSchedule(el)
-})
 
 watch([mySchedules, weekStart], () => {
   const el = document.getElementById('student-schedule-root')

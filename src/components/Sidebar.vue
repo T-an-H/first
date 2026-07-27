@@ -13,9 +13,8 @@ const route = useRoute()
 const router = useRouter()
 
 const adminNavItems = [
-  { to: '/admin/categories', icon: 'barChart3' as const, label: '分类管理' },
-  { to: '/admin/schedules', icon: 'calendar' as const, label: '排课管理' },
-  { to: '/admin/students', icon: 'users' as const, label: '学员管理' },
+  { to: '/admin/schedules', icon: 'calendar' as const, label: '课程管理' },
+  { to: '/admin/students', icon: 'users' as const, label: '班级管理' },
 ]
 
 const teacherNavItems = [
