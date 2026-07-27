@@ -14,12 +14,14 @@ const router = useRouter()
 
 const adminNavItems = [
   { to: '/admin/categories', icon: 'barChart3' as const, label: '分类管理' },
+  { to: '/admin/schedules', icon: 'calendar' as const, label: '排课管理' },
   { to: '/admin/students', icon: 'users' as const, label: '学员管理' },
 ]
 
 const teacherNavItems = [
   { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
-  { to: '/teacher/grades', icon: 'award' as const, label: '成绩管理' },
+  { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
+  { to: '/teacher/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
@@ -27,13 +29,14 @@ const studentNavItems = [
   { to: '/student/profile', icon: 'user' as const, label: '个人画像' },
   { to: '/student/schedule', icon: 'calendar' as const, label: '我的课表' },
   { to: '/student/courses', icon: 'bookOpen' as const, label: '我的课程' },
-  { to: '/student/grades', icon: 'award' as const, label: '成绩管理' },
+  { to: '/student/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/student/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
 const mentorNavItems = [
   { to: '/mentor/courses', icon: 'bookOpen' as const, label: '我的课程' },
-  { to: '/mentor/grades', icon: 'award' as const, label: '成绩管理' },
+  { to: '/mentor/schedule', icon: 'calendar' as const, label: '课程表' },
+  { to: '/mentor/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/mentor/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 

@@ -1,11 +1,5 @@
 <template>
-  <div v-if="loading" class="text-center py-12 text-gray-400">
-    <div class="flex items-center justify-center gap-2">
-      <LoaderCircle class="w-5 h-5 animate-spin text-blue-500" />
-      <span>加载中...</span>
-    </div>
-  </div>
-  <div v-else-if="!student" class="text-center py-12 text-gray-400">学生不存在</div>
+  <div v-if="!student" class="text-center py-12 text-gray-400">学生不存在</div>
   <div v-else class="space-y-6">
     <div class="flex items-center gap-4">
       <router-link to="/admin/students" class="p-2 rounded-lg hover:bg-gray-100 transition-colors">
@@ -70,50 +64,25 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { ArrowLeft, BookOpen, LoaderCircle } from 'lucide-vue-next'
+import { ArrowLeft, BookOpen } from 'lucide-vue-next'
 
 const route = useRoute()
-const router = useRouter()
 const store = useAppStore()
 
-const student = ref<any>(null)
-const loading = ref(true)
+const student = computed(() => store.students.find((s) => s.id === route.params.id) || null)
 
-async function loadStudent() {
-  loading.value = true
-  try {
-    const res = await fetch(`http://localhost:3000/api/students/${route.params.id}`)
-    const data = await res.json()
-    if (data.success) {
-      student.value = data.student
-    }
-  } catch (e) {
-    console.error('加载学生详情失败:', e)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 已选课程仍从 mock 数据获取（根据学号匹配）
 const enrolledCourses = computed(() => {
   if (!student.value) return []
-  return store.enrollments.filter((e) => {
-    const mockStudent = store.students.find((s) => s.studentId === student.value?.studentId)
-    return mockStudent && e.studentId === mockStudent.id
-  })
+  return store.enrollments.filter((e) => e.studentId === student.value!.id)
 })
 
 const getCourseName = (id: string) => store.courses.find((c) => c.id === id)?.title || '未知'
 const getCourseProgress = (courseId: string) => {
   if (!student.value) return 0
-  const mockStudent = store.students.find((s) => s.studentId === student.value?.studentId)
-  if (!mockStudent) return 0
-  const enrollment = store.enrollments.find((e) => e.studentId === mockStudent.id && e.courseId === courseId)
+  const enrollment = store.enrollments.find((e) => e.studentId === student.value!.id && e.courseId === courseId)
   return enrollment?.progress || 0
 }
-
-onMounted(loadStudent)
 </script>

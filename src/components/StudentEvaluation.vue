@@ -37,78 +37,78 @@
       </div>
     </div>
 
-    <!-- 评价弹窗 -->
+    <!-- 评价弹窗（移出 v-if 链，确保始终可渲染） -->
     <Modal :is-open="evalModalOpen" :on-close="closeEvalModal" :title="`第${editingSession}次评价填写`" max-width="max-w-2xl">
       <!-- 异常预警 -->
-      <div v-if="modalAnomalies.length > 0" class="mb-4 bg-brand-600/10 border border-brand-400 rounded-lg p-3">
-        <div class="flex items-center gap-2 text-brand-600 text-sm font-medium mb-1">
-          <AlertTriangle class="w-4 h-4" />
-          异常预警 ({{ modalAnomalies.length }}条)
+        <div v-if="modalAnomalies.length > 0" class="mb-4 bg-brand-600/10 border border-brand-400 rounded-lg p-3">
+          <div class="flex items-center gap-2 text-brand-600 text-sm font-medium mb-1">
+            <AlertTriangle class="w-4 h-4" />
+            异常预警 ({{ modalAnomalies.length }}条)
+          </div>
+          <p v-for="a in modalAnomalies" :key="a.id" class="text-xs text-brand-600 ml-6">{{ a.warning }}</p>
         </div>
-        <p v-for="a in modalAnomalies" :key="a.id" class="text-xs text-brand-600 ml-6">{{ a.warning }}</p>
-      </div>
 
-      <!-- 表单 - 各评价类型 -->
-      <div class="space-y-4">
-        <div v-for="{ type, record, icon: Icon } in modalEvalTypes" :key="type" class="flex items-start gap-3 p-3 rounded-lg border" :class="EvalTypeColors[type]">
-          <component :is="Icon" class="w-4 h-4 mt-1" />
-          <div class="flex-1 min-w-0">
-            <p class="text-xs font-semibold mb-1">{{ EvalTypeLabels[type] }}</p>
+        <!-- 表单 - 各评价类型 -->
+        <div class="space-y-4">
+          <div v-for="{ type, record, icon: Icon } in modalEvalTypes" :key="type" class="flex items-start gap-3 p-3 rounded-lg border" :class="EvalTypeColors[type]">
+            <component :is="Icon" class="w-4 h-4 mt-1" />
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-semibold mb-1">{{ EvalTypeLabels[type] }}</p>
 
-            <!-- 自评：评分器 -->
-            <div v-if="type === 'self'" class="space-y-2">
-              <div class="flex items-center gap-3">
-                <input type="range" min="0" max="100" v-model.number="modalScores.self" class="flex-1 h-1.5 accent-blue-500" />
-                <span class="text-sm font-bold w-10 text-right" :class="scoreColorClass(modalScores.self)">{{ modalScores.self }}</span>
-                <span class="text-xs text-gray-400">分</span>
+              <!-- 自评：评分器 -->
+              <div v-if="type === 'self'" class="space-y-2">
+                <div class="flex items-center gap-3">
+                  <input type="range" min="0" max="100" v-model.number="modalScores.self" class="flex-1 h-1.5 accent-blue-500" />
+                  <span class="text-sm font-bold w-10 text-right" :class="scoreColorClass(modalScores.self)">{{ modalScores.self }}</span>
+                  <span class="text-xs text-gray-400">分</span>
+                </div>
+                <p v-if="validationErrors.self" class="text-xs text-brand-600">{{ validationErrors.self }}</p>
               </div>
-              <p v-if="validationErrors.self" class="text-xs text-brand-600">{{ validationErrors.self }}</p>
-            </div>
 
-            <!-- 教师/导师评价：只读 -->
-            <div v-else-if="type === 'teacher' || type === 'mentor'">
-              <span class="text-sm" :class="record ? 'font-bold' : 'text-gray-400'">
-                {{ record ? `${record.score}分` : '待教师评价' }}
-              </span>
-              <span v-if="record" class="text-[10px] text-gray-400 ml-2">{{ record.createdAt }}</span>
-            </div>
+              <!-- 教师/导师评价：只读 -->
+              <div v-else-if="type === 'teacher' || type === 'mentor'">
+                <span class="text-sm" :class="record ? 'font-bold' : 'text-gray-400'">
+                  {{ record ? `${record.score}分` : '待教师评价' }}
+                </span>
+                <span v-if="record" class="text-[10px] text-gray-400 ml-2">{{ record.createdAt }}</span>
+              </div>
 
-            <!-- 组内/组间互评：目标列表 -->
-            <div v-else class="space-y-1.5">
-              <div v-if="getPeerTargets(type).length === 0" class="text-xs text-gray-400">暂无互评目标</div>
-              <div v-for="target in getPeerTargets(type)" :key="target.key" class="flex items-center gap-2 px-2 py-1.5 bg-white/60 rounded border">
-                <span class="text-xs font-medium text-gray-800 min-w-[4em]">{{ target.label }}</span>
-                <template v-if="hasSubmittedPeerFor(target)">
-                  <span class="text-xs text-brand-600 ml-auto">已评 {{ getSubmittedPeerScore(target) }}分</span>
-                </template>
-                <template v-else>
-                  <div class="flex items-center gap-1 ml-auto">
-                    <input type="range" min="0" max="100" :value="getPeerScore(target.key)" @input="setPeerScoreInput(target.key, $event)" class="w-20 h-1 accent-blue-500" />
-                    <span class="text-xs font-bold w-8 text-center">{{ getPeerScore(target.key) }}</span>
-                  </div>
-                  <p v-if="validationErrors[`peer_${target.key}`]" class="text-xs text-brand-600 ml-2">{{ validationErrors[`peer_${target.key}`] }}</p>
-                </template>
+              <!-- 组内/组间互评：目标列表 -->
+              <div v-else class="space-y-1.5">
+                <div v-if="getPeerTargets(type).length === 0" class="text-xs text-gray-400">暂无互评目标</div>
+                <div v-for="target in getPeerTargets(type)" :key="target.key" class="flex items-center gap-2 px-2 py-1.5 bg-white/60 rounded border">
+                  <span class="text-xs font-medium text-gray-800 min-w-[4em]">{{ target.label }}</span>
+                  <template v-if="hasSubmittedPeerFor(target)">
+                    <span class="text-xs text-brand-600 ml-auto">已评 {{ getSubmittedPeerScore(target) }}分</span>
+                  </template>
+                  <template v-else>
+                    <div class="flex items-center gap-1 ml-auto">
+                      <input type="range" min="0" max="100" :value="getPeerScore(target.key)" @input="setPeerScoreInput(target.key, $event)" class="w-20 h-1 accent-blue-500" />
+                      <span class="text-xs font-bold w-8 text-center">{{ getPeerScore(target.key) }}</span>
+                    </div>
+                    <p v-if="validationErrors[`peer_${target.key}`]" class="text-xs text-brand-600 ml-2">{{ validationErrors[`peer_${target.key}`] }}</p>
+                  </template>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 提交按钮 -->
-        <div class="flex items-center gap-3 pt-2 border-t border-brand-400/20">
-          <div v-if="submitError" class="flex-1 text-xs text-brand-600 flex items-center gap-1">
-            <AlertTriangle class="w-3 h-3" />{{ submitError }}
+          <!-- 提交按钮 -->
+          <div class="flex items-center gap-3 pt-2 border-t border-brand-400/20">
+            <div v-if="submitError" class="flex-1 text-xs text-brand-600 flex items-center gap-1">
+              <AlertTriangle class="w-3 h-3" />{{ submitError }}
+            </div>
+            <button @click="handleModalSubmit" class="ml-auto px-6 py-2 bg-brand-600 hover:bg-brand-800 text-white text-sm font-medium rounded-lg transition-colors">
+              保存提交
+            </button>
           </div>
-          <button @click="handleModalSubmit" class="ml-auto px-6 py-2 bg-brand-600 hover:bg-brand-800 text-white text-sm font-medium rounded-lg transition-colors">
-            保存提交
-          </button>
         </div>
-      </div>
     </Modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, reactive, type Component } from 'vue'
+import { ref, computed, watch, type Component } from 'vue'
 import { useAppStore } from '@/stores/app'
 import {
   AlertTriangle, User, Users, Building2, GraduationCap, Briefcase,
@@ -238,6 +238,15 @@ interface PeerTarget {
   memberIds?: string[]
 }
 
+/** 根据组内成员的班级推断小组所属班级 */
+function getGroupClass(groupId: string): string | null {
+  const group = groups.value.find((g) => g.id === groupId)
+  if (!group || group.memberIds.length === 0) return null
+  const classes = new Set(group.memberIds.map((id) => store.students.find((s) => s.id === id)?.className).filter(Boolean))
+  // 如果组内成员来自多个班级，返回 null（不应发生）
+  return classes.size === 1 ? classes.values().next().value : null
+}
+
 function getPeerTargets(type: EvalType): PeerTarget[] {
   if (type === 'intra_group' && myGroup.value) {
     return myGroup.value.memberIds
@@ -248,8 +257,9 @@ function getPeerTargets(type: EvalType): PeerTarget[] {
       })
   }
   if (type === 'inter_group' && myGroup.value) {
+    const myClass = getGroupClass(myGroup.value.id)
     return groups.value
-      .filter((g) => g.id !== myGroup.value!.id)
+      .filter((g) => g.id !== myGroup.value!.id && (myClass ? getGroupClass(g.id) === myClass : true))
       .map((g) => ({
         key: g.id,
         label: g.name,

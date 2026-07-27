@@ -29,6 +29,67 @@
       </button>
     </div>
 
+    <!-- Tab: 课程管理 -->
+    <div v-if="activeTab === 'schedule'" class="space-y-6">
+      <!-- 课程时间概览 -->
+      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div class="flex items-center gap-2 mb-4">
+          <Calendar class="w-5 h-5 text-gray-400" />
+          <h2 class="font-semibold text-gray-900">课程时间</h2>
+          <span class="text-xs text-gray-400">
+            共 {{ sortedCourseSchedules.length }} 次课
+            <template v-if="completedCount > 0">
+              · {{ completedCount }} 次已完成
+            </template>
+          </span>
+        </div>
+        <div v-if="schedulesWithStatus.length > 0" class="space-y-2">
+          <div v-for="(sch, idx) in schedulesWithStatus" :key="sch.id"
+            :class="['flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-all',
+              sch.isCompleted
+                ? 'bg-gray-50 border-gray-200 opacity-60'
+                : 'bg-brand-400/5 border-brand-400/20']">
+            <div class="flex items-center gap-3">
+              <span :class="['text-xs font-medium min-w-[2rem]',
+                sch.isCompleted ? 'text-gray-400 line-through' : 'text-gray-600']">
+                第{{ sch.originalIndex + 1 }}次
+              </span>
+              <span :class="['text-xs px-2 py-0.5 rounded border',
+                sch.isCompleted
+                  ? 'bg-gray-100 border-gray-300 text-gray-400 line-through'
+                  : 'bg-white border-brand-400/30 text-gray-600']">
+                {{ sch.startDate }}
+              </span>
+              <span class="text-xs text-gray-400">~</span>
+              <span :class="['text-xs px-2 py-0.5 rounded border',
+                sch.isCompleted
+                  ? 'bg-gray-100 border-gray-300 text-gray-400 line-through'
+                  : 'bg-white border-brand-400/30 text-gray-600']">
+                {{ sch.endDate }}
+              </span>
+              <span :class="['text-xs', sch.isCompleted ? 'text-gray-400 line-through' : 'text-gray-500']">
+                {{ sch.timeSlot }}
+              </span>
+              <span :class="['text-xs', sch.isCompleted ? 'text-gray-400 line-through' : 'text-gray-400']">
+                {{ sch.room }}
+              </span>
+            </div>
+            <span v-if="sch.isCompleted"
+              class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 border border-gray-200">
+              已结课
+            </span>
+            <span v-else
+              class="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-200">
+              待上课
+            </span>
+          </div>
+        </div>
+        <div v-else class="text-center py-4 text-sm text-gray-400">
+          <p>暂无课程时间安排</p>
+        </div>
+      </div>
+    </div>
+
     <!-- Tab: 评论管理 -->
     <div v-if="activeTab === 'comments'" class="space-y-6">
       <!-- 评价方案配置 -->
@@ -65,7 +126,7 @@
               {{ EvalTypeLabels[t] }} ✗
             </span>
             <span v-else-if="(t === 'intra_group' || t === 'inter_group') && !courseHasGroups || t === 'mentor' && selectedConfig && !selectedConfig.hasMentor"
-              class="text-xs px-2.5 py-1 rounded-full bg-amber-50 text-amber-500 border border-amber-200">
+              class="text-xs px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 border border-brand-200">
               <EyeOff class="w-3 h-3 inline mr-0.5" />
               {{ EvalTypeLabels[t] }}（自动隐藏）
             </span>
@@ -176,7 +237,7 @@
           <EyeOff class="w-3.5 h-3.5 text-gray-400" />
           <span>该轮次已锁定，评价不可修改。上一轮次结束后自动锁定并处理逾期。</span>
         </div>
-        <div v-else-if="!isSessionTime(selectedBatchSession)" class="flex items-center gap-2 px-3 py-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-600">
+        <div v-else-if="!isSessionTime(selectedBatchSession)" class="flex items-center gap-2 px-3 py-2 mb-3 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-700">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
           <span>{{ selectedBatchSession === 1 ? '第一节课已开始，评价已开启' : '该轮次尚未到开启时间' }}</span>
         </div>
@@ -185,139 +246,174 @@
           <span>课程已结束，最终评价已截止。</span>
         </div>
 
-        <!-- 学生搜索 -->
-        <div class="mb-3">
-          <div class="relative max-w-xs">
+        <!-- 搜索 + 过滤 + 弹窗查看 -->
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          <div class="relative max-w-xs flex-1 min-w-[180px]">
             <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input v-model="evalStudentSearch" type="text" placeholder="搜索学生姓名..."
               class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
           </div>
+          <select v-model="evalFilterClass"
+            class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
+            <option value="">全部班级</option>
+            <option v-for="opt in evalClassOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <select v-model="evalFilterGroup"
+            class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
+            <option value="">全部分组</option>
+            <option v-for="opt in evalGroupOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
         </div>
 
-        <!-- 学生列表（按组排列，显示全部评价类型分数） -->
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-100">
-                <th class="w-10 py-2.5 px-2">
-                  <input type="checkbox"
-                    :checked="isAllSelected"
-                    @change="toggleAll"
-                    class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                </th>
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium">学生</th>
-                <th class="text-center py-2.5 px-2 w-14 text-gray-500 font-medium text-[10px]">自评</th>
-                <th class="text-center py-2.5 px-2 w-14 text-gray-500 font-medium text-[10px]">组内</th>
-                <th class="text-center py-2.5 px-2 w-14 text-gray-500 font-medium text-[10px]">组间</th>
-                <th class="text-center py-2.5 px-2 w-14 text-gray-500 font-medium text-[10px]">教师</th>
-                <th class="text-center py-2.5 px-2 w-14 text-gray-500 font-medium text-[10px]">导师</th>
-                <th class="text-left py-2.5 px-3 w-24 text-gray-500 font-medium">状态</th>
-                <th class="text-left py-2.5 px-3 w-36 text-gray-500 font-medium">新评分</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- 无分组学生 -->
-              <template v-for="(section, si) in evalTableSections" :key="si">
-                <tr class="bg-gray-50 border-b border-gray-100">
-                  <td colspan="9" class="py-2 px-3">
-                    <span class="text-sm font-semibold text-gray-700">{{ section.groupName }}</span>
-                    <span class="text-xs text-gray-400 ml-2">{{ section.students.length }}人</span>
-                  </td>
-                </tr>
-                <tr v-for="s in section.students" :key="s.student.id"
-                  class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                  :class="{ 'bg-blue-50/30': selectedStudentIds.includes(s.student.id), 'bg-emerald-50/20': s.submitted }">
-                  <td class="py-2.5 px-2 text-center">
-                    <input type="checkbox"
-                      v-model="selectedStudentIds"
-                      :value="s.student.id"
-                      :disabled="s.submitted"
-                      class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                  </td>
-                  <td class="py-2.5 px-3">
-                    <div class="flex items-center gap-3">
-                      <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <span class="text-xs font-medium text-blue-600">{{ s.student.name.charAt(0) }}</span>
-                      </div>
-                      <div>
-                        <p class="font-medium text-gray-900 text-sm">{{ s.student.name }}</p>
-                        <p class="text-xs text-gray-400">{{ s.student.id }}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td class="py-2.5 px-2 text-center">
-                    <span class="text-xs font-medium" :class="s.selfScore !== null ? 'text-blue-600' : 'text-gray-300'">{{ s.selfScore !== null ? s.selfScore + '分' : '-' }}</span>
-                  </td>
-                  <td class="py-2.5 px-2 text-center">
-                    <span class="text-xs font-medium" :class="s.intraScore !== null ? 'text-emerald-600' : 'text-gray-300'">{{ s.intraScore !== null ? s.intraScore + '分' : '-' }}</span>
-                  </td>
-                  <td class="py-2.5 px-2 text-center">
-                    <span class="text-xs font-medium" :class="s.interScore !== null ? 'text-purple-600' : 'text-gray-300'">{{ s.interScore !== null ? s.interScore + '分' : '-' }}</span>
-                  </td>
-                  <td class="py-2.5 px-2 text-center">
-                    <span class="text-xs font-medium" :class="s.teacherScore !== null ? 'text-amber-600' : 'text-gray-300'">{{ s.teacherScore !== null ? s.teacherScore + '分' : '-' }}</span>
-                  </td>
-                  <td class="py-2.5 px-2 text-center">
-                    <span class="text-xs font-medium" :class="s.mentorScore !== null ? 'text-rose-600' : 'text-gray-300'">{{ s.mentorScore !== null ? s.mentorScore + '分' : '-' }}</span>
-                  </td>
-                  <td class="py-2.5 px-3">
-                    <span v-if="s.submitted" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
-                      <CheckCircle class="w-3 h-3" />已提交
-                    </span>
-                    <span v-else-if="s.hasDraft" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-                      <Save class="w-3 h-3" />已保存
-                    </span>
-                    <span v-else class="text-xs text-gray-300">-</span>
-                  </td>
-                  <td class="py-2.5 px-3">
-                    <div v-if="!s.submitted" class="flex items-center gap-1">
-                      <input type="number" min="0" max="100"
-                        v-model.number="evalScoreInputs[s.student.id]"
-                        placeholder="输入分数"
-                        class="w-full max-w-[90px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-                      <span class="text-xs text-gray-400">分</span>
-                    </div>
-                    <span v-else class="text-xs font-medium text-emerald-600">{{ s.finalScore }}分</span>
-                  </td>
-                </tr>
-              </template>
-            </tbody>
-          </table>
-          <div v-if="evalTableSections.length === 0 || evalTableSections.every(sec => sec.students.length === 0)" class="text-center py-8 text-gray-400">
-            {{ evalStudentSearch ? '未找到匹配的学生' : '该课程暂无学生' }}
-          </div>
-        </div>
-
-        <!-- 底部操作区 -->
-        <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-start justify-between gap-4">
-          <!-- 批量等级按钮 -->
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="text-xs text-gray-500 font-medium">一键等级评价（选中 {{ selectedUnsubmittedCount }} 名学生）：</span>
-            <div class="flex flex-wrap gap-1.5">
-              <button v-for="level in LEVEL_OPTIONS" :key="level.label"
-                @click="handleBatchEval(level.label)"
-                :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${level.color} hover:opacity-80 ${selectedUnsubmittedCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`"
-                :disabled="selectedUnsubmittedCount === 0">
-                {{ level.label }} ({{ level.range[0] }}-{{ level.range[1] }}分)
-              </button>
+        <!-- 班级卡片列表 -->
+        <div v-if="filteredEvalTableSections.length > 0">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div v-for="(classBlock, ci) in filteredEvalTableSections" :key="ci"
+              @click="selectedEvalClass = classBlock.className; showEvalPopup = true"
+              class="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-sm font-semibold text-gray-800">班级 {{ classBlock.className || '未分班' }}</span>
+                  <span class="text-xs text-gray-400 ml-2">{{ classBlock.groups.reduce((a, g) => a + g.students.length, 0) }}人</span>
+                </div>
+                <ChevronRight class="w-4 h-4 text-gray-400" />
+              </div>
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                <span v-for="(group, gi) in classBlock.groups" :key="gi"
+                  class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                  {{ group.groupName }} ({{ group.students.length }}人)
+                </span>
+              </div>
             </div>
           </div>
-          <div class="flex items-center gap-2">
-            <button @click="handleSaveEvalScores"
-              :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasEvalInputs ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-              :disabled="!hasEvalInputs">
-              <Save class="w-4 h-4" />
-              保存评分
-            </button>
-            <button @click="handleSubmitAll"
-              :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasSubmittable ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-              :disabled="!hasSubmittable">
-              <CheckCircle class="w-4 h-4" />
-              全部提交（{{ submittableCount }}人）
-            </button>
-          </div>
+        </div>
+        <div v-else class="text-center py-8 text-gray-400">
+          {{ evalStudentSearch ? '未找到匹配的学生' : '该课程暂无学生' }}
         </div>
       </div>
+
+      <!-- 评价管理弹窗 -->
+      <Teleport to="body">
+        <div v-if="showEvalPopup" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="closeEvalPopup()" />
+          <div class="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[85vh] flex flex-col">
+            <!-- 头部 -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-800">班级 {{ selectedEvalClass }} - 评价管理</h3>
+              <button @click="closeEvalPopup()" class="text-gray-400 hover:text-gray-600">
+                <X class="w-5 h-5" />
+              </button>
+            </div>
+            <!-- 内容 -->
+            <div class="flex-1 overflow-auto px-6 py-4">
+              <div v-if="!currentEvalClassSection" class="text-center py-8 text-gray-400">暂无数据</div>
+              <template v-if="currentEvalClassSection">
+                <div v-for="(group, gi) in currentEvalClassSection.groups" :key="gi" class="mb-4">
+                  <div class="text-xs font-semibold text-gray-600 mb-2 px-1">{{ group.groupName }}（{{ group.students.length }}人）</div>
+                  <table class="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                    <thead>
+                      <tr class="bg-gray-50 border-b border-gray-200">
+                        <th class="w-10 py-2 px-2">
+                          <input type="checkbox"
+                            :checked="isAllSelected"
+                            @change="toggleAll"
+                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        </th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs">学生</th>
+                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">自评</th>
+                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">组内</th>
+                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">组间</th>
+                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">教师</th>
+                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">导师</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">状态</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-24">新评分</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="s in group.students" :key="s.student.id"
+                        class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                        :class="{ 'bg-blue-50/30': selectedStudentIds.includes(s.student.id), 'bg-emerald-50/20': s.submitted }">
+                        <td class="py-2 px-2 text-center">
+                          <input type="checkbox"
+                            v-model="selectedStudentIds"
+                            :value="s.student.id"
+                            :disabled="s.submitted"
+                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                        </td>
+                        <td class="py-2 px-3">
+                          <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <span class="text-xs font-medium text-blue-600">{{ s.student.name.charAt(0) }}</span>
+                            </div>
+                            <div>
+                              <p class="font-medium text-gray-900 text-sm">{{ s.student.name }}</p>
+                              <p class="text-xs text-gray-400">{{ s.student.id }}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="py-2 px-2 text-center text-xs" :class="s.selfScore !== null ? 'text-blue-600 font-medium' : 'text-gray-300'">{{ s.selfScore !== null ? s.selfScore + '分' : '-' }}</td>
+                        <td class="py-2 px-2 text-center text-xs" :class="s.intraScore !== null ? 'text-emerald-600 font-medium' : 'text-gray-300'">{{ s.intraScore !== null ? s.intraScore + '分' : '-' }}</td>
+                        <td class="py-2 px-2 text-center text-xs" :class="s.interScore !== null ? 'text-purple-600 font-medium' : 'text-gray-300'">{{ s.interScore !== null ? s.interScore + '分' : '-' }}</td>
+                        <td class="py-2 px-2 text-center text-xs" :class="s.teacherScore !== null ? 'text-brand-700 font-medium' : 'text-gray-300'">{{ s.teacherScore !== null ? s.teacherScore + '分' : '-' }}</td>
+                        <td class="py-2 px-2 text-center text-xs" :class="s.mentorScore !== null ? 'text-rose-600 font-medium' : 'text-gray-300'">{{ s.mentorScore !== null ? s.mentorScore + '分' : '-' }}</td>
+                        <td class="py-2 px-3">
+                          <span v-if="s.submitted" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                            <CheckCircle class="w-3 h-3" />已提交
+                          </span>
+                          <span v-else-if="s.hasDraft" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                            <Save class="w-3 h-3" />已保存
+                          </span>
+                          <span v-else class="text-xs text-gray-300">-</span>
+                        </td>
+                        <td class="py-2 px-3">
+                          <div v-if="!s.submitted" class="flex items-center gap-1">
+                            <input type="number" min="0" max="100"
+                              v-model.number="evalScoreInputs[s.student.id]"
+                              placeholder="分数"
+                              class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                            <span class="text-xs text-gray-400">分</span>
+                          </div>
+                          <span v-else class="text-xs font-medium text-emerald-600">{{ s.finalScore }}分</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+            <!-- 底部 -->
+            <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-start justify-between gap-4">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs text-gray-500 font-medium">一键等级评价（选中 {{ selectedUnsubmittedCount }} 名学生）：</span>
+                <div class="flex flex-wrap gap-1.5">
+                  <button v-for="level in LEVEL_OPTIONS" :key="level.label"
+                    @click="handleBatchEval(level.label)"
+                    :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${level.color} hover:opacity-80 ${selectedUnsubmittedCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`"
+                    :disabled="selectedUnsubmittedCount === 0">
+                    {{ level.label }} ({{ level.range[0] }}-{{ level.range[1] }}分)
+                  </button>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="handleSaveEvalScores"
+                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasEvalInputs ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
+                  :disabled="!hasEvalInputs">
+                  <Save class="w-4 h-4" />
+                  保存评分
+                </button>
+                <button @click="handleSubmitAll"
+                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasSubmittable ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
+                  :disabled="!hasSubmittable">
+                  <CheckCircle class="w-4 h-4" />
+                  全部提交（{{ submittableCount }}人）
+                </button>
+                <button @click="closeEvalPopup()"
+                  class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">关闭</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
 
     <!-- Tab: 成绩管理（考试/项目成绩录入） -->
@@ -345,17 +441,6 @@
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
               添加考试/项目
             </button>
-            <!-- Excel导入 -->
-            <label :class="`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${isReadOnly ? 'bg-gray-100 text-gray-400' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'}`">
-              <FileSpreadsheet class="w-3.5 h-3.5" />
-              导入 Excel
-              <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly" />
-            </label>
-            <button @click="handleDownloadTemplate" :disabled="isReadOnly"
-              class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
-              <FileSpreadsheet class="w-3.5 h-3.5" />
-              下载模板
-            </button>
           </div>
           <span v-if="isMentor" class="text-xs text-gray-400 italic">导师仅可查看，如需操作请联系授课教师</span>
         </div>
@@ -375,7 +460,7 @@
               <span class="text-xs text-gray-400">权重总和: {{ examWeightTotal }}%</span>
             </div>
             <div class="flex items-center gap-2">
-              <span v-if="examWeightTotal !== 100" class="text-xs text-amber-500 font-medium">⚠ 权重总和不等于100%</span>
+              <span v-if="examWeightTotal !== 100" class="text-xs text-brand-600 font-medium">⚠ 权重总和不等于100%</span>
               <span v-else class="text-xs text-emerald-500 font-medium">✓ 权重已平衡</span>
             </div>
           </div>
@@ -434,139 +519,59 @@
               <input v-model="gradeSearch" type="text" placeholder="搜索学生姓名或学号..."
                 class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
             </div>
-          </div>
-        </div>
-
-        <div v-if="selectedExam" class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="border-b border-gray-100">
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium w-28">学生</th>
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium w-20">满分</th>
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium w-20">成绩</th>
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium w-28">折合百分制</th>
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium w-24">状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="{ student } in filteredGradeStudents" :key="student!.id"
-                class="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                :class="{ 'bg-emerald-50/20': isExamSubmitted(student!.id) }">
-                <td class="py-2.5 px-3">
-                  <span class="text-sm font-medium text-gray-900">{{ student!.name }}</span>
-                </td>
-                <td class="py-2.5 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
-                <td class="py-2.5 px-3">
-                  <div v-if="!isExamSubmitted(student!.id)" class="flex items-center gap-1">
-                    <input type="number" min="0" :max="currentExamFullScore"
-                      :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
-                      @input="(e) => { const v = parseInt((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(currentExamFullScore, Math.max(0, v)); else delete examInputs[student!.id] }"
-                      :placeholder="getStudentExamScore(student!.id) !== null ? String(getStudentExamScore(student!.id)) : '分数'"
-                      class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-                    <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
-                  </div>
-                  <span v-else class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
-                </td>
-                <td class="py-2.5 px-3">
-                  <span class="text-xs font-medium text-blue-600">
-                    {{ getStudentExamPercent(student!.id) }}
-                  </span>
-                </td>
-                <td class="py-2.5 px-3">
-                  <span v-if="isExamSubmitted(student!.id)" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
-                    <CheckCircle class="w-3 h-3" />已提交
-                  </span>
-                  <span v-else-if="getStudentExamScore(student!.id) !== null" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-                    <Save class="w-3 h-3" />已保存
-                  </span>
-                  <span v-else class="text-xs text-gray-300">-</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="filteredGradeStudents.length === 0" class="text-center py-8 text-gray-400">暂无学生数据</div>
-        </div>
-
-        <!-- 底部操作（保存/提交） -->
-        <div v-if="selectedExam && !isReadOnly && !isMentor" class="mt-4 pt-4 border-t border-gray-100 flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500">共 {{ enrolledStudents.length }} 名学生，已提交 {{ submittedExamCount }} 人</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <button @click="handleSaveExamScores"
-              :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasExamInputs ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-              :disabled="!hasExamInputs">
-              <Save class="w-4 h-4" />
-              保存成绩
-            </button>
-            <button @click="handleSubmitExamScores"
-              :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${pendingExamSubmits > 0 ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-              :disabled="pendingExamSubmits === 0">
-              <CheckCircle class="w-4 h-4" />
-              全部提交（{{ pendingExamSubmits }}人）
+            <!-- Excel导入 -->
+            <label v-if="!isMentor" :class="`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${isReadOnly ? 'bg-gray-100 text-gray-400' : 'bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100'}`">
+              <FileSpreadsheet class="w-3.5 h-3.5" />
+              导入 Excel
+              <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly" />
+            </label>
+            <button v-if="!isMentor" @click="openDownloadTemplateModal" :disabled="isReadOnly"
+              class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors">
+              <FileSpreadsheet class="w-3.5 h-3.5" />
+              下载模板
             </button>
           </div>
         </div>
-      </div>
 
-      <!-- 学生成绩总览/搜索区 -->
-      <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-2">
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            <h2 class="font-semibold text-gray-900">成绩查询</h2>
-          </div>
+        <!-- 过滤 + 弹窗查看（成绩管理） -->
+        <div v-if="selectedExam" class="mb-3 flex flex-wrap items-center gap-2">
+          <select v-model="gradeFilterClass"
+            class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
+            <option value="">全部班级</option>
+            <option v-for="opt in gradeClassOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
+          <select v-model="gradeFilterGroup"
+            class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
+            <option value="">全部分组</option>
+            <option v-for="opt in gradeGroupOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+          </select>
         </div>
-        <div class="flex items-end gap-3 mb-4">
-          <div class="flex-1">
-            <label class="text-xs text-gray-500 mb-1 block">搜索学生姓名</label>
-            <input v-model="totalSearch" type="text" placeholder="输入学生姓名查询总成绩..."
-              class="w-full max-w-xs px-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
-          </div>
-        </div>
-        <!-- 学生成绩列表（按首字母分组） -->
-        <div v-if="studentGradeGroups.length > 0" class="space-y-3">
-          <div v-for="group in studentGradeGroups" :key="group.initial"
-            class="border border-gray-100 rounded-xl overflow-hidden">
-            <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-              <span class="text-sm font-bold text-gray-700">{{ group.initial }}</span>
-              <span class="text-xs text-gray-400">{{ group.students.length }}人</span>
-            </div>
-            <div class="divide-y divide-gray-50">
-              <div v-for="student in group.students" :key="student.id"
-                class="px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors cursor-pointer"
-                @click="totalSearch = student.name">
-                <div class="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <span class="text-xs font-medium text-blue-600">{{ student.name.charAt(0) }}</span>
+
+        <div v-if="selectedExam && filteredGradeClassBlocks.length > 0">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
+              @click="selectedGradeClass = classBlock.className; showGradePopup = true"
+              class="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-sm font-semibold text-gray-800">班级 {{ classBlock.className || '未分班' }}</span>
+                  <span class="text-xs text-gray-400 ml-2">{{ classBlock.groups.reduce((a, g) => a + g.items.length, 0) }}人</span>
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="font-medium text-gray-900 text-sm">{{ student.name }}</p>
-                  <p class="text-xs text-gray-400">{{ student.id }}</p>
-                </div>
-                <div class="grid grid-cols-3 gap-4 text-right">
-                  <div>
-                    <p class="text-[10px] text-gray-400">加权总分</p>
-                    <p class="text-sm font-bold" :style="{ color: totalScoreColor(getStudentTotalScore(student.id)) }">
-                      {{ getStudentTotalScore(student.id) }}
-                    </p>
-                  </div>
-                  <div>
-                    <p class="text-[10px] text-gray-400">考试数</p>
-                    <p class="text-sm font-bold text-blue-600">{{ getStudentExamCount(student.id) }}</p>
-                  </div>
-                  <div>
-                    <p class="text-[10px] text-gray-400">平时成绩</p>
-                    <p class="text-sm font-bold text-emerald-600">{{ getStudentAvgScore(student.id) }}</p>
-                  </div>
-                </div>
+                <ChevronRight class="w-4 h-4 text-gray-400" />
+              </div>
+              <div class="mt-2 flex flex-wrap gap-1.5">
+                <span v-for="(group, gi) in classBlock.groups" :key="gi"
+                  class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                  {{ group.groupName }} ({{ group.items.length }}人)
+                </span>
               </div>
             </div>
           </div>
         </div>
-        <div v-else-if="totalSearch.trim()" class="text-center py-6 text-gray-400">
-          未找到学生 "{{ totalSearch }}"
-        </div>
+        <div v-else-if="selectedExam" class="text-center py-8 text-gray-400">暂无学生数据</div>
       </div>
+
+
 
       <!-- 新建考试/项目弹窗 -->
       <Teleport to="body">
@@ -610,265 +615,449 @@
           </div>
         </div>
       </Teleport>
+
+      <!-- 成绩管理弹窗 -->
+      <Teleport to="body">
+        <div v-if="showGradePopup" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="closeGradePopup()" />
+          <div class="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[85vh] flex flex-col">
+            <!-- 头部 -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 class="text-lg font-semibold text-gray-800">班级 {{ selectedGradeClass }} - 成绩管理（{{ selectedExam }}）</h3>
+              <div class="flex items-center gap-2">
+                <div class="relative w-48">
+                  <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input v-model="gradePopupSearch" type="text" placeholder="搜索学生姓名或学号..."
+                    class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
+                </div>
+                <button @click="closeGradePopup()" class="text-gray-400 hover:text-gray-600">
+                  <X class="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <!-- 内容 -->
+            <div class="flex-1 overflow-auto px-6 py-4">
+              <div v-if="!currentGradeClassSection" class="text-center py-8 text-gray-400">暂无数据</div>
+              <div v-else-if="filteredGradePopupGroups.length === 0" class="text-center py-8 text-gray-400">未找到匹配的学生</div>
+              <template v-if="currentGradeClassSection">
+                <div v-for="(group, gi) in filteredGradePopupGroups" :key="gi" class="mb-4">
+                  <div class="text-xs font-semibold text-gray-600 mb-2 px-1">{{ group.groupName }}（{{ group.items.length }}人）</div>
+                  <table class="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                    <thead>
+                      <tr class="bg-gray-50 border-b border-gray-200">
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs">学生</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">满分</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-32">成绩</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-24">折合百分制</th>
+                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">状态</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="{ student } in group.items" :key="student!.id"
+                        class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                        :class="{ 'bg-emerald-50/20': isExamSubmitted(student!.id) }">
+                        <td class="py-2 px-3">
+                          <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <span class="text-xs font-medium text-blue-600">{{ student!.name.charAt(0) }}</span>
+                            </div>
+                            <div>
+                              <p class="font-medium text-gray-900 text-sm">{{ student!.name }}</p>
+                              <p class="text-xs text-gray-400">{{ student!.studentId || student!.id }}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="py-2 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
+                        <td class="py-2 px-3">
+                          <div v-if="!isExamSubmitted(student!.id)" class="flex items-center gap-1">
+                            <input type="number" min="0" :max="currentExamFullScore" step="0.5"
+                              :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
+                              @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(currentExamFullScore, Math.max(0, v)); else delete examInputs[student!.id] }"
+                              :placeholder="getStudentExamScore(student!.id) !== null ? String(getStudentExamScore(student!.id)) : '分数'"
+                              class="w-full max-w-[100px] px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                            <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
+                          </div>
+                          <span v-else class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
+                        </td>
+                        <td class="py-2 px-3 text-xs text-blue-600 font-medium">{{ getStudentExamPercent(student!.id) }}</td>
+                        <td class="py-2 px-3">
+                          <span v-if="isExamSubmitted(student!.id)" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                            <CheckCircle class="w-3 h-3" />已提交
+                          </span>
+                          <span v-else-if="getStudentExamScore(student!.id) !== null" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                            <Save class="w-3 h-3" />已保存
+                          </span>
+                          <span v-else class="text-xs text-gray-300">-</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </template>
+            </div>
+            <!-- 底部 -->
+            <div v-if="!isReadOnly && !isMentor" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">已提交 {{ submittedExamCount }} 人</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="handleSaveExamScores"
+                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasExamInputs ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
+                  :disabled="!hasExamInputs">
+                  <Save class="w-4 h-4" />
+                  保存成绩
+                </button>
+                <button @click="handleSubmitExamScores"
+                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${pendingExamSubmits > 0 ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
+                  :disabled="pendingExamSubmits === 0">
+                  <CheckCircle class="w-4 h-4" />
+                  全部提交（{{ pendingExamSubmits }}人）
+                </button>
+                <button @click="closeGradePopup()"
+                  class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">关闭</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
 
-    <!-- Tab: 学生管理（班级 → 学生两级视图） -->
+    <!-- Tab: 学生管理（大改版：班级板块直展分组） -->
     <div v-if="activeTab === 'students'" class="space-y-6">
-      <!-- ====== Level 1: 班级列表 ====== -->
-      <template v-if="!selectedGroupId">
-        <div class="flex items-center justify-between">
-          <div>
-            <h1 class="text-2xl font-bold text-gray-900">班级管理</h1>
-            <p class="text-gray-500 mt-1">{{ enrolledStudents.length }}名学生 · {{ store.studentGroups.filter(g => g.courseId === courseId).length }}个班级</p>
-          </div>
-          <div v-if="!isMentor" class="flex items-center gap-2">
-            <input ref="groupExcelInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleImportGroupsExcel" />
-            <button @click="groupExcelInput?.click()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-              <FileSpreadsheet class="w-3.5 h-3.5" />
-              导入班级
-            </button>
-            <button @click="openNewGroupModal()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-              <Plus class="w-3.5 h-3.5" />
-              新建班级
-            </button>
-          </div>
-          <span v-if="isMentor" class="text-xs text-gray-400 italic">导师仅可查看，如需操作请联系授课教师</span>
+      <!-- 课程信息提示 -->
+      <div class="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3">
+        <BookOpen class="w-5 h-5 text-blue-600" />
+        <span class="text-sm font-medium text-blue-800">
+          当前课程：<span class="font-bold">{{ course?.title }}</span>
+        </span>
+        <span class="text-xs text-blue-500 ml-auto">共 {{ enrolledStudents.length }} 名学生</span>
+      </div>
+
+      <!-- 顶部全局操作栏 -->
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="font-semibold text-gray-900 text-lg">班级管理</h2>
+        <div class="flex gap-2 flex-wrap">
+          <button @click="showOneClickGroup = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm">
+            <RefreshCw class="w-3.5 h-3.5" />
+            一键分组
+          </button>
+          <button @click="showAddClass = true"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors shadow-sm">
+            <Plus class="w-3.5 h-3.5" />
+            新增班级
+          </button>
+          <button @click="handleImportClassDetail"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm">
+            <Upload class="w-3.5 h-3.5" />
+            导入班级信息
+          </button>
+          <input ref="groupExcelInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleImportGroupsExcel" />
+          <button @click="groupExcelInput?.click()"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors">
+            <FileSpreadsheet class="w-3.5 h-3.5" />
+            导入分组数据
+          </button>
+          <button @click="openNewGroupModal()"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors">
+            <Plus class="w-3.5 h-3.5" />
+            新建分组
+          </button>
         </div>
+      </div>
 
-        <!-- 班级卡片网格 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div
-            v-for="group in courseGroups"
-            :key="group.id"
-            @click="selectedGroupId = group.id"
-            class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer group"
-          >
-            <div class="flex items-start justify-between mb-3">
-              <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                <Users class="w-5 h-5 text-indigo-600" />
-              </div>
-              <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button @click.stop="openEditGroupModal(group)" class="text-xs px-2 py-1 text-blue-500 hover:bg-blue-50 rounded transition-colors">编辑</button>
-                <button @click.stop="handleDeleteGroup(group.id)" class="text-xs px-2 py-1 text-red-400 hover:bg-red-50 rounded transition-colors">删除</button>
-              </div>
-            </div>
-            <h3 class="font-semibold text-gray-900">{{ group.name }}</h3>
-            <p class="text-xs text-gray-400 mt-1">{{ group.memberIds.length }} 名学生</p>
-          </div>
-
-          <!-- 未分组学生卡片 -->
-          <div
-            v-if="ungroupedStudents.length > 0"
-            @click="selectedGroupId = '__ungrouped__'"
-            class="bg-white rounded-xl border border-dashed border-gray-300 shadow-sm p-5 hover:shadow-md transition-shadow cursor-pointer"
-          >
-            <div class="flex items-start justify-between mb-3">
-              <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Users class="w-5 h-5 text-gray-400" />
-              </div>
-            </div>
-            <h3 class="font-semibold text-gray-500">未分班学生</h3>
-            <p class="text-xs text-gray-400 mt-1">{{ ungroupedStudents.length }} 名学生</p>
-          </div>
-
-          <div v-if="courseGroups.length === 0 && ungroupedStudents.length === 0" class="col-span-full text-center py-16 text-gray-400">
-            <Users class="w-12 h-12 mx-auto mb-3 opacity-30" />
-            <p>暂无班级，请先新建班级并导入学生</p>
-          </div>
-        </div>
-      </template>
-
-      <!-- ====== Level 2: 班级学生详情 ====== -->
-      <template v-else>
-        <!-- 返回按钮 -->
-        <button @click="selectedGroupId = null; studentSearch = ''" class="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors">
-          <ArrowLeft class="w-4 h-4" /> 返回班级列表
-        </button>
-
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-              <Users class="w-5 h-5 text-indigo-600" />
-            </div>
-            <div>
-              <h1 class="text-2xl font-bold text-gray-900">{{ selectedGroupName }}</h1>
-              <p class="text-gray-500 mt-1">{{ selectedGroupStudents.length }} 名学生</p>
+      <!-- 班级横向等分板块 -->
+      <div v-if="classBlocks.length > 0" class="flex flex-nowrap gap-5 overflow-x-auto pb-2" style="scrollbar-width: thin;">
+        <div
+          v-for="(classData, clsIdx) in classBlocks" :key="clsIdx"
+          class="flex-1 min-w-[320px] bg-white rounded-xl border border-gray-100 shadow-sm p-5 group"
+        >
+          <!-- 班级标题 + 人数 + 操作 -->
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-semibold text-lg text-gray-900 flex items-center gap-2">
+              <span class="text-xs font-normal text-gray-400 bg-gray-100 px-2 py-0.5 rounded">班级</span>
+              {{ classData.className || '未分班' }}
+              <span class="text-xs text-gray-400 font-normal">（{{ classData.students.length }}人）</span>
+            </h3>
+            <div v-if="classData.className" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button @click.stop="openEditClassModal(classData.className)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="编辑班级">
+                <Pencil class="w-3.5 h-3.5" />
+              </button>
+              <button @click.stop="handleDeleteClass(classData.className)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="删除班级">
+                <Trash2 class="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-          <div v-if="!isMentor" class="flex items-center gap-2">
-            <input ref="studentExcelInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleImportStudentsExcel" />
-            <button @click="studentExcelInput?.click()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors">
-              <FileSpreadsheet class="w-3.5 h-3.5" />
-              导入学生
-            </button>
-            <button @click="showAddStudentModal = true" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-              <Plus class="w-3.5 h-3.5" />
-              添加学生
-            </button>
-            <button v-if="selectedGroupId !== '__ungrouped__'" @click="openEditGroupModal(store.studentGroups.find(g => g.id === selectedGroupId)!)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-              <Edit3 class="w-3.5 h-3.5" />
-              编辑班级
-            </button>
-            <button v-if="selectedGroupId !== '__ungrouped__'" @click="handleDeleteGroup(selectedGroupId); selectedGroupId = null" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-              <Trash2 class="w-3.5 h-3.5" />
-              删除班级
-            </button>
-          </div>
-          <span v-if="isMentor" class="text-xs text-gray-400 italic">导师仅可查看，如需操作请联系授课教师</span>
-        </div>
 
-        <!-- 搜索 -->
-        <div class="relative max-w-xs">
-          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input v-model="studentSearch" type="text" placeholder="搜索学生姓名或学号..."
-            class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-        </div>
-
-        <!-- 学生表格 -->
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <table class="w-full text-sm">
-            <thead>
-              <tr class="bg-gray-50 border-b border-gray-100">
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium">学生</th>
-                <th class="text-left py-2.5 px-3 text-gray-500 font-medium">学号</th>
-                <th class="text-center py-2.5 px-2 w-32 text-gray-500 font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="item in filteredSelectedGroupStudents" :key="item.student.id"
-                class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                <td class="py-2.5 px-3">
-                  <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                      <span class="text-xs font-medium text-emerald-600">{{ item.student.name.charAt(0) }}</span>
-                    </div>
-                    <span class="font-medium text-gray-900 text-sm">{{ item.student.name }}</span>
+          <!-- 该班级的分组列表 -->
+          <div v-if="getGroupsForClassBlock(classData.className).length > 0" class="space-y-3">
+            <div
+              v-for="group in getGroupsForClassBlock(classData.className)" :key="group.id"
+              class="p-3 rounded-lg border border-gray-100 hover:border-gray-200 group/grp transition-all"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-700">
+                    {{ group.name.charAt(0) }}
                   </div>
-                </td>
-                <td class="py-2.5 px-3">
-                  <span class="text-sm text-gray-500">{{ item.student.id }}</span>
-                </td>
-                <td class="py-2.5 px-3">
-                  <div class="flex items-center justify-center gap-1">
-                    <button @click="handleEditStudent(item.student)"
-                      class="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 rounded hover:bg-blue-50 transition-colors">
-                      <Edit3 class="w-3.5 h-3.5" />
-                      编辑
-                    </button>
-                    <button v-if="selectedGroupId !== '__ungrouped__'"
-                      @click="handleRemoveStudentFromGroup(item.student.id)"
-                      class="flex items-center gap-1 text-xs text-orange-500 hover:text-orange-700 px-2 py-1 rounded hover:bg-orange-50 transition-colors">
-                      移出班
-                    </button>
-                    <button @click="handleRemoveStudent(item.student.id)"
-                      class="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors">
-                      <Trash2 class="w-3.5 h-3.5" />
-                      删除
-                    </button>
+                  <div>
+                    <p class="text-sm font-semibold text-gray-900">{{ group.name }}</p>
+                    <p class="text-[11px] text-gray-400">{{ group.memberIds.length }} 名成员</p>
                   </div>
-                </td>
-              </tr>
-              <tr v-if="filteredSelectedGroupStudents.length === 0">
-                <td colspan="3" class="px-4 py-12 text-center text-gray-400">
-                  {{ studentSearch ? '未找到匹配的学生' : '该班级暂无学生，请导入或添加学生' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </div>
+                <div class="flex gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
+                  <button @click.stop="openEditGroupModal(group)" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="编辑分组">
+                    <Pencil class="w-3.5 h-3.5" />
+                  </button>
+                  <button @click.stop="handleDeleteGroup(group.id)" class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="删除分组">
+                    <Trash2 class="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span v-for="sid in group.memberIds" :key="sid"
+                  class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  {{ getStudentName(sid) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div v-else class="border border-dashed border-gray-200 rounded-lg p-6 text-center">
+            <Users class="w-8 h-8 mx-auto mb-2 text-gray-200" />
+            <p class="text-xs text-gray-400">该班级暂无分组</p>
+            <button @click="openNewGroupForClass(classData.className)"
+              class="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+              <Plus class="w-3 h-3" />新建分组
+            </button>
+          </div>
         </div>
-      </template>
+      </div>
+      <div v-else class="text-center py-12 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+        <Users class="w-12 h-12 mx-auto mb-3 opacity-30" />
+        <p>暂无班级数据，请先导入学生</p>
+      </div>
 
-      <!-- 添加学生弹窗 -->
+      <!-- ====== 一键分组弹窗 ====== -->
       <Teleport to="body">
-        <div v-if="showAddStudentModal" class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-black/50" @click="showAddStudentModal = false" />
-          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">添加学生到{{ selectedGroupId !== '__ungrouped__' ? '班级' : '课程' }}</h3>
-            <div class="space-y-3">
-              <div>
-                <label class="text-sm text-gray-600 block mb-1">学生姓名</label>
-                <input v-model="newStudentName" type="text" placeholder="输入学生姓名"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-              </div>
-              <div>
-                <label class="text-sm text-gray-600 block mb-1">学生学号</label>
-                <input v-model="newStudentId" type="text" placeholder="输入学生学号（可选）"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-              </div>
+        <div v-if="showOneClickGroup" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showOneClickGroup = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div class="flex items-center justify-between mb-5">
+              <h3 class="font-semibold text-gray-900 text-lg">一键随机分组</h3>
+              <button @click="showOneClickGroup = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
             </div>
-            <div class="flex justify-end gap-2 mt-6">
-              <button @click="showAddStudentModal = false" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-              <button @click="handleAddSingleStudent" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">添加</button>
+            <div class="space-y-4">
+              <!-- 选择班级 -->
+              <div>
+                <label class="text-xs text-gray-500 block mb-1.5 font-medium">选择班级</label>
+                <select
+                  v-model="oneClickGroupData.className"
+                  @change="oneClickGroupData.groupCount = Math.max(2, Math.ceil(getClassStudentCount(oneClickGroupData.className) / 3))"
+                  class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
+                >
+                  <option value="" disabled>请选择班级</option>
+                  <option v-for="cb in classBlocks" :key="cb.className" :value="cb.className">
+                    {{ cb.className || '未分班' }}（{{ cb.students.length }}人）
+                  </option>
+                </select>
+              </div>
+
+              <!-- 班级总人数 -->
+              <div v-if="oneClickGroupData.className" class="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center gap-3">
+                <Users class="w-5 h-5 text-blue-600" />
+                <div>
+                  <p class="text-sm font-medium text-blue-800">
+                    该班共 <span class="text-lg font-bold">{{ getClassStudentCount(oneClickGroupData.className) }}</span> 名学生
+                  </p>
+                  <p class="text-xs text-blue-500">请根据人数设置合适的总组数</p>
+                </div>
+              </div>
+
+              <!-- 填写总组数 -->
+              <div>
+                <label class="text-xs text-gray-500 block mb-1.5 font-medium">设置总组数</label>
+                <div class="flex items-center gap-3">
+                  <button
+                    @click="oneClickGroupData.groupCount = Math.max(2, (oneClickGroupData.groupCount || 2) - 1)"
+                    class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                  >−</button>
+                  <input
+                    v-model.number="oneClickGroupData.groupCount"
+                    type="number" min="2"
+                    :max="oneClickMaxGroups"
+                    class="flex-1 text-center px-3 py-2 border border-gray-200 rounded-lg text-sm font-semibold focus:border-blue-400 outline-none"
+                    :class="{ 'border-red-400 focus:border-red-500': groupCountExceedsStudents }"
+                  />
+                  <button
+                    @click="oneClickGroupData.groupCount = Math.min(oneClickMaxGroups || 1, (oneClickGroupData.groupCount || 2) + 1)"
+                    class="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                  >+</button>
+                </div>
+                <!-- 组数超过班级人数警告 -->
+                <p v-if="groupCountExceedsStudents" class="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
+                  <AlertTriangle class="w-3 h-3" />
+                  总组数（{{ oneClickGroupData.groupCount }}）不能超过该班级人数（{{ oneClickMaxGroups }}）
+                </p>
+                <p v-else-if="oneClickGroupData.className" class="text-[11px] text-gray-400 mt-1.5">
+                  每组约 {{ Math.ceil(oneClickMaxGroups / (oneClickGroupData.groupCount || 2)) }} 人
+                </p>
+              </div>
+
+              <button
+                @click="handleOneClickGroup"
+                :disabled="!oneClickGroupData.className || !oneClickGroupData.groupCount || oneClickGroupData.groupCount < 2 || groupCountExceedsStudents"
+                class="w-full py-2.5 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <RefreshCw class="w-4 h-4" />
+                开始随机分组
+              </button>
             </div>
           </div>
         </div>
       </Teleport>
 
-      <!-- 新建/编辑分组弹窗 -->
+      <!-- ====== 新增班级弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showAddClass" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showAddClass = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-gray-900 text-lg">新增班级</h3>
+              <button @click="showAddClass = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">班级名称</label>
+                <input v-model="addClassForm.className" placeholder="输入班级名称，如：软件工程一班"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-400 outline-none" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">选择该班级的学生（可选，点击切换）</label>
+                <div class="max-h-44 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                  <div
+                    v-for="item in enrolledStudents" :key="item.student?.id"
+                    @click="toggleAddClassStudent(item.student!.id)"
+                    class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+                    :class="addClassForm.studentIds.includes(item.student!.id) ? 'bg-cyan-50 text-cyan-700' : 'hover:bg-gray-50 text-gray-600'"
+                  >
+                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                      :class="addClassForm.studentIds.includes(item.student!.id) ? 'border-cyan-500 bg-cyan-500' : 'border-gray-300'">
+                      <span v-if="addClassForm.studentIds.includes(item.student!.id)" class="text-white text-[10px]">✓</span>
+                    </div>
+                    <span>{{ item.student?.name }}</span>
+                    <span class="text-xs text-gray-400 ml-auto">{{ item.student?.studentId || item.student?.id }}</span>
+                  </div>
+                  <div v-if="enrolledStudents.length === 0" class="text-center py-4 text-xs text-gray-400">
+                    暂无已选课程的学生，请先导入学员
+                  </div>
+                </div>
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="showAddClass = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="saveAddClass" :disabled="!addClassForm.className.trim()"
+                  class="flex-1 px-4 py-2 text-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- ====== 编辑班级弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showEditClassModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showEditClassModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-gray-900 text-lg">编辑班级</h3>
+              <button @click="showEditClassModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">班级名称</label>
+                <input v-model="editClassName" placeholder="输入班级名称"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-400 outline-none" />
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="showEditClassModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="handleSaveEditClass" :disabled="!editClassName.trim()"
+                  class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- ====== 新建/编辑分组弹窗（选班级 + 选成员） ====== -->
       <Teleport to="body">
         <div v-if="showGroupModal" class="fixed inset-0 z-50 flex items-center justify-center">
           <div class="absolute inset-0 bg-black/50" @click="showGroupModal = false" />
           <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ editingGroup ? '编辑班级' : '新建班级' }}</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">新建分组</h3>
             <div class="space-y-3">
               <div>
-                <label class="text-sm text-gray-600 block mb-1">班级名称</label>
-                <input v-model="groupFormName" type="text" placeholder="输入班级名称"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                <label class="text-xs text-gray-500 block mb-1">所属班级</label>
+                <select v-model="groupFormClassName"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:border-blue-400 outline-none">
+                  <option value="" disabled>请选择班级</option>
+                  <option v-for="cb in classBlocks" :key="cb.className" :value="cb.className">
+                    {{ cb.className || '未分班' }}
+                  </option>
+                </select>
               </div>
               <div>
-                <label class="text-sm text-gray-600 block mb-1">选择成员</label>
-                <div class="max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
-                  <label v-for="s in enrolledStudents" :key="s.student!.id"
-                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" :value="s.student!.id" v-model="groupFormMembers"
-                      class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                    <span class="text-sm text-gray-700">{{ s.student!.name }}</span>
-                    <span class="text-xs text-gray-400">{{ s.student!.id }}</span>
-                  </label>
-                  <div v-if="enrolledStudents.length === 0" class="text-center py-4 text-xs text-gray-400">暂无学生可添加</div>
+                <label class="text-xs text-gray-500 block mb-1">组名</label>
+                <input v-model="groupFormName" placeholder="请输入组名" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">选择成员（仅显示该班学生）</label>
+                <div class="max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                  <div v-for="stu in getClassStudents(groupFormClassName)" :key="stu.id"
+                    @click="toggleGroupFormMember(stu.id)"
+                    class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+                    :class="groupFormMembers.includes(stu.id) ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-600'">
+                    <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                      :class="groupFormMembers.includes(stu.id) ? 'border-blue-500 bg-blue-500' : 'border-gray-300'">
+                      <span v-if="groupFormMembers.includes(stu.id)" class="text-white text-[10px]">✓</span>
+                    </div>
+                    <span>{{ stu.name }}</span>
+                    <span class="text-xs text-gray-400 ml-auto">{{ stu.id }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="flex justify-end gap-2 mt-6">
-              <button @click="showGroupModal = false" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-              <button @click="handleSaveGroup" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">{{ editingGroup ? '保存' : '创建' }}</button>
+              <div class="flex gap-2 pt-2">
+                <button @click="showGroupModal = false; editingGroup = null" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="handleSaveGroup" class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+                  {{ editingGroup ? '保存' : '保存' }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </Teleport>
 
-      <!-- 编辑学生弹窗 -->
+      <!-- ====== 编辑学生弹窗 ====== -->
       <Teleport to="body">
         <div v-if="showEditStudentModal" class="fixed inset-0 z-50 flex items-center justify-center">
           <div class="absolute inset-0 bg-black/50" @click="showEditStudentModal = false" />
-          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">编辑学生信息</h3>
             <div class="space-y-3">
               <div>
-                <label class="text-sm text-gray-600 block mb-1">学生姓名</label>
-                <input v-model="editStudentName" type="text" placeholder="输入学生姓名"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                <label class="text-xs text-gray-500 block mb-1">姓名</label>
+                <input v-model="editStudentName" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               </div>
               <div>
-                <label class="text-sm text-gray-600 block mb-1">学生学号</label>
-                <input v-model="editStudentIdField" type="text" placeholder="输入学生学号"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+                <label class="text-xs text-gray-500 block mb-1">学号</label>
+                <input v-model="editStudentIdField" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               </div>
               <div>
-                <label class="text-sm text-gray-600 block mb-1">归属班级</label>
-                <select v-model="editStudentGroupId"
-                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
-                  <option value="">-- 不分班 --</option>
-                  <option v-for="g in store.studentGroups.filter(g => g.courseId === courseId)" :key="g.id" :value="g.id">
-                    {{ g.name }}
-                  </option>
-                </select>
+                <label class="text-xs text-gray-500 block mb-1">班级</label>
+                <input v-model="editStudentClass" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="输入班级名称" />
               </div>
-            </div>
-            <div class="flex justify-end gap-2 mt-6">
-              <button @click="showEditStudentModal = false" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
-              <button @click="handleSaveEditStudent" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">保存</button>
+              <div class="flex gap-2 pt-2">
+                <button @click="showEditStudentModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="handleSaveEditStudent" class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700">保存</button>
+              </div>
             </div>
           </div>
         </div>
@@ -882,6 +1071,53 @@
     :open="showGradeConfig"
     :on-close="() => { showGradeConfig = false; if (pendingFinalExamSelect) { selectedExam = pendingFinalExamSelect; pendingFinalExamSelect = ''; } }"
   />
+
+  <!-- 下载模板弹窗 -->
+  <Teleport to="body">
+    <div v-if="showDownloadTemplateModal" class="fixed inset-0 z-50 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black/50" @click="showDownloadTemplateModal = false" />
+      <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-semibold text-gray-900 text-lg">下载成绩模板</h3>
+          <button @click="showDownloadTemplateModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+        </div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-xs text-gray-500 block mb-2 font-medium">选择班级</label>
+            <div class="space-y-2 max-h-48 overflow-y-auto">
+              <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
+                :class="downloadTemplateClass === '__all__' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                <input type="radio" v-model="downloadTemplateClass" value="__all__"
+                  class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <p class="text-sm font-medium text-gray-900">全部班级</p>
+                  <p class="text-xs text-gray-400">所有已分班或未分班的学生</p>
+                </div>
+              </label>
+              <label v-for="cb in classBlocks" :key="cb.className"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
+                :class="downloadTemplateClass === cb.className ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
+                <input type="radio" v-model="downloadTemplateClass" :value="cb.className"
+                  class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
+                <div>
+                  <p class="text-sm font-medium text-gray-900">{{ cb.className || '未分班' }}</p>
+                  <p class="text-xs text-gray-400">{{ cb.students.length }} 名学生</p>
+                </div>
+              </label>
+            </div>
+          </div>
+          <div class="flex gap-2 pt-2">
+            <button @click="showDownloadTemplateModal = false"
+              class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+            <button @click="handleDownloadTemplate"
+              class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
+              下载模板
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -889,14 +1125,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import GradeConfig from '@/components/GradeConfig.vue'
-import * as d3 from 'd3'
-import { renderIcon } from '@/utils/d3-renderer'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
   EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
   EvalFrequencyDescs, OverdueRuleLabels
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule } from '@/types'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -907,12 +1142,49 @@ const course = computed(() => store.courses.find((c) => c.id === courseId.value)
 const isReadOnly = computed(() => course.value?.status !== 'active')
 const isMentor = computed(() => store.currentRole === 'mentor')
 
+const courseSchedules = computed(() =>
+  store.schedules.filter((s) => s.courseId === courseId.value)
+)
+
+const sortedCourseSchedules = computed(() =>
+  [...courseSchedules.value].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+)
+
+const schedulesWithStatus = computed(() => {
+  const sorted = [...courseSchedules.value].sort(
+    (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  )
+  // 以第一节课开课时间作为参考基准，学期前所有课程均显示为"待上课"
+  const referenceDate = sorted.length > 0 ? new Date(sorted[0].startDate) : new Date()
+  referenceDate.setHours(0, 0, 0, 0)
+  const completed: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
+  const upcoming: (Schedule & { isCompleted: boolean; originalIndex: number })[] = []
+  sorted.forEach((sch, i) => {
+    if (new Date(sch.endDate) < referenceDate) {
+      completed.push({ ...sch, isCompleted: true, originalIndex: i })
+    } else {
+      upcoming.push({ ...sch, isCompleted: false, originalIndex: i })
+    }
+  })
+  return [...upcoming, ...completed]
+})
+
+const completedCount = computed(() =>
+  schedulesWithStatus.value.filter((s) => s.isCompleted).length
+)
+
 // ---- Tab 配置 ----
 const tabList = [
+  { key: 'schedule',  label: '课程管理', icon: Calendar },
   { key: 'comments',  label: '评论管理', icon: 'clipboardCheck' as const },
   { key: 'grades',    label: '成绩管理', icon: 'trendingUp' as const },
   { key: 'students',  label: '学生管理', icon: 'users' as const },
 ]
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
+}
 
 // ---- 常量 ----
 const LEVEL_OPTIONS = [
@@ -945,7 +1217,7 @@ const isWeightLocked = computed(() => {
 })
 
 // ---- 状态 ----
-const activeTab = ref<string>('comments')
+const activeTab = ref<string>('schedule')
 const showSettings = ref(false)
 const studentSearch = ref('')
 
@@ -954,18 +1226,126 @@ const showAddStudentModal = ref(false)
 const newStudentName = ref('')
 const newStudentId = ref('')
 const studentExcelInput = ref<HTMLInputElement | null>(null)
-// 班级选择
+// 班级选择（兼容旧版 handleAddSingleStudent）
 const selectedGroupId = ref<string | null>(null)
-// 分组管理
+// 分组管理（新建/编辑）
 const showGroupModal = ref(false)
 const editingGroup = ref<import('@/types').StudentGroup | null>(null)
 const groupFormName = ref('')
 const groupFormMembers = ref<string[]>([])
+const groupFormClassName = ref('')
+// 编辑学生
 const showEditStudentModal = ref(false)
 const editingStudent = ref<import('@/types').Student | null>(null)
 const editStudentName = ref('')
 const editStudentIdField = ref('')
+const editStudentClass = ref('')
 const editStudentGroupId = ref('')
+// 新增班级
+const showAddClass = ref(false)
+const addClassForm = ref({ className: '', studentIds: [] as string[] })
+function toggleAddClassStudent(studentId: string) {
+  const idx = addClassForm.value.studentIds.indexOf(studentId)
+  if (idx >= 0) {
+    addClassForm.value.studentIds.splice(idx, 1)
+  } else {
+    addClassForm.value.studentIds.push(studentId)
+  }
+}
+function saveAddClass() {
+  const className = addClassForm.value.className.trim()
+  if (!className) return
+  for (const sid of addClassForm.value.studentIds) {
+    const stu = store.students.find(s => s.id === sid)
+    if (stu) store.updateStudent(sid, { className })
+  }
+  const assignedCount = addClassForm.value.studentIds.length
+  addClassForm.value = { className: '', studentIds: [] }
+  showAddClass.value = false
+  alert(`已创建班级"${className}"，并分配了 ${assignedCount} 名学生`)
+}
+// 编辑班级
+const showEditClassModal = ref(false)
+const editingOldClassName = ref('')
+const editClassName = ref('')
+function openEditClassModal(className: string) {
+  editingOldClassName.value = className
+  editClassName.value = className
+  showEditClassModal.value = true
+}
+function handleSaveEditClass() {
+  if (!editingOldClassName.value || !editClassName.value.trim()) return
+  const newName = editClassName.value.trim()
+  // 更新该班级所有学生的 className
+  for (const stu of store.students) {
+    if (stu.className === editingOldClassName.value) {
+      store.updateStudent(stu.id, { className: newName })
+    }
+  }
+  showEditClassModal.value = false
+  alert(`班级"${editingOldClassName.value}"已重命名为"${newName}"`)
+}
+function handleDeleteClass(className: string) {
+  if (!confirm(`确定删除班级"${className}"？该操作只会清空学生的班级信息，不会删除学生。`)) return
+  for (const stu of store.students) {
+    if (stu.className === className) {
+      store.updateStudent(stu.id, { className: '' })
+    }
+  }
+}
+/** Excel 导入班级信息 */
+async function handleImportClassDetail() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls,.csv'
+  input.onchange = async (e: any) => {
+    const file = e.target?.files?.[0]
+    if (!file || !courseId.value) return
+    const XLSX = await import('xlsx')
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+    let classCount = 0
+    let assignedCount = 0
+    for (const row of rows) {
+      const className = (row['班级名称'] || row['className'] || '').toString().trim()
+      if (!className) continue
+      classCount++
+      const stuName = (row['学生姓名'] || row['name'] || '').toString().trim()
+      const stuId = (row['学生学号'] || row['studentId'] || '').toString().trim()
+      if (stuName || stuId) {
+        const match = store.students.find(s =>
+          (stuId && (s.studentId === stuId || s.id === stuId)) ||
+          (stuName && s.name === stuName)
+        )
+        if (match) {
+          store.updateStudent(match.id, { className })
+          assignedCount++
+        }
+      }
+    }
+    alert(`导入完成：共 ${classCount} 个班级，已分配 ${assignedCount} 名学生`)
+  }
+  input.click()
+}
+// 一键分组
+const showOneClickGroup = ref(false)
+const oneClickGroupData = ref({ className: '', groupCount: 2 })
+
+/** 当前选中班级的学生人数（也是最大组数） */
+const oneClickMaxGroups = computed(() => {
+  if (!oneClickGroupData.value.className) return 0
+  return getClassStudentCount(oneClickGroupData.value.className)
+})
+
+/** 组数是否超过班级人数 */
+const groupCountExceedsStudents = computed(() => {
+  return oneClickMaxGroups.value > 0 && (oneClickGroupData.value.groupCount || 0) > oneClickMaxGroups.value
+})
+
+// 导入班级 ref
+const groupExcelInput = ref<HTMLInputElement | null>(null)
 
 // ---- 成绩管理 ----
 const showNewExamModal = ref(false)
@@ -975,46 +1355,38 @@ const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_exam' | 'midterm_project' | 'final_exam' | 'final_project' | 'quiz' | 'assignment'>('midterm_exam')
 const selectedExam = ref('')
 const gradeSearch = ref('')
-const totalSearch = ref('')
+/** 下载模板弹窗 */
+const showDownloadTemplateModal = ref(false)
+const downloadTemplateClass = ref('__all__')
+function openDownloadTemplateModal() {
+  if (!courseId.value || !selectedExam.value) {
+    alert('请先选择一个考试/项目')
+    return
+  }
+  downloadTemplateClass.value = '__all__'
+  showDownloadTemplateModal.value = true
+}
 const showWeightReminderModal = ref(false)
 const pendingFinalExamSelect = ref('')
-const groupExcelInput = ref<HTMLInputElement | null>(null)
-
-function getStudentInitial(name: string): string {
-  const ch = name.charAt(0)
-  if (/[a-zA-Z]/.test(ch)) return ch.toUpperCase()
-  return ch
-}
-
-const studentGradeGroups = computed(() => {
-  const enrolled = enrolledStudents.value
-    .map((e) => e.student)
-    .filter(Boolean) as NonNullable<(typeof enrolledStudents.value)[number]['student']>[]
-
-  const q = totalSearch.value.trim().toLowerCase()
-  const filtered = q
-    ? enrolled.filter((s) => s.name.toLowerCase().includes(q))
-    : enrolled
-
-  const groups = new Map<string, typeof filtered>()
-  for (const student of filtered) {
-    const initial = getStudentInitial(student.name)
-    if (!groups.has(initial)) groups.set(initial, [])
-    groups.get(initial)!.push(student)
-  }
-
-  const sorted = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, 'zh-CN'))
-  return sorted.map(([initial, students]) => ({
-    initial,
-    students: students.sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')),
-  }))
-})
 
 const examInputs = ref<Record<string, number>>({})
 const selectedStudentIds = ref<string[]>([])
 const evalScoreInputs = ref<Record<string, number>>({})
 const evalStudentSearch = ref('')
 const selectedBatchSession = ref(1)
+
+// 评价管理过滤
+const evalFilterClass = ref('')
+const evalFilterGroup = ref('')
+const showEvalPopup = ref(false)
+const selectedEvalClass = ref('')
+
+// 成绩管理过滤
+const gradeFilterClass = ref('')
+const gradeFilterGroup = ref('')
+const showGradePopup = ref(false)
+const selectedGradeClass = ref('')
+const gradePopupSearch = ref('')
 
 const myCourses = computed(() => store.courses.filter((c) => c.teacher === store.currentUser))
 const selectedConfig = computed(() => courseId.value ? store.evalConfigs.find((c) => c.courseId === courseId.value) : null)
@@ -1045,18 +1417,6 @@ const evalTableSections = computed(() => {
     }
   }
 
-  const groupedMap = new Map<string, typeof filtered>()
-  const ungrouped: typeof filtered = []
-  for (const s of filtered) {
-    const groupName = memberToGroup.get(s.id)
-    if (groupName) {
-      if (!groupedMap.has(groupName)) groupedMap.set(groupName, [])
-      groupedMap.get(groupName)!.push(s)
-    } else {
-      ungrouped.push(s)
-    }
-  }
-
   function buildRow(student: typeof filtered[number]) {
     const evals = store.evaluations.filter(
       (e) => e.courseId === courseId.value && e.studentId === student.id && e.sessionNumber === session
@@ -1083,12 +1443,70 @@ const evalTableSections = computed(() => {
     }
   }
 
-  const sections: { groupName: string; students: ReturnType<typeof buildRow>[] }[] = []
-  for (const [name, members] of groupedMap) {
-    sections.push({ groupName: name, students: members.map(buildRow) })
+  // 先按班级分组，再按分组组织
+  const classMap = new Map<string, typeof filtered>()
+  for (const s of filtered) {
+    const cn = s.className || '未分班'
+    if (!classMap.has(cn)) classMap.set(cn, [])
+    classMap.get(cn)!.push(s)
   }
-  if (ungrouped.length > 0) {
-    sections.push({ groupName: '未分组', students: ungrouped.map(buildRow) })
+
+  const sections: { className: string; groups: { groupName: string; students: ReturnType<typeof buildRow>[] }[] }[] = []
+  for (const [className, students] of classMap) {
+    const groupedMap = new Map<string, typeof filtered>()
+    const ungrouped: typeof filtered = []
+    for (const s of students) {
+      const groupName = memberToGroup.get(s.id)
+      if (groupName) {
+        if (!groupedMap.has(groupName)) groupedMap.set(groupName, [])
+        groupedMap.get(groupName)!.push(s)
+      } else {
+        ungrouped.push(s)
+      }
+    }
+    const groupsArr: { groupName: string; students: ReturnType<typeof buildRow>[] }[] = []
+    for (const [name, members] of groupedMap) {
+      groupsArr.push({ groupName: name, students: members.map(buildRow) })
+    }
+    if (ungrouped.length > 0) {
+      groupsArr.push({ groupName: '未分组', students: ungrouped.map(buildRow) })
+    }
+    sections.push({ className, groups: groupsArr })
+  }
+  return sections
+})
+
+/** 当前选中的评价班级数据（用于弹窗）— 使用 filteredEvalTableSections 保持过滤一致性 */
+const currentEvalClassSection = computed(() => {
+  if (!selectedEvalClass.value) return null
+  return filteredEvalTableSections.value.find(cb => cb.className === selectedEvalClass.value) || null
+})
+
+/** 评价管理 - 班级选项 */
+const evalClassOptions = computed(() => {
+  const names = new Set(evalTableSections.value.map(s => s.className))
+  return Array.from(names).map(n => ({ label: n, value: n }))
+})
+
+/** 评价管理 - 分组选项（基于当前选中的班级） */
+const evalGroupOptions = computed(() => {
+  if (!evalFilterClass.value) return []
+  const section = evalTableSections.value.find(s => s.className === evalFilterClass.value)
+  if (!section) return []
+  return section.groups.map(g => ({ label: g.groupName, value: g.groupName }))
+})
+
+/** 评价管理 - 过滤后的数据 */
+const filteredEvalTableSections = computed(() => {
+  let sections = evalTableSections.value
+  if (evalFilterClass.value) {
+    sections = sections.filter(s => s.className === evalFilterClass.value)
+  }
+  if (evalFilterGroup.value) {
+    sections = sections.map(s => ({
+      ...s,
+      groups: s.groups.filter(g => g.groupName === evalFilterGroup.value)
+    })).filter(s => s.groups.length > 0)
   }
   return sections
 })
@@ -1096,8 +1514,10 @@ const evalTableSections = computed(() => {
 const hasEvalInputs = computed(() => Object.keys(evalScoreInputs.value).length > 0)
 
 const isAllSelected = computed(() => {
-  const total = evalTableSections.value.reduce((a, s) => a + s.students.length, 0)
-  return total > 0 && selectedStudentIds.value.length === total
+  const all = currentEvalClassSection.value
+    ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
+    : []
+  return all.length > 0 && all.every(id => selectedStudentIds.value.includes(id))
 })
 
 // ---- 成绩管理 computed ----
@@ -1153,17 +1573,153 @@ const filteredGradeStudents = computed(() => {
   return list
 })
 
-const hasExamInputs = computed(() => Object.keys(examInputs.value).length > 0)
+const gradeClassBlocks = computed(() => {
+  if (!courseId.value || !selectedExam.value) return []
+  const search = gradeSearch.value.trim().toLowerCase()
+  let list = enrolledStudents.value
+  if (search) {
+    list = list.filter(({ student }) =>
+      student && (student.name.toLowerCase().includes(search) || student.id.toLowerCase().includes(search))
+    )
+  }
+
+  // 按班级分组
+  const classMap = new Map<string, typeof list>()
+  for (const item of list) {
+    if (!item.student) continue
+    const cn = item.student.className || '未分班'
+    if (!classMap.has(cn)) classMap.set(cn, [])
+    classMap.get(cn)!.push(item)
+  }
+
+  // 按分组组织
+  const result: { className: string; groups: { groupName: string; items: typeof list }[] }[] = []
+  const groups = store.studentGroups.filter(g => g.courseId === courseId.value)
+
+  for (const [className, data] of classMap) {
+    const memberToGroup = new Map<string, string>()
+    for (const g of groups) {
+      for (const mid of g.memberIds) {
+        const student = store.students.find(s => s.id === mid)
+        if (student && (student.className || '未分班') === className) {
+          memberToGroup.set(mid, g.name)
+        }
+      }
+    }
+    
+    const groupedMap = new Map<string, typeof list>()
+    const ungrouped: typeof list = []
+    for (const item of data) {
+      const groupName = memberToGroup.get(item.student!.id)
+      if (groupName) {
+        if (!groupedMap.has(groupName)) groupedMap.set(groupName, [])
+        groupedMap.get(groupName)!.push(item)
+      } else {
+        ungrouped.push(item)
+      }
+    }
+    
+    const groupsArr: { groupName: string; items: typeof list }[] = []
+    for (const [name, members] of groupedMap) {
+      groupsArr.push({ groupName: name, items: members })
+    }
+    if (ungrouped.length > 0) {
+      groupsArr.push({ groupName: '未分组', items: ungrouped })
+    }
+    
+    result.push({ className, groups: groupsArr })
+  }
+  return result
+})
+
+/** 成绩管理 - 班级选项 */
+const gradeClassOptions = computed(() => {
+  const names = new Set(gradeClassBlocks.value.map(s => s.className))
+  return Array.from(names).map(n => ({ label: n, value: n }))
+})
+
+/** 成绩管理 - 分组选项（基于当前选中的班级） */
+const gradeGroupOptions = computed(() => {
+  if (!gradeFilterClass.value) return []
+  const block = gradeClassBlocks.value.find(s => s.className === gradeFilterClass.value)
+  if (!block) return []
+  return block.groups.map(g => ({ label: g.groupName, value: g.groupName }))
+})
+
+/** 成绩管理 - 过滤后的数据 */
+const filteredGradeClassBlocks = computed(() => {
+  let blocks = gradeClassBlocks.value
+  if (gradeFilterClass.value) {
+    blocks = blocks.filter(s => s.className === gradeFilterClass.value)
+  }
+  if (gradeFilterGroup.value) {
+    blocks = blocks.map(s => ({
+      ...s,
+      groups: s.groups.filter(g => g.groupName === gradeFilterGroup.value)
+    })).filter(s => s.groups.length > 0)
+  }
+  return blocks
+})
+
+/** 当前选中的成绩班级数据（用于弹窗）— 使用 filteredGradeClassBlocks 保持过滤一致性 */
+const currentGradeClassSection = computed(() => {
+  if (!selectedGradeClass.value) return null
+  return filteredGradeClassBlocks.value.find(cb => cb.className === selectedGradeClass.value) || null
+})
+
+/** 弹窗内按搜索过滤后的分组数据 */
+const filteredGradePopupGroups = computed(() => {
+  const section = currentGradeClassSection.value
+  if (!section) return []
+  const search = gradePopupSearch.value.trim().toLowerCase()
+  if (!search) return section.groups
+  return section.groups.map(g => ({
+    ...g,
+    items: g.items.filter(({ student }) =>
+      student && (student.name.toLowerCase().includes(search) || student.id.toLowerCase().includes(search) || (student.studentId && student.studentId.toLowerCase().includes(search)))
+    )
+  })).filter(g => g.items.length > 0)
+})
+
+/** 弹窗内当前班级的所有学生 ID */
+const currentGradeClassStudentIds = computed(() => {
+  const section = currentGradeClassSection.value
+  if (!section) return new Set<string>()
+  const ids = new Set<string>()
+  for (const group of section.groups) {
+    for (const item of group.items) {
+      if (item.student) ids.add(item.student.id)
+    }
+  }
+  return ids
+})
+
+const hasExamInputs = computed(() => {
+  // 弹窗打开时只检查当前班级的输入
+  if (selectedGradeClass.value) {
+    const ids = currentGradeClassStudentIds.value
+    return Object.keys(examInputs.value).some(id => ids.has(id))
+  }
+  return Object.keys(examInputs.value).length > 0
+})
 
 const submittedExamCount = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
-  return store.getExamScoresForCourse(courseId.value, selectedExam.value)
-    .filter((s) => s.status === 'submitted').length
+  const all = store.getExamScoresForCourse(courseId.value, selectedExam.value).filter((s) => s.status === 'submitted')
+  // 弹窗打开时只统计当前班级
+  if (selectedGradeClass.value) {
+    const ids = currentGradeClassStudentIds.value
+    return all.filter(s => ids.has(s.studentId)).length
+  }
+  return all.length
 })
 
 const pendingExamSubmits = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
-  return filteredGradeStudents.value.filter(({ student }) => {
+  const target = selectedGradeClass.value
+    ? filteredGradeStudents.value.filter(({ student }) => student && currentGradeClassStudentIds.value.has(student.id))
+    : filteredGradeStudents.value
+  return target.filter(({ student }) => {
     if (!student) return false
     const score = store.getExamScoresForCourse(courseId.value, selectedExam.value)
       .find((s) => s.studentId === student.id)
@@ -1229,18 +1785,15 @@ function handleSelectExam(name: string) {
     if (isConfigDefault) {
       showWeightReminderModal.value = true
       pendingFinalExamSelect.value = name
-      render()
       return
     }
   }
   selectedExam.value = name
-  render()
 }
 
 function handleOpenGradeConfigFromReminder() {
   showWeightReminderModal.value = false
   showGradeConfig.value = true
-  render()
 }
 
 function handleAddExam() {
@@ -1291,7 +1844,7 @@ function handleAddExam() {
   showNewExamModal.value = false
   selectedExam.value = name
   newExamName.value = ''
-  render()
+
 }
 
 function handleSaveExamScores() {
@@ -1301,7 +1854,13 @@ function handleSaveExamScores() {
     ? existingScores[0].type
     : 'midterm_exam'
   const examWeight = store.getExamWeight(courseId.value, selectedExam.value)
-  Object.entries(examInputs.value).forEach(([studentId, score]) => {
+  // 弹窗打开时只保存当前班级的输入
+  let inputsToSave = Object.entries(examInputs.value)
+  if (selectedGradeClass.value) {
+    const ids = currentGradeClassStudentIds.value
+    inputsToSave = inputsToSave.filter(([sid]) => ids.has(sid))
+  }
+  inputsToSave.forEach(([studentId, score]) => {
     const existing = existingScores.find((s) => s.studentId === studentId)
     if (existing && existing.status !== 'submitted') {
       store.updateExamScore(existing.id, { score, gradedAt: new Date().toISOString().split('T')[0] })
@@ -1322,15 +1881,24 @@ function handleSaveExamScores() {
       })
     }
   })
-  examInputs.value = {}
-  render()
+  // 只清除已保存的学生输入
+  const savedIds = new Set(inputsToSave.map(([sid]) => sid))
+  for (const sid of savedIds) {
+    delete examInputs.value[sid]
+  }
+
 }
 
 function handleSubmitExamScores() {
   if (!courseId.value || !selectedExam.value) return
   handleSaveExamScores()
-  store.submitExamScores(courseId.value, selectedExam.value)
-  render()
+  if (selectedGradeClass.value) {
+    const ids = Array.from(currentGradeClassStudentIds.value)
+    store.submitExamScores(courseId.value, selectedExam.value, ids.length > 0 ? ids : undefined)
+  } else {
+    store.submitExamScores(courseId.value, selectedExam.value)
+  }
+
 }
 
 function getStudentTotalScore(studentId: string): string | number {
@@ -1457,17 +2025,29 @@ async function handleExcelImport(event: Event) {
 }
 
 async function handleDownloadTemplate() {
-  if (!courseId.value || !selectedExam.value) {
-    alert('请先选择一个考试/项目')
-    return
-  }
+  if (!courseId.value || !selectedExam.value) return
+  const targetClass = downloadTemplateClass.value
   try {
     const XLSX = await import('xlsx')
-    const data = enrolledStudents.value.map(({ student }) => ({
-      '学生姓名': student!.name,
-      '学生学号': student!.id,
-      [selectedExam.value]: '',
-    }))
+    const data = enrolledStudents.value
+      .filter(({ student }) => {
+        if (targetClass === '__all__') return true
+        return (student!.className || '') === targetClass
+      })
+      .map(({ student }) => {
+        const row: Record<string, string | number> = {
+          '学生姓名': student!.name,
+          '学生学号': student!.id,
+          '班级': student!.className || '',
+          [selectedExam.value]: '',
+        }
+        return row
+      })
+    if (data.length === 0) {
+      alert('所选班级暂无学生')
+      return
+    }
+    const suffix = targetClass === '__all__' ? '全部班级' : targetClass
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '成绩')
@@ -1476,9 +2056,10 @@ async function handleDownloadTemplate() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${selectedExam.value}-成绩模板.xlsx`
+    a.download = `${selectedExam.value}-${suffix}-成绩模板.xlsx`
     a.click()
     URL.revokeObjectURL(url)
+    showDownloadTemplateModal.value = false
   } catch (err) {
     console.error('下载模板失败:', err)
     alert('下载模板失败')
@@ -1491,7 +2072,7 @@ const enabledTypes = computed(() => baseEnabledTypes.value.filter((t) => {
   return true
 }))
 
-const filteredEvalTypes = computed(() => enabledTypes.value.filter((t) => true))
+const filteredEvalTypes = computed(() => enabledTypes.value)
 
 const displaySessions = computed(() => {
   const count = Math.min(totalSessions.value, 3)
@@ -1570,6 +2151,116 @@ const courseGroups = computed(() => {
   return store.studentGroups.filter((g) => g.courseId === courseId.value)
 })
 
+// ====== 新版学生管理：班级板块 computed ======
+
+/** 班级板块：按学生 className 分组 */
+const classBlocks = computed(() => {
+  if (!courseId.value) return []
+  const classMap = new Map<string, typeof enrolledStudents.value>()
+  for (const item of enrolledStudents.value) {
+    if (!item.student) continue
+    const cn = item.student.className || ''
+    if (!classMap.has(cn)) classMap.set(cn, [])
+    classMap.get(cn)!.push(item)
+  }
+  return Array.from(classMap.entries())
+    .map(([className, items]) => ({
+      className,
+      students: items.map(i => i.student!).filter(Boolean),
+    }))
+    .sort((a, b) => a.className.localeCompare(b.className, 'zh-CN'))
+})
+
+/** 获取某班级的分组（检查组内所有学生 className 是否匹配） */
+function getGroupsForClassBlock(className: string) {
+  if (!courseId.value) return []
+  const allGroups = store.studentGroups.filter((g) => g.courseId === courseId.value)
+  return allGroups.filter((g) => {
+    if (g.memberIds.length === 0) return false
+    // 检查组中所有成员是否都属于该班级
+    return g.memberIds.every((sid) => {
+      const student = store.students.find((s) => s.id === sid)
+      return student && (student.className || '') === className
+    })
+  })
+}
+
+/** 获取某班级的学生人数 */
+function getClassStudentCount(className: string) {
+  return getClassStudents(className).length
+}
+
+/** 获取某班级的学生列表 */
+function getClassStudents(className: string) {
+  return store.students.filter((s) => (s.className || '') === className && store.enrollments.some((e) => e.courseId === courseId.value && e.studentId === s.id && e.status !== 'dropped'))
+}
+
+/** 点击班级内的"新建分组" */
+function openNewGroupForClass(className: string) {
+  groupFormClassName.value = className
+  // 自动建议该班级的下一个组号
+  const existingGroups = getGroupsForClassBlock(className)
+  const nextNum = existingGroups.length + 1
+  groupFormName.value = `第${nextNum}组`
+  groupFormMembers.value = []
+  editingGroup.value = null
+  showGroupModal.value = true
+}
+
+/** 切换分组表单中成员勾选 */
+function toggleGroupFormMember(studentId: string) {
+  const idx = groupFormMembers.value.indexOf(studentId)
+  if (idx >= 0) {
+    groupFormMembers.value.splice(idx, 1)
+  } else {
+    groupFormMembers.value.push(studentId)
+  }
+}
+
+/** 一键随机分组 */
+function handleOneClickGroup() {
+  const className = oneClickGroupData.value.className
+  const groupCount = oneClickGroupData.value.groupCount
+  if (!className || !groupCount || groupCount < 2) return
+  const students = getClassStudents(className)
+  if (students.length === 0) { alert('该班级暂无学生'); return }
+  if (groupCount > students.length) {
+    alert(`总组数（${groupCount}）不能超过该班级人数（${students.length}）`)
+    return
+  }
+
+  // 打乱学生数组（Fisher-Yates）
+  const shuffled = [...students]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  // 先删除该班级现有的所有分组
+  const existingGroups = getGroupsForClassBlock(className)
+  for (const g of existingGroups) {
+    store.deleteStudentGroup(g.id)
+  }
+
+  // 按组数平均分配
+  const perGroup = Math.ceil(shuffled.length / groupCount)
+  let created = 0
+  for (let g = 0; g < groupCount; g++) {
+    const chunk = shuffled.slice(g * perGroup, (g + 1) * perGroup)
+    if (chunk.length === 0) continue
+    store.addStudentGroup({
+      id: `group-${courseId.value}-${Date.now()}-${g}`,
+      courseId: courseId.value!,
+      name: `第${g + 1}组`,
+      memberIds: chunk.map((s) => s.id),
+    })
+    created++
+  }
+  showOneClickGroup.value = false
+  oneClickGroupData.value = { className: '', groupCount: 2 }
+  alert(`已成功分为 ${created} 组（共 ${shuffled.length} 名学生）`)
+}
+
 /** 未分班的学生 */
 const ungroupedStudents = computed(() => {
   const allGroupMemberIds = new Set<string>()
@@ -1632,9 +2323,9 @@ function getScoreDisplay(studentId: string, sessionNumber: number, type: EvalTyp
 function scoreCellClass(studentId: string, sessionNumber: number, type: EvalType): string {
   const v = getAvgScore(studentId, sessionNumber, type)
   if (v === null) return 'text-gray-400/60'
-  if (v >= 85) return 'text-brand-600'
-  if (v >= 60) return 'text-brand-600'
-  return 'text-brand-600'
+  if (v >= 85) return 'text-emerald-600 font-medium'
+  if (v >= 60) return 'text-blue-600'
+  return 'text-red-500'
 }
 
 function getStudentTotalAvg(studentId: string): string {
@@ -1651,9 +2342,9 @@ function getStudentTotalAvg(studentId: string): string {
 function totalScoreColor(val: string | number): string {
   if (val === '-') return '#9ca3af'
   const n = parseInt(String(val))
-  if (n >= 85) return '#429fc4'
-  if (n >= 60) return '#429fc4'
-  return '#429fc4'
+  if (n >= 85) return '#22c55e'
+  if (n >= 60) return '#3b82f6'
+  return '#ef4444'
 }
 
 function getEnrollStatus(studentId: string): { label: string; color: string; progress: number } {
@@ -1718,7 +2409,7 @@ const handleBatchEval = (level: string) => {
   })
   evalScoreInputs.value = {}
   store.markSessionEvalRemindersCompleted(courseId.value, session)
-  render()
+
 }
 
 function handleSaveEvalScores() {
@@ -1749,7 +2440,7 @@ function handleSaveEvalScores() {
     }
   })
   evalScoreInputs.value = {}
-  render()
+
 }
 
 function handleSubmitAll() {
@@ -1774,33 +2465,50 @@ function handleSubmitAll() {
   }
 
   store.markSessionEvalRemindersCompleted(courseId.value, session)
-  render()
+
 }
 
 const toggleAll = () => {
+  const all = currentEvalClassSection.value
+    ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
+    : []
   if (isAllSelected.value) {
-    selectedStudentIds.value = []
+    selectedStudentIds.value = selectedStudentIds.value.filter(id => !all.includes(id))
   } else {
-    const allIds: string[] = []
-    for (const section of evalTableSections.value) {
-      for (const s of section.students) {
-        if (!s.submitted) allIds.push(s.student.id)
-      }
-    }
-    selectedStudentIds.value = allIds
+    all.forEach(id => { if (!selectedStudentIds.value.includes(id)) selectedStudentIds.value.push(id) })
   }
-  render()
+}
+
+function closeEvalPopup() {
+  showEvalPopup.value = false
+  selectedEvalClass.value = ''
+}
+
+function closeGradePopup() {
+  showGradePopup.value = false
+  selectedGradeClass.value = ''
+  gradePopupSearch.value = ''
 }
 
 const selectedUnsubmittedCount = computed(() => {
-  return selectedStudentIds.value.length
+  const selected = selectedStudentIds.value
+  if (selectedEvalClass.value) {
+    const section = currentEvalClassSection.value
+    if (!section) return 0
+    const allUnsubmitted = section.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
+    return selected.filter(id => allUnsubmitted.includes(id)).length
+  }
+  return selected.filter(id => {
+    const found = evalTableSections.value.some(cb => cb.groups.some(g => g.students.some(s => s.student.id === id && !s.submitted)))
+    return found
+  }).length
 })
 
 function handleSessionSelect(session: number) {
   if (!courseId.value) return
   store.autoLockPreviousSession(courseId.value, session)
   selectedBatchSession.value = session
-  render()
+
 }
 
 function isSessionDisabled(session: number): boolean {
@@ -1821,6 +2529,10 @@ const isFinalSessionExpired = computed(() => {
   return store.isFinalSessionDeadlinePassed(courseId.value, totalSessions.value)
 })
 
+// 过滤下拉联动：切换班级时重置分组选择
+watch(evalFilterClass, () => { evalFilterGroup.value = '' })
+watch(gradeFilterClass, () => { gradeFilterGroup.value = '' })
+
 function getSessionTitle(session: number): string {
   if (!courseId.value) return ''
   if (store.isSessionLocked(courseId.value, session)) return '该轮次已锁定，不可修改'
@@ -1832,15 +2544,13 @@ function getSessionTitle(session: number): string {
 const hasSubmittable = computed(() => submittableCount.value > 0)
 
 const submittableCount = computed(() => {
-  const session = selectedBatchSession.value
-  let count = 0
-  for (const section of evalTableSections.value) {
-    for (const s of section.students) {
-      if (s.submitted) continue
-      if (s.hasDraft) count++
-    }
+  // 当弹窗打开时只统计当前班级，否则统计全部
+  if (selectedEvalClass.value) {
+    const section = currentEvalClassSection.value
+    if (!section) return 0
+    return section.groups.reduce((a, g) => a + g.students.filter(s => !s.submitted && evalScoreInputs.value[s.student.id] !== undefined).length, 0)
   }
-  return count
+  return evalTableSections.value.reduce((a, cb) => a + cb.groups.reduce((b, g) => b + g.students.filter(s => !s.submitted && evalScoreInputs.value[s.student.id] !== undefined).length, 0), 0)
 })
 
 const handleProcessOverdue = () => {
@@ -1854,7 +2564,7 @@ const handleProcessOverdue = () => {
       store.markEvalReminderCompleted(courseId.value, s!.id, sn)
     }
   }
-  render()
+
 }
 
 function getStudentName(studentId: string): string {
@@ -1878,17 +2588,18 @@ function handleRemoveStudentFromGroup(studentId: string) {
       break
     }
   }
-  render()
+
 }
 
 function handleEditStudent(student: import('@/types').Student) {
   editingStudent.value = student
   editStudentName.value = student.name
   editStudentIdField.value = student.id
+  editStudentClass.value = student.className || ''
   const group = store.studentGroups.find(g => g.courseId === courseId.value && g.memberIds.includes(student.id))
   editStudentGroupId.value = group?.id || ''
   showEditStudentModal.value = true
-  render()
+
 }
 
 function handleSaveEditStudent() {
@@ -1900,7 +2611,7 @@ function handleSaveEditStudent() {
     return
   }
   const oldId = student.id
-  store.updateStudent(oldId, { name: editStudentName.value.trim(), id: newId })
+  store.updateStudent(oldId, { name: editStudentName.value.trim(), id: newId, className: editStudentClass.value || '' })
 
   if (newId !== oldId) {
     store.enrollments.forEach((e) => {
@@ -1965,7 +2676,7 @@ function handleSaveEditStudent() {
   editStudentName.value = ''
   editStudentIdField.value = ''
   editStudentGroupId.value = ''
-  render()
+
 }
 
 function handleRemoveStudent(studentId: string) {
@@ -1978,7 +2689,7 @@ function handleRemoveStudent(studentId: string) {
   if (enrollment) {
     store.deleteEnrollment(enrollment.id)
   }
-  render()
+
 }
 
 function handleAddSingleStudent() {
@@ -2016,7 +2727,7 @@ function handleAddSingleStudent() {
   showAddStudentModal.value = false
   newStudentName.value = ''
   newStudentId.value = ''
-  render()
+
 }
 
 async function handleImportStudentsExcel(event: Event) {
@@ -2077,16 +2788,22 @@ function openNewGroupModal() {
   editingGroup.value = null
   groupFormName.value = ''
   groupFormMembers.value = []
+  groupFormClassName.value = ''
   showGroupModal.value = true
-  render()
 }
 
 function openEditGroupModal(group: import('@/types').StudentGroup) {
   editingGroup.value = group
   groupFormName.value = group.name
   groupFormMembers.value = [...group.memberIds]
+  // 从成员推断所属班级
+  if (group.memberIds.length > 0) {
+    const firstMember = store.students.find(s => s.id === group.memberIds[0])
+    groupFormClassName.value = firstMember?.className || ''
+  } else {
+    groupFormClassName.value = ''
+  }
   showGroupModal.value = true
-  render()
 }
 
 function handleSaveGroup() {
@@ -2112,13 +2829,13 @@ function handleSaveGroup() {
   editingGroup.value = null
   groupFormName.value = ''
   groupFormMembers.value = []
-  render()
+
 }
 
 function handleDeleteGroup(groupId: string) {
   if (!confirm('确定删除该分组？')) return
   store.deleteStudentGroup(groupId)
-  render()
+
 }
 
 async function handleImportGroupsExcel(event: Event) {
@@ -2180,276 +2897,4 @@ async function handleImportGroupsExcel(event: Event) {
   input.value = ''
 }
 
-// ====== D3 渲染函数 ======
-
-function renderFileSpreadsheetIcon(parent: d3.Selection<any, any, any, any>, className?: string) {
-  const svg = parent.append('svg')
-    .attr('viewBox', '0 0 24 24')
-    .attr('fill', 'none')
-    .attr('stroke', 'currentColor')
-    .attr('stroke-width', '2')
-    .attr('stroke-linecap', 'round')
-    .attr('stroke-linejoin', 'round')
-  if (className) svg.attr('class', className)
-  svg.html('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 12h8"/><path d="M8 16h8"/><path d="M8 20h8"/>')
-  return svg
-}
-
-function renderPlusIconSvg(parent: d3.Selection<any, any, any, any>, className?: string) {
-  const svg = parent.append('svg')
-    .attr('viewBox', '0 0 24 24')
-    .attr('fill', 'none')
-    .attr('stroke', 'currentColor')
-    .attr('stroke-width', '2')
-    .attr('stroke-linecap', 'round')
-    .attr('stroke-linejoin', 'round')
-  if (className) svg.attr('class', className)
-  svg.html('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>')
-  return svg
-}
-
-function render() {
-  const root = document.getElementById('teacher-course-detail-root')
-  if (!root) return
-  const sel = d3.select(root)
-  sel.selectAll('*').remove()
-
-  const container = sel.append('div').attr('class', 'space-y-6')
-
-  // ===== 返回按钮 + 课程信息 =====
-  renderHeader(container)
-
-  // ===== 已结束只读提示 =====
-  if (isReadOnly.value) {
-    renderReadOnlyBanner(container)
-  }
-
-  // ===== Tab 切换 =====
-  renderTabBar(container)
-
-  // ===== Tab 内容 =====
-  if (activeTab.value === 'comments') {
-    renderCommentsTab(container)
-  } else if (activeTab.value === 'grades') {
-    // 成绩管理 Tab - 显示提示
-    const panel = container.append('div')
-      .attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-6 text-center text-gray-400')
-    panel.append('p').text('成绩管理内容加载中...')
-  } else if (activeTab.value === 'students') {
-    // 学员管理 Tab - 显示提示
-    const panel = container.append('div')
-      .attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-6 text-center text-gray-400')
-    panel.append('p').text('学员管理内容加载中...')
-  }
-}
-
-function renderHeader(container: d3.Selection<any, any, any, any>) {
-  const topRow = container.append('div').attr('class', 'flex items-center gap-3')
-
-  const backBtn = topRow.append('button')
-    .attr('class', 'p-2 rounded-lg hover:bg-brand-400/10 transition-colors')
-    .on('click', () => router.back())
-  renderIcon(backBtn, 'arrowLeft', 'w-5 h-5 text-gray-400')
-
-  const infoDiv = topRow.append('div').attr('class', 'flex-1')
-  infoDiv.append('h1').attr('class', 'text-2xl font-bold text-gray-900').text(course.value?.title || '课程详情')
-  infoDiv.append('p').attr('class', 'text-gray-400 mt-1').text(`${course.value?.id} · ${course.value?.duration}课时`)
-
-  const statusClass = course.value?.status === 'active' ? 'bg-brand-600/10 text-gray-600' : 'bg-brand-400/10 text-gray-400'
-  topRow.append('span')
-    .attr('class', `text-xs px-2 py-0.5 rounded-full ${statusClass}`)
-    .text(course.value?.status === 'active' ? '进行中' : '已结束')
-}
-
-function renderReadOnlyBanner(container: d3.Selection<any, any, any, any>) {
-  const banner = container.append('div').attr('class', 'flex items-center gap-2 px-4 py-3 bg-brand-400/10 border border-brand-400/30 rounded-xl text-sm text-gray-400')
-  renderIcon(banner, 'eye', 'w-4 h-4 text-gray-400')
-  banner.append('span').html('该课程已结束，当前为<strong>只读查看</strong>模式，无法进行配置修改操作')
-}
-
-function renderTabBar(container: d3.Selection<any, any, any, any>) {
-  const tabBar = container.append('div').attr('class', 'flex gap-1 border-b border-brand-400/30')
-  tabList.forEach((tab) => {
-    const isActive = activeTab.value === tab.key
-    const btn = tabBar.append('button')
-      .attr('class', `px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${isActive ? 'bg-white text-gray-600 border border-b-0 border-brand-400/30 -mb-px' : 'text-gray-400 hover:text-gray-800'}`)
-      .on('click', () => { activeTab.value = tab.key; render() })
-    renderIcon(btn, tab.icon, 'w-4 h-4 inline mr-1.5')
-    btn.append('span').text(tab.label)
-  })
-}
-
-function renderCommentsTab(container: d3.Selection<any, any, any, any>) {
-  const tabContent = container.append('div').attr('class', 'space-y-6')
-
-  // 评价方案配置
-  renderEvalConfigCard(tabContent)
-
-  // 评价管理
-  if (!isReadOnly.value) {
-    renderEvalManagementCard(tabContent)
-  }
-}
-
-function renderEvalManagementCard(container: d3.Selection<any, any, any, any>) {
-  const card = container.append('div')
-    .attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-5')
-  card.append('h3').attr('class', 'text-sm font-semibold text-gray-900 mb-3').text('评价管理')
-  card.append('p').attr('class', 'text-sm text-gray-400').text('评价管理功能内容加载中...')
-}
-
-function renderEvalConfigCard(container: d3.Selection<any, any, any, any>) {
-  const card = container.append('div').attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-5')
-
-  const headerBtn = card.append('button')
-    .attr('class', 'w-full flex items-center justify-between')
-    .on('click', () => {
-      if (isReadOnly.value || evalConfigLocked.value || isMentor.value) return
-      showSettings.value = !showSettings.value
-      render()
-    })
-
-  const left = headerBtn.append('div').attr('class', 'flex items-center gap-2')
-  renderIcon(left, 'settings', 'w-5 h-5 text-gray-400')
-  left.append('h2').attr('class', 'font-semibold text-gray-900').text('评价方案配置')
-
-  const right = headerBtn.append('div').attr('class', 'flex items-center gap-3')
-
-  // 锁定标签
-  if (evalConfigLocked.value || isMentor.value) {
-    const lockSpan = right.append('span').attr('class', 'text-xs px-2 py-0.5 rounded-full bg-brand-400/10 text-gray-400 border border-brand-400/30')
-    renderIcon(lockSpan, 'lock', 'w-3 h-3 inline mr-0.5')
-    lockSpan.append('span').text('仅查看')
-  }
-
-  right.append('span').attr('class', 'text-xs text-gray-400')
-    .text(`${selectedConfig.value ? EvalTemplateLabels[selectedConfig.value.template] : '默认方案'} · ${selectedConfig.value ? EvalFrequencyLabels[selectedConfig.value.frequency] : '默认频率'}`)
-
-  if (!isReadOnly.value && !evalConfigLocked.value && !isMentor.value) {
-    right.append('span').attr('class', 'text-xs text-gray-400 hover:text-gray-600')
-      .text(showSettings.value ? '收起 ▲' : '展开 ▼')
-  }
-  if (isReadOnly.value || evalConfigLocked.value || isMentor.value) {
-    right.append('span').attr('class', 'text-xs text-gray-400/60').text('仅查看')
-  }
-
-  // 锁定提示
-  if (evalConfigLocked.value) {
-    const lockHint = card.append('div').attr('class', 'mt-3 flex items-center gap-2 px-3 py-2 bg-brand-400/10 border border-brand-400/30 rounded-lg text-xs text-gray-400')
-    renderIcon(lockHint, 'lock', 'w-3.5 h-3.5 text-gray-400')
-    if (selectedConfig.value) {
-      lockHint.append('span').text('评价方案已在第一节课开始前配置完成，已锁定不可修改。')
-    } else {
-      lockHint.append('span').text('第一节课已开始，评价方案未配置，现按默认方案实施，已锁定不可修改。')
-    }
-  }
-
-  // 评价类型标签
-  const tagWrap = card.append('div').attr('class', 'flex flex-wrap gap-2 mt-3 mb-1')
-  ALL_EVAL_TYPES.forEach((t) => {
-    if (!selectedConfig.value || !TEMPLATE_EVAL_TYPES[selectedConfig.value.template].includes(t)) {
-      tagWrap.append('span')
-        .attr('class', 'text-xs px-2.5 py-1 rounded-full bg-brand-400/10 text-gray-400/60 border border-brand-400/30')
-        .text(`${EvalTypeLabels[t]} ✗`)
-    } else if (((t === 'intra_group' || t === 'inter_group') && !courseHasGroups.value) || (t === 'mentor' && selectedConfig.value && !selectedConfig.value.hasMentor)) {
-      const span = tagWrap.append('span')
-        .attr('class', 'text-xs px-2.5 py-1 rounded-full bg-brand-400/10 text-gray-400 border border-brand-400/50')
-      renderIcon(span, 'eyeOff', 'w-3 h-3 inline mr-0.5')
-      span.append('span').text(`${EvalTypeLabels[t]}（自动隐藏）`)
-    } else {
-      const span = tagWrap.append('span')
-        .attr('class', `text-xs px-2.5 py-1 rounded-full border ${EvalTypeColors[t]}`)
-      renderIcon(span, 'eye', 'w-3 h-3 inline mr-0.5')
-      span.append('span').text(EvalTypeLabels[t])
-    }
-  })
-
-  // 配置编辑区域
-  if (showSettings.value && !isReadOnly.value && !evalConfigLocked.value && !isMentor.value) {
-    renderEvalSettings(card)
-  } else if ((isReadOnly.value || evalConfigLocked.value) && showSettings.value) {
-    const readonlyArea = card.append('div').attr('class', 'border-t border-brand-400/20 mt-3 pt-4 text-sm text-gray-400 text-center py-4')
-    renderIcon(readonlyArea, 'eyeOff', 'w-5 h-5 inline mr-1')
-    readonlyArea.append('span').text(isReadOnly.value ? '已结束课程不可修改配置' : '第一节课已开始，评价方案已锁定不可修改')
-  }
-}
-
-function renderEvalSettings(card: d3.Selection<any, any, any, any>) {
-  const area = card.append('div').attr('class', 'border-t border-brand-400/20 mt-3 pt-4 space-y-4')
-
-  // 评价模板
-  const tplDiv = area.append('div')
-  tplDiv.append('p').attr('class', 'text-sm font-medium text-gray-800 mb-2').text('评价模板')
-  const tplGrid = tplDiv.append('div').attr('class', 'grid grid-cols-1 md:grid-cols-2 gap-2')
-
-  EVAL_TEMPLATE_KEYS.forEach((tpl) => {
-    const isSelected = selectedConfig.value?.template === tpl
-    const btn = tplGrid.append('button')
-      .attr('class', `text-left p-3 rounded-lg border transition-all ${isSelected ? 'border-brand-600 bg-brand-400/10' : 'border-brand-400/30 bg-white hover:border-brand-400'}`)
-      .on('click', () => { handleSetConfig({ template: tpl }); render() })
-
-    btn.append('span').attr('class', 'text-sm font-medium text-gray-900').text(EvalTemplateLabels[tpl])
-    btn.append('p').attr('class', 'text-xs text-gray-400 mt-0.5').text(EvalTemplateDescs[tpl])
-
-    const tagRow = btn.append('div').attr('class', 'flex gap-1 mt-1')
-    TEMPLATE_EVAL_TYPES[tpl].forEach((et) => {
-      tagRow.append('span').attr('class', 'text-[10px] px-1.5 py-0.5 rounded bg-brand-400/10 text-gray-400').text(EvalTypeLabels[et])
-    })
-  })
-
-  // 评价频率
-  const freqDiv = area.append('div')
-  freqDiv.append('p').attr('class', 'text-sm font-medium text-gray-800 mb-2').text('评价频率')
-  const freqGrid = freqDiv.append('div').attr('class', 'grid grid-cols-1 md:grid-cols-2 gap-2')
-
-  EVAL_FREQUENCY_KEYS.forEach((freq) => {
-    const isSelected = selectedConfig.value?.frequency === freq
-    const btn = freqGrid.append('button')
-      .attr('class', `text-left p-3 rounded-lg border transition-all ${isSelected ? 'border-brand-600 bg-brand-400/10' : 'border-brand-400/30 bg-white hover:border-brand-400'}`)
-      .on('click', () => { handleSetConfig({ frequency: freq }); render() })
-
-    btn.append('span').attr('class', 'text-sm font-medium text-gray-900').text(EvalFrequencyLabels[freq])
-    btn.append('p').attr('class', 'text-xs text-gray-400 mt-0.5').text(EvalFrequencyDescs[freq])
-    btn.append('span').attr('class', 'text-xs text-gray-400 mt-0.5 block')
-      .text(`共 ${courseId.value ? store.getEvalSessions(courseId.value) : 0} 次评价`)
-  })
-
-  // 自定义次数
-  if (selectedConfig.value?.frequency === 'custom') {
-    const customDiv = area.append('div').attr('class', 'mt-2')
-    customDiv.append('label').attr('class', 'text-xs text-gray-400').text('自定义评价次数：')
-    customDiv.append('input')
-      .attr('type', 'number').attr('min', '1').attr('max', '20')
-      .attr('class', 'ml-2 w-16 px-2 py-1 border border-brand-400/30 rounded-lg text-sm')
-      .property('value', selectedConfig.value?.customSessions || 3)
-      .on('change', (e) => {
-        const val = parseInt((e.target as HTMLInputElement).value) || 3
-        handleSetConfig({ customSessions: val })
-        render()
-      })
-  }
-
-  // 企业导师开关
-  const mentorRow = area.append('div').attr('class', 'flex items-center gap-3')
-  mentorRow.append('label').attr('class', 'text-sm font-medium text-gray-800').text('企业导师参与评价')
-  const toggle = mentorRow.append('input')
-    .attr('type', 'checkbox')
-    .attr('class', 'w-4 h-4 text-gray-600 border-brand-400/50 rounded focus:ring-brand-600')
-    .property('checked', selectedConfig.value?.hasMentor ?? false)
-    .on('change', (e) => {
-      handleSetConfig({ hasMentor: (e.target as HTMLInputElement).checked })
-      render()
-    })
-  mentorRow.append('label').attr('class', 'ml-2 text-sm text-gray-400').text('(企业导师可以对学员进行评价)')
-}
-
-// ===== 生命周期 =====
-function renderPage() {
-  const el = document.getElementById('teacher-course-detail-root')
-  if (el) render()
-}
-
-onMounted(renderPage)
-watch(activeTab, renderPage)
-watch(showSettings, renderPage)
 </script>

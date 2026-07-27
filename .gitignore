@@ -23,4 +23,9 @@ server/node_modules
 *.njsproj
 *.sln
 *.sw?
+
+# Postman collections
+.postman/
+postman/
+
 规则.md/

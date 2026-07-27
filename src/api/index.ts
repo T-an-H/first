@@ -9,19 +9,28 @@ const API_BASE = 'http://localhost:3000/api';
 
 /** 通用请求封装 */
 async function request(url, options = {}) {
+  // 3 秒超时 —— 避免后端未启动时用户卡在"登录中..."
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
+
   const config = {
     headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
     ...options,
   };
 
-  const response = await fetch(`${API_BASE}${url}`, config);
-  const data = await response.json();
+  try {
+    const response = await fetch(`${API_BASE}${url}`, config);
+    const data = await response.json();
 
-  if (!response.ok && !data.success) {
-    throw new Error(data.message || `请求失败 (${response.status})`);
+    if (!response.ok && !data.success) {
+      throw new Error(data.message || `请求失败 (${response.status})`);
+    }
+
+    return data;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  return data;
 }
 
 /** 统一登录（所有角色：管理员/教师/学生） */

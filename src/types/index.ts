@@ -194,6 +194,7 @@ export interface CloudFile {
   dataUrl: string;
   uploadedAt: string;
   uploadedBy: string;
+  courseId?: string;
 }
 
 export interface TodoItem {
@@ -222,6 +223,34 @@ export interface Note {
   createdAt: string;
   updatedAt: string;
   createdBy: string;
+  attachments?: {
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    dataUrl: string;
+  }[];
+}
+
+export interface Homework {
+  id: string;
+  courseId: string;
+  title: string;
+  description?: string;
+  dueDate: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface HomeworkSubmission {
+  id: string;
+  homeworkId: string;
+  courseId: string;
+  studentId: string;
+  submittedAt: string;
+  fileName: string;
+  fileDataUrl: string;
+  fileSize: number;
+  fileType: string;
 }
 
 // ========== 评价系统 ==========
@@ -241,7 +270,7 @@ export const EvalTypeColors: Record<EvalType, string> = {
   self: 'text-blue-600 bg-blue-50 border-blue-200',
   intra_group: 'text-emerald-600 bg-emerald-50 border-emerald-200',
   inter_group: 'text-purple-600 bg-purple-50 border-purple-200',
-  teacher: 'text-amber-600 bg-amber-50 border-amber-200',
+  teacher: 'text-brand-700 bg-brand-50 border-brand-200',
   mentor: 'text-rose-600 bg-rose-50 border-rose-200',
 };
 

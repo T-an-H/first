@@ -286,7 +286,12 @@ const selectedCourse = ref<string | null>(null)
 const showSettings = ref(false)
 const evalTypeFilter = ref<EvalType | 'all'>('all')
 
-const myCourses = computed(() => store.courses.filter((c) => c.teacher === store.currentUser))
+const myCourses = computed(() => {
+  if (store.leaders.some((l) => l.name === store.currentUser && l.asTeacher)) {
+    return store.getLeaderCourses(store.currentUser || '')
+  }
+  return store.courses.filter((c) => c.teacher === store.currentUser)
+})
 const selectedCourseData = computed(() => selectedCourse.value ? store.courses.find((c) => c.id === selectedCourse.value) : null)
 const selectedConfig = computed(() => selectedCourse.value ? store.evalConfigs.find((c) => c.courseId === selectedCourse.value) : null)
 const baseEnabledTypes = computed<EvalType[]>(() => selectedConfig.value ? TEMPLATE_EVAL_TYPES[selectedConfig.value.template] : [])

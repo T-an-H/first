@@ -4,7 +4,8 @@ import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
   StudentGroup, EvalAnomaly, EvalReminder, GradeWeightConfig, DetailedGrade,
-  Mentor, Leader, AITierQuestion, StudentTierRecord, EvalType
+  Mentor, Leader, AITierQuestion, StudentTierRecord, EvalType,
+  Homework, HomeworkSubmission
 } from '@/types'
 import { getDefaultGradeConfig, TEMPLATE_EVAL_TYPES } from '@/types'
 import {
@@ -20,7 +21,16 @@ import {
   studentGroups as mockStudentGroups,
   detailedGrades as mockDetailedGrades,
   mentors as mockMentors,
-  leaders as mockLeaders
+  leaders as mockLeaders,
+  onlineDocs as mockOnlineDocs,
+  notes as mockNotes,
+  todoItems as mockTodos,
+  cloudFiles as mockCloudFiles,
+  homework as mockHomework,
+  homeworkSubmissions as mockHomeworkSubmissions,
+  examScores as mockExamScores,
+  supplementaryGrades as mockSupplementaryGrades,
+  supplementaryAll
 } from '@/data/mockData'
 
 type UserRole = 'admin' | 'teacher' | 'student' | 'mentor' | 'leader' | null
@@ -47,20 +57,22 @@ export const useAppStore = defineStore('app', () => {
   const courses = ref<Course[]>(loadFromStorage('courses', mockCourses))
   const categories = ref<Category[]>(loadFromStorage('categories', mockCategories))
   const students = ref<Student[]>(loadFromStorage('students', mockStudents))
-  const schedules = ref<Schedule[]>(loadFromStorage('schedules', mockSchedules))
-  const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', mockEnrollments))
+  const schedules = ref<Schedule[]>(loadFromStorage('schedules', [...mockSchedules, ...supplementaryAll.supplementarySchedules]))
+  const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', [...mockEnrollments, ...supplementaryAll.supplementaryEnrollments]))
   const teachers = ref<Teacher[]>(loadFromStorage('teachers', mockTeachers))
-  const grades = ref<Grade[]>(loadFromStorage('grades', mockGrades))
-  const cloudFiles = ref<CloudFile[]>(loadFromStorage<CloudFile[]>('cloudFiles', []))
-  const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', []))
-  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', []))
-  const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', []))
-  const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', mockEvaluations))
+  const grades = ref<Grade[]>(loadFromStorage('grades', [...mockGrades, ...mockSupplementaryGrades]))
+  const cloudFiles = ref<CloudFile[]>(loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles]))
+  const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', [...mockTodos, ...supplementaryAll.supplementaryTodos]))
+  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', [...mockOnlineDocs, ...supplementaryAll.supplementaryOnlineDocs]))
+  const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', [...mockNotes, ...supplementaryAll.supplementaryNotes]))
+  const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', [...mockEvaluations, ...supplementaryAll.supplementaryEvaluations]))
   const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', mockEvalConfigs))
-  const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', mockStudentGroups))
-  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', []))
+  const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', [...mockStudentGroups, ...supplementaryAll.supplementaryStudentGroups]))
+  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', supplementaryAll.supplementaryEvalReminders))
   const gradeConfigs = ref<Record<string, GradeWeightConfig>>(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {}))
-  const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', mockDetailedGrades))
+  const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', [...mockDetailedGrades, ...supplementaryAll.supplementaryDetailedGrades]))
+  const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', [...mockHomework, ...supplementaryAll.supplementaryHomework]))
+  const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', [...mockHomeworkSubmissions, ...supplementaryAll.supplementaryHomeworkSubmissions]))
   const isLoggedIn = ref<boolean>(loadFromStorage<boolean>('isLoggedIn', false))
   const currentUser = ref<string | null>(loadFromStorage<string | null>('currentUser', null))
   const currentRole = ref<UserRole>(loadFromStorage<UserRole>('currentRole', null))
@@ -68,8 +80,8 @@ export const useAppStore = defineStore('app', () => {
 
   // 企业导师数据
   const mentors = ref<Mentor[]>(loadFromStorage<Mentor[]>('mentors', mockMentors))
-  // 学院领导数据
-  const leaders = ref<Leader[]>(loadFromStorage<Leader[]>('leaders', mockLeaders))
+  // 学院领导数据（只读演示数据，不从 localStorage 缓存，确保新数据及时生效）
+  const leaders = ref<Leader[]>([...mockLeaders])
   // 次要角色（用于 leader+teacher/mentor 双重身份）
   const secondaryRoles = ref<UserRole[]>(loadFromStorage<UserRole[]>('secondaryRoles', []))
 
@@ -80,7 +92,7 @@ export const useAppStore = defineStore('app', () => {
 
   // 考试/项目成绩
   const examScores = ref<import('@/types').ExamScore[]>(
-    loadFromStorage<import('@/types').ExamScore[]>('examScores', [])
+    loadFromStorage<import('@/types').ExamScore[]>('examScores', mockExamScores)
   )
 
   // 考试/项目权重配置 (courseId → examName → weight)
@@ -340,6 +352,42 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('notes', notes.value)
   }
 
+  // ====== 作业系统 ======
+
+  function addHomework(hw: Homework) {
+    homework.value = [...homework.value, hw]
+    saveToStorage('homework', homework.value)
+  }
+
+  function updateHomework(id: string, data: Partial<Homework>) {
+    homework.value = homework.value.map((h) => (h.id === id ? { ...h, ...data } : h))
+    saveToStorage('homework', homework.value)
+  }
+
+  function deleteHomework(id: string) {
+    homework.value = homework.value.filter((h) => h.id !== id)
+    saveToStorage('homework', homework.value)
+  }
+
+  function getCourseHomework(courseId: string): Homework[] {
+    return homework.value.filter((h) => h.courseId === courseId)
+  }
+
+  function getCourseCloudFiles(courseId: string): CloudFile[] {
+    return cloudFiles.value.filter((f) => f.courseId === courseId)
+  }
+
+  function submitHomework(submission: HomeworkSubmission) {
+    homeworkSubmissions.value = [...homeworkSubmissions.value, submission]
+    saveToStorage('homeworkSubmissions', homeworkSubmissions.value)
+  }
+
+  function getHomeworkSubmission(homeworkId: string, studentId: string): HomeworkSubmission | undefined {
+    return homeworkSubmissions.value.find(
+      (s) => s.homeworkId === homeworkId && s.studentId === studentId
+    )
+  }
+
   // ====== 评价系统 ======
 
   function addEvaluation(ev: Evaluation) {
@@ -403,6 +451,61 @@ export const useAppStore = defineStore('app', () => {
   function deleteStudentGroup(id: string) {
     studentGroups.value = studentGroups.value.filter((g) => g.id !== id)
     saveToStorage('studentGroups', studentGroups.value)
+  }
+
+  /** 获取某课程的分组列表 */
+  function getCourseGroups(courseId: string): StudentGroup[] {
+    return studentGroups.value.filter((g) => g.courseId === courseId)
+  }
+
+  /** 清空某课程所有分组 */
+  function clearCourseGroups(courseId: string) {
+    studentGroups.value = studentGroups.value.filter((g) => g.courseId !== courseId)
+    saveToStorage('studentGroups', studentGroups.value)
+  }
+
+  /** 批量设置某课程的分组 */
+  function setCourseGroups(courseId: string, groups: { name: string; memberIds: string[] }[]) {
+    // 先清空旧分组
+    studentGroups.value = studentGroups.value.filter((g) => g.courseId !== courseId)
+    // 添加新分组
+    groups.forEach((g, i) => {
+      studentGroups.value.push({
+        id: `grp-${courseId}-${Date.now()}-${i}`,
+        courseId,
+        name: g.name,
+        memberIds: g.memberIds,
+      })
+    })
+    saveToStorage('studentGroups', studentGroups.value)
+  }
+
+  /** 随机分组：将某课程的学生随机分成 n 组 */
+  function randomGroup(courseId: string, groupCount: number) {
+    // 获取该课程所有未退课学生
+    const members = enrollments.value
+      .filter((e) => e.courseId === courseId && e.status !== 'dropped')
+      .map((e) => e.studentId)
+    // 洗牌算法
+    const shuffled = [...members]
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    }
+    // 均分到各组
+    const groups: { name: string; memberIds: string[] }[] = []
+    const perGroup = Math.ceil(shuffled.length / groupCount)
+    for (let g = 0; g < groupCount; g++) {
+      const start = g * perGroup
+      const end = start + perGroup
+      if (start >= shuffled.length) break
+      groups.push({
+        name: `第${'一二三四五六七八九十'[g] || g + 1}组`,
+        memberIds: shuffled.slice(start, end),
+      })
+    }
+    setCourseGroups(courseId, groups)
+    return groups
   }
 
   function detectAnomalies(courseId: string, sessionNumber: number): EvalAnomaly[] {
@@ -480,9 +583,10 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function submitExamScores(courseId: string, examName: string) {
+  function submitExamScores(courseId: string, examName: string, studentIds?: string[]) {
     examScores.value = examScores.value.map((s) => {
-      if (s.courseId === courseId && s.examName === examName && s.status === 'draft') {
+      if (s.courseId === courseId && s.examName === examName && s.status === 'draft'
+          && (!studentIds || studentIds.includes(s.studentId))) {
         return { ...s, status: 'submitted' as const, gradedAt: new Date().toISOString().split('T')[0] }
       }
       return s
@@ -620,7 +724,7 @@ export const useAppStore = defineStore('app', () => {
 
   /**
    * 判断最终评价轮次是否已过截止期
-   * 最后一次评价在课程结束后结束（最后一节课结束时间）
+   * 最终评价截止时间为最后一节课结束时间后第三天
    */
   function isFinalSessionDeadlinePassed(courseId: string, totalSessions: number): boolean {
     const courseSchedules = schedules.value
@@ -629,8 +733,9 @@ export const useAppStore = defineStore('app', () => {
 
     if (courseSchedules.length === 0) return false
 
-    // 最终评价截止时间：最后一节课结束
+    // 最终评价截止时间：最后一节课结束时间 + 3天
     const lastEndDate = new Date(courseSchedules[courseSchedules.length - 1].endDate)
+    lastEndDate.setDate(lastEndDate.getDate() + 3)
     return new Date() > lastEndDate
   }
 
@@ -690,8 +795,9 @@ export const useAppStore = defineStore('app', () => {
     if (courseSchedules.length === 0) return ''
 
     if (sessionNumber >= totalSessions) {
-      // 最终轮次：最后一节课结束时间
+      // 最终轮次：最后一节课结束时间后第三天
       const lastEnd = new Date(courseSchedules[courseSchedules.length - 1].endDate)
+      lastEnd.setDate(lastEnd.getDate() + 3)
       return lastEnd.toISOString().split('T')[0]
     }
     // 非最终轮次：该轮次最后一节课结束时间
@@ -1182,7 +1288,14 @@ export const useAppStore = defineStore('app', () => {
     const mentor = mentors.value.find((m) => m.name === mentorName)
     if (mentor) return mentor.courseIds
     // 也检查课程 mentor 字段
-    return courses.value.filter((c) => c.mentor === mentorName).map((c) => c.id)
+    const byMentorField = courses.value.filter((c) => c.mentor === mentorName).map((c) => c.id)
+    if (byMentorField.length > 0) return byMentorField
+    // 如果是领导以 asMentor 身份访问，按分类获取课程
+    const leader = leaders.value.find((l) => l.name === mentorName)
+    if (leader?.asMentor) {
+      return courses.value.filter((c) => leader.categoryIds.includes(c.categoryId)).map((c) => c.id)
+    }
+    return []
   }
 
   // ====== 学院领导相关 ======
@@ -1250,6 +1363,7 @@ export const useAppStore = defineStore('app', () => {
     cloudFiles, todos, onlineDocs, notes,
     evaluations, evalConfigs, studentGroups, evalReminders,
     gradeConfigs, detailedGrades,
+    homework, homeworkSubmissions,
     isLoggedIn, currentUser, currentRole,
     hasEvalReminders,
     mentors, leaders, secondaryRoles,
@@ -1268,8 +1382,12 @@ export const useAppStore = defineStore('app', () => {
     addTodo, updateTodo, deleteTodo,
     addOnlineDoc, updateOnlineDoc, deleteOnlineDoc,
     addNote, updateNote, deleteNote,
+    addHomework, updateHomework, deleteHomework,
+    getCourseHomework, getCourseCloudFiles,
+    submitHomework, getHomeworkSubmission,
     addEvaluation, updateEvaluation, deleteEvaluation,
     setEvalConfig, addStudentGroup, addStudent, updateStudent, updateStudentGroup, deleteStudentGroup,
+    getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
     addExamScore, updateExamScore, submitExamScores, getExamScoresForCourse, getExamNames,

@@ -22,11 +22,11 @@
           <!-- ===== AI 分层 ===== -->
           <div v-if="activeTab === 'ai_tier'" class="space-y-6">
             <!-- 未到开始条件 -->
-            <div v-if="!firstClassEnded" class="bg-amber-50 border border-amber-200 rounded-xl p-8 text-center">
-              <Layers class="w-12 h-12 mx-auto mb-3 text-amber-400" />
-              <h3 class="text-lg font-semibold text-amber-700 mb-2">AI 分层测试</h3>
-              <p class="text-sm text-amber-600">第一节课尚未结束，AI 分层测试将在第一节课结束后开启</p>
-              <p class="text-xs text-amber-400 mt-1">届时将根据第一节课内容生成 10 道测试题，依据得分判定学习层级</p>
+            <div v-if="!firstClassEnded" class="bg-brand-50 border border-brand-200 rounded-xl p-8 text-center">
+              <Layers class="w-12 h-12 mx-auto mb-3 text-brand-400" />
+              <h3 class="text-lg font-semibold text-brand-800 mb-2">AI 分层测试</h3>
+              <p class="text-sm text-brand-700">第一节课尚未结束，AI 分层测试将在第一节课结束后开启</p>
+              <p class="text-xs text-brand-400 mt-1">届时将根据第一节课内容生成 10 道测试题，依据得分判定学习层级</p>
             </div>
 
             <!-- 测试窗口期（第一节课后～第二节课前） -->
@@ -34,7 +34,7 @@
               <Sparkles class="w-12 h-12 mx-auto mb-3 text-blue-500" />
               <h3 class="text-lg font-semibold text-blue-800 mb-2">AI 分层测试已开放</h3>
               <p class="text-sm text-blue-600 mb-2">完成 10 道测试题（单选+判断），系统将根据得分判定你的学习层级</p>
-              <p class="text-xs text-amber-500 mb-6">⚠ 测试窗口：第一节课结束后 ~ 第二节课开始前，逾期将自动分配到基础层</p>
+              <p class="text-xs text-brand-600 mb-6">⚠ 测试窗口：第一节课结束后 ~ 第二节课开始前，逾期将自动分配到基础层</p>
               <button @click="openAITest"
                 class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors shadow-lg shadow-blue-500/25 inline-flex items-center gap-2">
                 <HelpCircle class="w-5 h-5" />
@@ -48,7 +48,7 @@
               <h3 class="text-lg font-semibold text-red-700 mb-2">测试窗口已关闭</h3>
               <p class="text-sm text-red-600 mb-4">第二节课已开始，AI 分层测试逾期未完成，已自动分配到基础层</p>
               <div class="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm">
-                <Layers class="w-4 h-4 text-amber-500" />
+                <Layers class="w-4 h-4 text-brand-600" />
                 <span class="text-sm font-bold text-gray-800">基础层</span>
               </div>
               <p class="text-xs text-gray-400 mt-4">本学期不可修改，后续任务、资源、作业将根据基础层进行适配</p>
@@ -156,7 +156,7 @@
               </div>
 
               <div class="flex items-center justify-between mt-6 pt-4 border-t border-brand-400/20">
-                <span v-if="!allAnswered" class="text-xs text-amber-500">请完成所有题目后再提交</span>
+                <span v-if="!allAnswered" class="text-xs text-brand-600">请完成所有题目后再提交</span>
                 <span v-else class="text-xs text-emerald-500">所有题目已作答</span>
                 <button @click="submitAITest" :disabled="!allAnswered"
                   class="px-6 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -170,8 +170,8 @@
             <template v-else>
               <div class="text-center py-6 space-y-4">
                 <div class="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
-                  :class="testScore >= 80 ? 'bg-emerald-100' : testScore >= 60 ? 'bg-blue-100' : 'bg-amber-100'">
-                  <Award class="w-10 h-10" :class="testScore >= 80 ? 'text-emerald-500' : testScore >= 60 ? 'text-blue-500' : 'text-amber-500'" />
+                  :class="testScore >= 80 ? 'bg-emerald-100' : testScore >= 60 ? 'bg-blue-100' : 'bg-brand-50'">
+                  <Award class="w-10 h-10" :class="testScore >= 80 ? 'text-emerald-500' : testScore >= 60 ? 'text-blue-500' : 'text-brand-600'" />
                 </div>
                 <div>
                   <p class="text-4xl font-bold text-gray-900">{{ testScore }}<span class="text-lg text-gray-400">/{{ totalQuestions * 10 }}</span></p>
@@ -345,37 +345,64 @@
 
           <!-- ===== 资源 ===== -->
           <div v-if="activeTab === 'resources'" class="space-y-4">
-            <h3 class="text-sm font-semibold text-gray-800">课程资源</h3>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-gray-800">课程资源</h3>
+              <span class="text-xs text-gray-400">教师上传的资源，可下载学习</span>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div v-for="res in courseResources" :key="res.id"
-                class="flex items-center gap-3 p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5">
-                <div class="w-10 h-10 rounded-lg bg-brand-400/5 flex items-center justify-center">
-                  <FileText class="w-5 h-5 text-gray-400" />
+              <div v-for="res in courseResources" :key="res.id" class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center">
+                    <FileText class="w-5 h-5 text-gray-500" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-medium text-gray-900">{{ res.name }}</p>
+                    <p class="text-xs text-gray-400">{{ getFileTypeName(res.type) }} · {{ formatFileSize(res.size) }} · 上传者：{{ res.uploadedBy }}</p>
+                  </div>
                 </div>
-                <div>
-                  <p class="text-sm font-medium text-gray-900">{{ res.title }}</p>
-                  <p class="text-xs text-gray-400">{{ res.type }} · {{ res.size }}</p>
-                </div>
+                <button @click="downloadFile(res)" class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="下载文件">
+                  <Download class="w-4 h-4" />
+                </button>
               </div>
-              <div v-if="courseResources.length === 0" class="col-span-full text-center py-8 text-gray-400">暂无资源</div>
+              <div v-if="courseResources.length === 0" class="col-span-full text-center py-8 text-gray-400">暂无课程资源</div>
             </div>
           </div>
 
           <!-- ===== 作业 ===== -->
           <div v-if="activeTab === 'homework'" class="space-y-4">
-            <h3 class="text-sm font-semibold text-gray-800">课程作业</h3>
-            <div class="space-y-2">
-              <div v-for="hw in courseHomework" :key="hw.id"
-                class="flex items-center justify-between p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5">
-                <div class="flex items-center gap-3">
-                  <FileText class="w-5 h-5 text-blue-500" />
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-gray-800">课程作业</h3>
+              <span class="text-xs text-gray-400">{{ submittedCount }}/{{ courseHomework.length }} 已提交</span>
+            </div>
+            <div class="space-y-3">
+              <div v-for="hw in courseHomework" :key="hw.id" class="p-4 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
+                <div class="flex items-start justify-between mb-2">
                   <div>
                     <p class="text-sm font-medium text-gray-900">{{ hw.title }}</p>
-                    <p class="text-xs text-gray-400">截止：{{ hw.dueDate }}</p>
+                    <p v-if="hw.description" class="text-xs text-gray-500 mt-1">{{ hw.description }}</p>
+                    <p class="text-xs text-gray-400 mt-2">截止：{{ hw.dueDate }} · 创建者：{{ hw.createdBy }}</p>
                   </div>
+                  <span v-if="isHomeworkSubmitted(hw.id)" class="px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 rounded-full">已提交</span>
+                  <span v-else class="px-2 py-1 text-xs font-medium text-brand-700 bg-brand-50 rounded-full">未提交</span>
                 </div>
-                <span v-if="hw.submitted" class="text-xs text-emerald-500">已提交</span>
-                <span v-else class="text-xs text-amber-500">未提交</span>
+                <div v-if="isHomeworkSubmitted(hw.id)" class="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+                  <FileText class="w-4 h-4 text-gray-400" />
+                  <span class="text-xs text-gray-500">已提交：{{ getSubmissionFileName(hw.id) }}</span>
+                  <button @click="downloadSubmission(hw.id)" class="ml-auto p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <Download class="w-4 h-4" />
+                  </button>
+                </div>
+                <div v-else class="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+                  <label class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors">
+                    <Upload class="w-4 h-4" />
+                    <span>选择文件</span>
+                    <input type="file" :data-homework-id="hw.id" @change="handleFileSelect($event, hw.id)" class="hidden" />
+                  </label>
+                  <button v-if="selectedFiles[hw.id]" @click="submitHomework(hw)" class="px-3 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
+                    提交作业
+                  </button>
+                  <span v-if="selectedFiles[hw.id]" class="text-xs text-gray-500">{{ selectedFiles[hw.id].name }}</span>
+                </div>
               </div>
               <div v-if="courseHomework.length === 0" class="text-center py-8 text-gray-400">暂无作业</div>
             </div>
@@ -451,10 +478,10 @@
             </div>
 
             <!-- 成绩权重说明 -->
-            <div v-if="currentCfg" class="bg-amber-50 rounded-xl p-4 border border-amber-200 text-sm text-amber-800">
+            <div v-if="currentCfg" class="bg-brand-50 rounded-xl p-4 border border-brand-200 text-sm text-brand-800">
               <p class="font-medium mb-1">成绩构成</p>
               <p>总成绩 = 平时成绩({{ currentCfg.regularWeight }}%) + 期中成绩({{ currentCfg.midtermWeight }}%) + 期末成绩({{ currentCfg.finalWeight }}%)</p>
-              <p class="text-xs text-amber-600 mt-1">
+              <p class="text-xs text-brand-700 mt-1">
                 平时成绩构成：自评({{ currentCfg.selfEvalWeight }}%) + 互评({{ currentCfg.peerReviewWeight }}%) + 组间评({{ currentCfg.interGroupEvalWeight }}%) + 教师({{ currentCfg.teacherScoreWeight }}%) + 导师({{ currentCfg.mentorScoreWeight }}%)
               </p>
             </div>
@@ -473,45 +500,36 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
-  CheckCircle, Circle, Layers, GitBranch, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle
+  CheckCircle, Circle, Layers, GitBranch, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
+  Download, Upload
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
-import type { AITierQuestion, LearningTier } from '@/types'
+import type { AITierQuestion, LearningTier, CloudFile } from '@/types'
 import Modal from '@/components/Modal.vue'
-import * as d3 from 'd3'
-import { renderIcon } from '@/utils/d3-renderer'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
 const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
-const activeTab = ref('knowledge_graph')
+const activeTab = ref('tasks')
+const selectedFiles = ref<Record<string, File>>({})
 
 onMounted(() => {
   store.pushNearDeadlineEvalReminders()
-  // 逾期自动分配基础层
   if (myStudent.value) {
     store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
   }
-  // 初始渲染 D3 知识图谱
-  const root = document.getElementById('student-course-learn-root')
-  if (root) renderCourseLearn(root)
 })
 
-function reRender() {
-  const root = document.getElementById('student-course-learn-root')
-  if (root) renderCourseLearn(root)
-}
-
 const tabs = [
-  { id: 'ai_tier', label: 'AI分层', icon: 'layers' },
-  { id: 'knowledge_graph', label: '知识图谱', icon: 'gitBranch' },
-  { id: 'tasks', label: '任务', icon: 'edit3' },
-  { id: 'resources', label: '资源', icon: 'fileText' },
-  { id: 'homework', label: '作业', icon: 'bookOpen' },
-  { id: 'evaluations', label: '评价填写', icon: 'clipboardCheck' },
-  { id: 'eval_overview', label: '综合评价', icon: 'award' },
+  { id: 'ai_tier', label: 'AI分层', icon: Layers },
+  { id: 'knowledge_graph', label: '知识图谱', icon: GitBranch },
+  { id: 'tasks', label: '任务', icon: Edit3 },
+  { id: 'resources', label: '资源', icon: FileText },
+  { id: 'homework', label: '作业', icon: BookOpen },
+  { id: 'evaluations', label: '评价填写', icon: ClipboardCheck },
+  { id: 'eval_overview', label: '综合评价', icon: Award },
 ]
 
 const course = computed(() => store.courses.find((c) => c.id === courseId))
@@ -549,59 +567,12 @@ const courseTasks = computed(() => {
   return basicTasks
 })
 
-// ===== 资源（按层级区分） =====
-const courseResources = computed(() => {
-  const tier = tierFinalized.value ? myTier.value : 'basic'
-  const basicResources = [
-    { id: '1', title: '课程大纲.pdf', type: 'PDF', size: '2.3 MB' },
-    { id: '2', title: '第1章课件（基础版）.pptx', type: 'PPT', size: '5.1 MB' },
-    { id: '3', title: '基础参考书目.pdf', type: 'PDF', size: '1.8 MB' },
-    { id: '4', title: '基础练习题集.docx', type: 'DOC', size: '0.5 MB' },
-  ]
-  const advancedResources = [
-    { id: '1', title: '课程大纲.pdf', type: 'PDF', size: '2.3 MB' },
-    { id: '2', title: '第1-3章完整课件.pptx', type: 'PPT', size: '8.5 MB' },
-    { id: '3', title: '进阶参考书目及论文合集.pdf', type: 'PDF', size: '3.2 MB' },
-    { id: '4', title: '项目案例分析集.docx', type: 'DOC', size: '1.1 MB' },
-    { id: '5', title: '实战项目模板.zip', type: 'ZIP', size: '4.7 MB' },
-  ]
-  const excellentResources = [
-    { id: '1', title: '课程大纲.pdf', type: 'PDF', size: '2.3 MB' },
-    { id: '2', title: '全章节高阶课件合集.pptx', type: 'PPT', size: '12.3 MB' },
-    { id: '3', title: '前沿领域文献综述.pdf', type: 'PDF', size: '4.1 MB' },
-    { id: '4', title: '竞赛项目案例集.docx', type: 'DOC', size: '2.8 MB' },
-    { id: '5', title: '开源项目代码库.zip', type: 'ZIP', size: '8.2 MB' },
-    { id: '6', title: '学术论文写作指南.pdf', type: 'PDF', size: '1.5 MB' },
-  ]
-  if (tier === 'excellent') return excellentResources
-  if (tier === 'advanced') return advancedResources
-  return basicResources
-})
+// ===== 资源（从store获取课程关联资源） =====
+const courseResources = computed(() => store.getCourseCloudFiles(courseId))
 
-// ===== 作业（按层级区分） =====
-const courseHomework = computed(() => {
-  const tier = tierFinalized.value ? myTier.value : 'basic'
-  const basicHomework = [
-    { id: '1', title: '基础概念填空题', dueDate: '2025-03-20', submitted: true },
-    { id: '2', title: '基础代码练习题', dueDate: '2025-03-27', submitted: true },
-    { id: '3', title: '基础应用题', dueDate: '2025-04-03', submitted: false },
-  ]
-  const advancedHomework = [
-    { id: '1', title: '进阶编程作业', dueDate: '2025-03-20', submitted: true },
-    { id: '2', title: '综合案例分析报告', dueDate: '2025-03-27', submitted: true },
-    { id: '3', title: '小型项目开发作业', dueDate: '2025-04-03', submitted: false },
-    { id: '4', title: '代码审查与重构作业', dueDate: '2025-04-10', submitted: false },
-  ]
-  const excellentHomework = [
-    { id: '1', title: '高阶算法设计与实现', dueDate: '2025-03-20', submitted: true },
-    { id: '2', title: '创新项目研究作业', dueDate: '2025-03-27', submitted: true },
-    { id: '3', title: '跨学科综合应用作业', dueDate: '2025-04-03', submitted: false },
-    { id: '4', title: '学术论文摘要与框架', dueDate: '2025-04-10', submitted: false },
-  ]
-  if (tier === 'excellent') return excellentHomework
-  if (tier === 'advanced') return advancedHomework
-  return basicHomework
-})
+// ===== 作业（从store获取课程作业） =====
+const courseHomework = computed(() => store.getCourseHomework(courseId))
+const submittedCount = computed(() => courseHomework.value.filter(hw => isHomeworkSubmitted(hw.id)).length)
 
 // ===== AI 分层 =====
 const tierRecord = computed(() =>
@@ -623,19 +594,19 @@ const tierLabel = computed(() => {
 })
 
 const tierBadgeClass = computed(() => {
-  if (!tierFinalized.value) return 'bg-brand-400/10 text-gray-400 border border-brand-400/30'
+  if (!tierFinalized.value) return 'bg-brand-400/10 text-brand-700 border border-brand-400'
   const map = {
-    basic: 'bg-brand-400/10 text-brand-600 border border-brand-400',
-    advanced: 'bg-brand-600/10 text-brand-600 border border-brand-400',
-    excellent: 'bg-brand-600/10 text-brand-600 border border-brand-400',
+    basic: 'bg-brand-400/10 text-brand-700 border border-brand-400',
+    advanced: 'bg-blue-600/10 text-blue-600 border border-blue-400',
+    excellent: 'bg-emerald-600/10 text-emerald-600 border border-emerald-400',
   }
   return map[myTier.value]
 })
 
 const tierComparison = computed(() => [
-  { level: 'basic' as const, label: '基础层', color: 'text-brand-600', desc: '初步掌握课程基础知识，建议加强练习与复习' },
-  { level: 'advanced' as const, label: '进阶层', color: 'text-brand-600', desc: '较好掌握课程核心知识，可尝试拓展深入学习' },
-  { level: 'excellent' as const, label: '卓越层', color: 'text-brand-600', desc: '全面掌握课程内容，具备独立项目实践能力' },
+  { level: 'basic' as const, label: '基础层', color: 'text-brand-700', desc: '初步掌握课程基础知识，建议加强练习与复习' },
+  { level: 'advanced' as const, label: '进阶层', color: 'text-blue-600', desc: '较好掌握课程核心知识，可尝试拓展深入学习' },
+  { level: 'excellent' as const, label: '卓越层', color: 'text-emerald-600', desc: '全面掌握课程内容，具备独立项目实践能力' },
 ])
 
 // ===== AI 分层测试弹窗 =====
@@ -934,10 +905,10 @@ const relationLegend = [
 ]
 
 const categoryColors = [
-  { key: 'foundation', label: '基础知识', light: '#80b8d7', mid: '#5eb6b9', deep: '#429fc4' },
-  { key: 'core', label: '核心知识', light: '#80b8d7', mid: '#5eb6b9', deep: '#429fc4' },
-  { key: 'advanced', label: '进阶能力', light: '#80b8d7', mid: '#5eb6b9', deep: '#429fc4' },
-  { key: 'comprehensive', label: '综合能力', light: '#80b8d7', mid: '#5eb6b9', deep: '#429fc4' },
+  { key: 'foundation', label: '基础知识', light: '#93c5fd', mid: '#3b82f6', deep: '#1d4ed8' },
+  { key: 'core', label: '核心知识', light: '#86efac', mid: '#22c55e', deep: '#15803d' },
+  { key: 'advanced', label: '进阶能力', light: '#fde68a', mid: '#f59e0b', deep: '#b45309' },
+  { key: 'comprehensive', label: '综合能力', light: '#c4b5fd', mid: '#8b5cf6', deep: '#6d28d9' },
 ]
 
 function categoryColorMap(cat: string): { light: string; mid: string; deep: string } {
@@ -1171,639 +1142,76 @@ const evalDimensions = computed(() => {
   return dims
 })
 
-// ===== 任务内容渲染 =====
-function renderTasksContent(container: d3.Selection<any, any, any, any>) {
-  container.append('h3').attr('class', 'text-sm font-semibold text-gray-800').text('课程任务')
-  const list = container.append('div').attr('class', 'space-y-2')
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+}
 
-  if (courseTasks.value.length === 0) {
-    list.append('div').attr('class', 'text-center py-8 text-gray-400').text('暂无任务')
-    return
+function getFileTypeName(type: string): string {
+  const extMap: Record<string, string> = {
+    'application/pdf': 'PDF',
+    'application/docx': 'DOC',
+    'application/zip': 'ZIP',
+    'application/fig': 'FIG',
+    'text/markdown': 'MD',
+    'text/csv': 'CSV',
+    'application/ipynb': 'IPYNB',
+    'text/typescript': 'TS',
+    'application/pptx': 'PPT',
   }
+  return extMap[type] || '文件'
+}
 
-  courseTasks.value.forEach((task) => {
-    const row = list.append('div').attr('class', 'flex items-center justify-between p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5')
+function downloadFile(file: CloudFile) {
+  alert(`开始下载：${file.name}`)
+}
 
-    const left = row.append('div').attr('class', 'flex items-center gap-3')
-    if (task.completed) {
-      renderIcon(left, 'checkCircle', 'w-5 h-5 text-brand-600')
-    } else {
-      // Empty circle
-      left.append('svg').attr('class', 'w-5 h-5 text-gray-400')
-        .attr('viewBox', '0 0 24 24').attr('fill', 'none').attr('stroke', 'currentColor')
-        .attr('stroke-width', '2')
-        .append('circle').attr('cx', '12').attr('cy', '12').attr('r', '10')
-    }
-    const info = left.append('div')
-    info.append('p').attr('class', 'text-sm font-medium text-gray-900').text(task.title)
-    if (task.dueDate) {
-      info.append('p').attr('class', 'text-xs text-gray-400').text(`截止：${task.dueDate}`)
-    }
+function isHomeworkSubmitted(homeworkId: string): boolean {
+  if (!myStudent.value) return false
+  return !!store.getHomeworkSubmission(homeworkId, myStudent.value.id)
+}
 
-    if (task.score !== undefined) {
-      row.append('span').attr('class', 'text-sm font-bold text-brand-600').text(`${task.score}分`)
-    }
+function getSubmissionFileName(homeworkId: string): string {
+  if (!myStudent.value) return ''
+  const submission = store.getHomeworkSubmission(homeworkId, myStudent.value.id)
+  return submission?.fileName || ''
+}
+
+function downloadSubmission(homeworkId: string) {
+  if (!myStudent.value) return
+  const submission = store.getHomeworkSubmission(homeworkId, myStudent.value.id)
+  if (submission) {
+    alert(`开始下载已提交作业：${submission.fileName}`)
+  }
+}
+
+function handleFileSelect(event: Event, homeworkId: string) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    selectedFiles.value[homeworkId] = file
+  }
+}
+
+function submitHomework(hw: typeof courseHomework.value[0]) {
+  if (!myStudent.value || !selectedFiles.value[hw.id]) return
+  
+  const file = selectedFiles.value[hw.id]
+  
+  store.submitHomework({
+    id: `sub-${Date.now()}`,
+    homeworkId: hw.id,
+    courseId: courseId,
+    studentId: myStudent.value.id,
+    submittedAt: new Date().toISOString().split('T')[0],
+    fileName: file.name,
+    fileDataUrl: 'https://example.com/submissions/' + file.name,
+    fileSize: file.size,
+    fileType: file.type,
   })
+  
+  delete selectedFiles.value[hw.id]
+  alert('作业提交成功！')
 }
-
-// ===== 资源内容渲染 =====
-function renderResourcesContent(container: d3.Selection<any, any, any, any>) {
-  container.append('h3').attr('class', 'text-sm font-semibold text-gray-800').text('课程资源')
-  const grid = container.append('div').attr('class', 'grid grid-cols-1 md:grid-cols-2 gap-3')
-
-  if (courseResources.value.length === 0) {
-    grid.append('div').attr('class', 'col-span-full text-center py-8 text-gray-400').text('暂无资源')
-    return
-  }
-
-  courseResources.value.forEach((res) => {
-    const card = grid.append('div').attr('class', 'flex items-center gap-3 p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5')
-    const iconBox = card.append('div').attr('class', 'w-10 h-10 rounded-lg bg-brand-400/10 flex items-center justify-center')
-    renderIcon(iconBox, 'fileText', 'w-5 h-5 text-gray-400')
-    const info = card.append('div')
-    info.append('p').attr('class', 'text-sm font-medium text-gray-900').text(res.title)
-    info.append('p').attr('class', 'text-xs text-gray-400').text(`${res.type} · ${res.size}`)
-  })
-}
-
-// ===== 作业内容渲染 =====
-function renderHomeworkContent(container: d3.Selection<any, any, any, any>) {
-  container.append('h3').attr('class', 'text-sm font-semibold text-gray-800').text('课程作业')
-  const list = container.append('div').attr('class', 'space-y-2')
-
-  if (courseHomework.value.length === 0) {
-    list.append('div').attr('class', 'text-center py-8 text-gray-400').text('暂无作业')
-    return
-  }
-
-  courseHomework.value.forEach((hw) => {
-    const row = list.append('div').attr('class', 'flex items-center justify-between p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5')
-    const left = row.append('div').attr('class', 'flex items-center gap-3')
-    renderIcon(left, 'fileText', 'w-5 h-5 text-brand-600')
-    const info = left.append('div')
-    info.append('p').attr('class', 'text-sm font-medium text-gray-900').text(hw.title)
-    info.append('p').attr('class', 'text-xs text-gray-400').text(`截止：${hw.dueDate}`)
-
-    if (hw.submitted) {
-      row.append('span').attr('class', 'text-xs text-brand-600').text('已提交')
-    } else {
-      row.append('span').attr('class', 'text-xs text-brand-600').text('未提交')
-    }
-  })
-}
-
-// ===== 评价填写内容渲染 =====
-function renderEvaluationsContent(container: d3.Selection<any, any, any, any>) {
-  container.append('h3').attr('class', 'text-sm font-semibold text-gray-800').text('课程评价')
-  if (isReadOnly.value) {
-    const readOnlyBox = container.append('div').attr('class', 'bg-brand-400/10 border border-brand-400/30 rounded-xl p-6 text-center text-sm text-gray-400')
-    renderIcon(readOnlyBox, 'eye', 'w-8 h-8 mx-auto mb-2 text-gray-400')
-    readOnlyBox.append('p').text('课程已结束，评价填写功能已关闭')
-    readOnlyBox.append('p').attr('class', 'text-xs mt-1').text('如需查看评价记录，请在"综合评价"中查看')
-  }
-  // StudentEvaluation is rendered in the hidden template div
-}
-
-// ===== 综合评价内容渲染 =====
-function renderEvalOverviewContent(container: d3.Selection<any, any, any, any>) {
-  const section1 = container.append('div')
-  section1.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('综合评价')
-
-  const scoreCard = section1.append('div').attr('class', 'bg-gradient-to-br from-brand-400/5 to-brand-400/5 rounded-xl p-5 border border-brand-400/20')
-  const scoreRow = scoreCard.append('div').attr('class', 'flex items-center justify-between mb-4')
-
-  const scoreLeft = scoreRow.append('div')
-  scoreLeft.append('p').attr('class', 'text-xs text-gray-400 mb-1').text('课程总评')
-  const scoreVal = scoreLeft.append('p').attr('class', 'text-3xl font-bold text-brand-600')
-  scoreVal.text(String(totalScore.value ?? '-'))
-  scoreVal.append('span').attr('class', 'text-base text-gray-400').text('分')
-
-  const scoreRight = scoreRow.append('div').attr('class', 'text-right')
-  scoreRight.append('p').attr('class', 'text-xs text-gray-400').text('班级平均')
-  scoreRight.append('p').attr('class', 'text-xl font-semibold text-brand-600').text(`${classAvgScore.value}分`)
-
-  // 分数条
-  const barContainer = scoreCard.append('div').attr('class', 'relative h-3 bg-brand-400/10 rounded-full overflow-hidden')
-  barContainer.append('div').attr('class', 'absolute top-0 h-full w-0.5 bg-brand-600 z-10')
-    .style('left', `${classAvgScore.value}%`)
-  if (totalScore.value) {
-    barContainer.append('div').attr('class', 'h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all')
-      .style('width', `${Math.min(totalScore.value, 100)}%`)
-  }
-  const barLabels = scoreCard.append('div').attr('class', 'flex justify-between text-xs text-gray-400 mt-1')
-  barLabels.append('span').text('0')
-  barLabels.append('span').style('color', '#429fc4').text(`平均${classAvgScore.value}`)
-  barLabels.append('span').text('100')
-
-  // 评价维度细分
-  const dimSection = container.append('div')
-  dimSection.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('评价维度细分')
-  const dimList = dimSection.append('div').attr('class', 'space-y-3')
-
-  if (evalDimensions.value.length === 0) {
-    dimList.append('div').attr('class', 'text-center py-6 text-gray-400').text('暂无评价数据')
-  } else {
-    evalDimensions.value.forEach((dim) => {
-      const dimRow = dimList.append('div').attr('class', 'flex items-center gap-3 p-3 rounded-lg border border-brand-400/20')
-      const iconBox = dimRow.append('div').attr('class', 'w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0')
-      // Parse Tailwind classes for iconBox styling
-      const iconBgCls = dim.iconBg
-      if (iconBgCls) iconBox.attr('class', (iconBox.attr('class') || '') + ' ' + iconBgCls)
-      renderIcon(iconBox, dim.icon as any, `w-4 h-4 ${dim.iconColor}`)
-
-      const dimInfo = dimRow.append('div').attr('class', 'flex-1 min-w-0')
-      dimInfo.append('p').attr('class', 'text-sm font-medium text-gray-900').text(dim.label)
-
-      const progressRow = dimInfo.append('div').attr('class', 'flex items-center gap-2 mt-1')
-      const pct = (dim.score / (dim.maxScore || 100)) * 100
-      const barBg = progressRow.append('div').attr('class', 'flex-1 bg-brand-400/10 rounded-full h-2 overflow-hidden')
-      barBg.append('div').attr('class', 'h-full rounded-full transition-all duration-500')
-        .style('width', `${pct}%`)
-        .style('background', '#429fc4')
-      progressRow.append('span').attr('class', 'text-xs font-medium text-brand-600 w-12 text-right')
-        .text(`${dim.score}/${dim.maxScore || 100}`)
-    })
-  }
-
-  // 成绩权重说明
-  const cfg = currentCfg.value
-  if (cfg) {
-    const cfgBox = container.append('div').attr('class', 'bg-brand-400/10 rounded-xl p-4 border border-brand-400/20 text-sm text-gray-800')
-    cfgBox.append('p').attr('class', 'font-medium mb-1').text('成绩构成')
-    cfgBox.append('p').text(`总成绩 = 平时成绩(${cfg.regularWeight}%) + 期中成绩(${cfg.midtermWeight}%) + 期末成绩(${cfg.finalWeight}%)`)
-    cfgBox.append('p').attr('class', 'text-xs text-brand-600 mt-1')
-      .text(`平时成绩构成：自评(${cfg.selfEvalWeight}%) + 互评(${cfg.peerReviewWeight}%) + 组间评(${cfg.interGroupEvalWeight}%) + 教师(${cfg.teacherScoreWeight}%) + 导师(${cfg.mentorScoreWeight}%)`)
-  }
-}
-
-// ===== 右侧栏渲染 =====
-function renderSidebar(container: d3.Selection<any, any, any, any>) {
-  // AI 学习助手
-  const aiCard = container.append('div').attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-4')
-  aiCard.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('AI 学习助手')
-  const aiBox = aiCard.append('div').attr('class', 'bg-gradient-to-br from-brand-400/5 to-brand-400/5 rounded-lg p-3 text-xs text-brand-600')
-  aiBox.append('p').attr('class', 'font-medium mb-1').text('智能推荐')
-  aiBox.append('p').text(aiAssistantTip.value)
-
-  // 预习画像
-  const profileCard = container.append('div').attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-4')
-  profileCard.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('预习画像')
-  const profileContent = profileCard.append('div').attr('class', 'space-y-2')
-
-  const pp = previewProfile.value
-
-  // 预习完成度
-  const completeRow = profileContent.append('div')
-  const completeLabel = completeRow.append('div').attr('class', 'flex justify-between text-xs')
-  completeLabel.append('span').attr('class', 'text-gray-400').text('预习完成度')
-  completeLabel.append('span').attr('class', 'font-medium').text(`${pp.previewComplete}%`)
-  completeRow.append('div').attr('class', 'h-2 bg-brand-400/10 rounded-full overflow-hidden')
-    .append('div').attr('class', 'h-full rounded-full').style('width', `${pp.previewComplete}%`).style('background', '#429fc4')
-
-  // 知识点掌握
-  const masteryRow = profileContent.append('div')
-  const masteryLabel = masteryRow.append('div').attr('class', 'flex justify-between text-xs')
-  masteryLabel.append('span').attr('class', 'text-gray-400').text('知识点掌握')
-  masteryLabel.append('span').attr('class', 'font-medium').text(`${pp.knowledgeMastery}%`)
-  masteryRow.append('div').attr('class', 'h-2 bg-brand-400/10 rounded-full overflow-hidden')
-    .append('div').attr('class', 'h-full rounded-full').style('width', `${pp.knowledgeMastery}%`).style('background', '#429fc4')
-
-  // 学习时长
-  const hoursRow = profileContent.append('div')
-  const hoursLabel = hoursRow.append('div').attr('class', 'flex justify-between text-xs')
-  hoursLabel.append('span').attr('class', 'text-gray-400').text('学习时长')
-  hoursLabel.append('span').attr('class', 'font-medium').text(`${pp.studyHours}h`)
-}
-
-// ===== 右侧栏 =====
-const aiAssistantTip = computed(() => {
-  const tier = myTier.value
-  if (tier === 'basic') return '根据你的学习进度，建议重点复习第1-3章基础内容'
-  if (tier === 'advanced') return '根据你的学习进度，建议重点复习第4-5章进阶内容'
-  return '根据你的学习进度，建议尝试完成综合项目实践'
-})
-
-const previewProfile = computed(() => {
-  const progress = myEnrollment.value?.progress ?? 50
-  return {
-    previewComplete: Math.min(progress + 10, 100),
-    knowledgeMastery: progress,
-    studyHours: Math.round(progress * 0.24),
-  }
-})
-
-// ===== D3 渲染函数 =====
-
-function renderGitBranchIcon(parent: d3.Selection<any, any, any, any>, className?: string) {
-  const svg = parent.append('svg')
-    .attr('viewBox', '0 0 24 24')
-    .attr('fill', 'none')
-    .attr('stroke', 'currentColor')
-    .attr('stroke-width', '2')
-    .attr('stroke-linecap', 'round')
-    .attr('stroke-linejoin', 'round')
-  if (className) svg.attr('class', className)
-  svg.html('<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>')
-  return svg
-}
-
-function renderCourseLearn(root: HTMLElement) {
-  const container = d3.select(root)
-  container.selectAll('*').remove()
-
-  const c = course.value
-  const readOnly = isReadOnly.value
-
-  // ---- 外层容器 ----
-  const wrapper = container.append('div').attr('class', 'space-y-6')
-
-  // ===== 头部 =====
-  renderHeader(wrapper, c, readOnly)
-
-  // ===== 已结束只读提示 =====
-  if (readOnly) {
-    renderReadOnlyBanner(wrapper)
-  }
-
-  // ===== Tab 栏 =====
-  renderTabBar(wrapper)
-
-  // ===== 主内容 + 侧栏网格 =====
-  const grid = wrapper.append('div').attr('class', 'grid grid-cols-1 lg:grid-cols-4 gap-6')
-  const mainCol = grid.append('div').attr('class', 'lg:col-span-3')
-  const sideCol = grid.append('div').attr('class', 'space-y-6')
-
-  // ---- 主内容卡片 ----
-  const mainCard = mainCol.append('div').attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm p-6')
-
-  // 根据 activeTab 渲染不同内容
-  const tabId = activeTab.value
-  if (tabId === 'ai_tier') {
-    renderAITierContent(mainCard)
-  } else if (tabId === 'knowledge_graph') {
-    renderKnowledgeGraphContent(mainCard)
-  } else if (tabId === 'tasks') {
-    renderTasksContent(mainCard)
-  } else if (tabId === 'resources') {
-    renderResourcesContent(mainCard)
-  } else if (tabId === 'homework') {
-    renderHomeworkContent(mainCard)
-  } else if (tabId === 'evaluations') {
-    renderEvaluationsContent(mainCard)
-  } else if (tabId === 'eval_overview') {
-    renderEvalOverviewContent(mainCard)
-  }
-
-  // ---- 右侧栏 ----
-  renderSidebar(sideCol)
-}
-
-// ===== 头部渲染 =====
-function renderHeader(container: d3.Selection<any, any, any, any>, c: any, readOnly: boolean) {
-  const topRow = container.append('div').attr('class', 'flex items-center gap-4')
-
-  const backBtn = topRow.append('button')
-    .attr('class', 'p-2 rounded-lg hover:bg-brand-400/10 transition-colors')
-    .on('click', () => router.back())
-  renderIcon(backBtn, 'arrowLeft', 'w-5 h-5 text-gray-400')
-
-  const infoDiv = topRow.append('div').attr('class', 'flex-1')
-  infoDiv.append('h1').attr('class', 'text-2xl font-bold text-gray-900').text(c?.title || '')
-  infoDiv.append('p').attr('class', 'text-gray-400 mt-1').text(`${c?.id || ''} · ${c?.teacher || ''}`)
-
-  if (readOnly) {
-    const badge = topRow.append('span').attr('class', 'text-xs px-3 py-1 rounded-full bg-brand-400/10 text-gray-400 border border-brand-400/30')
-    const badgeIcon = badge.append('span').attr('class', 'inline-flex items-center')
-    renderIcon(badgeIcon, 'eye', 'w-3 h-3 mr-1')
-    badge.append('span').text('课程已结束')
-  }
-}
-
-// ===== 只读提示 =====
-function renderReadOnlyBanner(container: d3.Selection<any, any, any, any>) {
-  const banner = container.append('div').attr('class', 'flex items-center gap-2 px-4 py-3 bg-brand-400/10 border border-brand-400/30 rounded-xl text-sm text-gray-400')
-  renderIcon(banner, 'eye', 'w-4 h-4 text-gray-400')
-  banner.append('span').html('该课程已结束，当前为<strong>只读查看</strong>模式')
-}
-
-// ===== Tab 栏渲染 =====
-function renderTabBar(container: d3.Selection<any, any, any, any>) {
-  const tabBar = container.append('div').attr('class', 'flex gap-1 bg-brand-400/10 p-1 rounded-xl overflow-x-auto')
-
-  tabs.forEach((tab) => {
-    const isActive = activeTab.value === tab.id
-    const btn = tabBar.append('button')
-      .attr('class', `flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${isActive ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-800'}`)
-      .on('click', () => {
-        activeTab.value = tab.id
-        reRender()
-      })
-
-    if (tab.icon === 'gitBranch') {
-      renderGitBranchIcon(btn, 'w-4 h-4')
-    } else {
-      renderIcon(btn, tab.icon as any, 'w-4 h-4')
-    }
-    btn.append('span').text(tab.label)
-  })
-}
-
-// ===== AI 分层内容 =====
-function renderAITierContent(container: d3.Selection<any, any, any, any>) {
-  const contentDiv = container.append('div').attr('class', 'space-y-6')
-
-  if (!firstClassEnded.value) {
-    // 未到开始条件
-    const box = contentDiv.append('div').attr('class', 'bg-brand-400/10 border border-brand-400/20 rounded-xl p-8 text-center')
-    renderIcon(box, 'layers', 'w-12 h-12 mx-auto mb-3 text-gray-400')
-    box.append('h3').attr('class', 'text-lg font-semibold text-gray-800 mb-2').text('AI 分层测试')
-    box.append('p').attr('class', 'text-sm text-brand-600').text('第一节课尚未结束，AI 分层测试将在第一节课结束后开启')
-    box.append('p').attr('class', 'text-xs text-gray-400 mt-1').text('届时将根据第一节课内容生成 10 道测试题，依据得分判定学习层级')
-  } else if (firstClassEnded.value && !tierFinalized.value) {
-    // 条件已满足但未测试
-    const box = contentDiv.append('div').attr('class', 'bg-gradient-to-br from-brand-400/5 to-brand-400/5 border border-brand-400 rounded-xl p-8 text-center')
-    renderIcon(box, 'sparkles', 'w-12 h-12 mx-auto mb-3 text-brand-600')
-    box.append('h3').attr('class', 'text-lg font-semibold text-gray-800 mb-2').text('AI 分层测试已开放')
-    box.append('p').attr('class', 'text-sm text-brand-600 mb-6').text('完成 10 道测试题（单选+判断），系统将根据得分判定你的学习层级')
-
-    const startBtn = box.append('button')
-      .attr('class', 'px-8 py-3 bg-brand-600 hover:bg-brand-800 text-white font-medium rounded-xl transition-colors shadow-lg inline-flex items-center gap-2')
-      .on('click', () => openAITest())
-    renderIcon(startBtn, 'helpCircle', 'w-5 h-5')
-    startBtn.append('span').text('开始 AI 分层测试')
-  } else {
-    // 已分层 → 永久锁定展示
-    renderTierFinalizedContent(contentDiv)
-  }
-}
-
-function renderTierFinalizedContent(container: d3.Selection<any, any, any, any>) {
-  // 当前层级
-  const section1 = container.append('div')
-  section1.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('AI 学习层级评估')
-
-  const tierCard = section1.append('div').attr('class', 'bg-gradient-to-br from-brand-400/5 to-brand-400/5 rounded-xl p-5 border border-brand-400/20')
-
-  const tierRow = tierCard.append('div').attr('class', 'flex items-center justify-between mb-4')
-  const tierLeft = tierRow.append('div')
-  tierLeft.append('p').attr('class', 'text-xs text-gray-400 mb-1').text('当前学习层级')
-
-  const tierBadge = tierLeft.append('span').attr('class', 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold')
-  // Apply tierBadgeClass-like styling via D3
-  if (!tierFinalized.value) {
-    tierBadge.attr('class', 'bg-brand-400/10 text-gray-400 border border-brand-400/30')
-  } else {
-    tierBadge.attr('class', 'bg-brand-600/10 text-brand-600 border border-brand-400')
-  }
-  renderIcon(tierBadge, 'layers', 'w-4 h-4')
-  tierBadge.append('span').text(tierLabel.value)
-
-  tierLeft.append('span').attr('class', 'ml-2 text-[10px] text-gray-400').text('已锁定 · 该学期不可修改')
-
-  const tierRight = tierRow.append('div').attr('class', 'text-right')
-  tierRight.append('p').attr('class', 'text-xs text-gray-400').text('分层测试得分')
-  tierRight.append('p').attr('class', 'text-2xl font-bold text-brand-600').text(String(myTierScore.value))
-  tierRight.append('p').attr('class', 'text-xs text-gray-400').text(`/ ${totalQuestions.value * 10}分`)
-
-  // 锁定提示
-  const lockNotice = tierCard.append('div').attr('class', 'mt-3 flex items-center gap-2 px-3 py-2 bg-brand-400/10 rounded-lg text-xs text-gray-400')
-  renderIcon(lockNotice, 'lock', 'w-3.5 h-3.5')
-  lockNotice.append('span').text(`AI 分层结果已锁定，本学期不可更改。后续任务、资源、作业将根据 ${tierLabel.value} 进行适配`)
-
-  // AI 学习建议
-  const tipsSection = container.append('div')
-  tipsSection.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('AI 学习建议')
-
-  const tipsList = tipsSection.append('div').attr('class', 'space-y-3')
-  aiTips.value.forEach((tip, i) => {
-    const tipRow = tipsList.append('div').attr('class', 'flex items-start gap-3 p-3 rounded-lg border border-brand-400/20 bg-brand-400/5')
-    const numCircle = tipRow.append('div').attr('class', 'w-6 h-6 rounded-full bg-brand-600/15 flex items-center justify-center flex-shrink-0 mt-0.5')
-    numCircle.append('span').attr('class', 'text-xs font-bold text-brand-600').text(String(i + 1))
-
-    const tipContent = tipRow.append('div')
-    tipContent.append('p').attr('class', 'text-sm font-medium text-gray-900').text(tip.title)
-    tipContent.append('p').attr('class', 'text-xs text-gray-400 mt-0.5').text(tip.desc)
-  })
-
-  // 分层对比
-  const compareSection = container.append('div')
-  compareSection.append('h3').attr('class', 'text-sm font-semibold text-gray-800 mb-3').text('层级对照')
-
-  const compareGrid = compareSection.append('div').attr('class', 'grid grid-cols-1 sm:grid-cols-3 gap-3')
-  tierComparison.value.forEach((ct) => {
-    const isActive = ct.level === myTier.value
-    const card = compareGrid.append('div').attr('class', `p-3 rounded-lg border ${isActive ? 'border-brand-400 bg-brand-600/10 ring-1 ring-brand-400' : 'border-brand-400/20'}`)
-    card.append('p').attr('class', `text-xs font-semibold mb-1 ${ct.color}`).text(ct.label)
-    card.append('p').attr('class', 'text-xs text-gray-400').text(ct.desc)
-  })
-}
-
-// ===== 知识图谱内容 =====
-function renderKnowledgeGraphContent(container: d3.Selection<any, any, any, any>) {
-  const contentDiv = container.append('div').attr('class', 'space-y-5')
-
-  // 头部说明
-  const header = contentDiv.append('div').attr('class', 'flex items-center justify-between')
-  const headerLeft = header.append('div')
-  headerLeft.append('h3').attr('class', 'text-base font-semibold text-gray-800').text('知识点掌握图谱')
-  headerLeft.append('p').attr('class', 'text-xs text-gray-400').text('基于学习进度与评价数据自动生成 · 泡泡越大表示知识越重要 · 颜色越深表示掌握度越高')
-  header.append('span').attr('class', 'text-xs text-gray-400').text('点击泡泡查看详情')
-
-  // 图例
-  renderGraphLegend(contentDiv)
-
-  // SVG 知识图谱
-  renderGraphSVG(contentDiv)
-
-  // 选中节点的详情
-  if (selectedBubble.value && bubbleNode(selectedBubble.value)) {
-    renderBubbleDetail(contentDiv)
-  }
-}
-
-function renderGraphLegend(container: d3.Selection<any, any, any, any>) {
-  const legend = container.append('div').attr('class', 'flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-400 items-center')
-
-  categoryColors.forEach((cat) => {
-    const item = legend.append('span').attr('class', 'flex items-center gap-1.5')
-    item.append('span').attr('class', 'w-3 h-3 rounded-full').style('background', cat.mid)
-    item.append('span').text(cat.label)
-  })
-
-  legend.append('span').attr('class', 'text-gray-400/60').text('|')
-
-  relationLegend.forEach((rel) => {
-    const item = legend.append('span').attr('class', 'flex items-center gap-1.5')
-    const svgEl = item.append('svg').attr('width', 20).attr('height', 4).attr('class', 'overflow-visible')
-    svgEl.append('line')
-      .attr('x1', 0).attr('y1', 2).attr('x2', 20).attr('y2', 2)
-      .attr('stroke', rel.color).attr('stroke-width', 2)
-      .attr('stroke-dasharray', rel.dash || 'none')
-    item.append('span').text(rel.label)
-  })
-}
-
-function renderGraphSVG(container: d3.Selection<any, any, any, any>) {
-  const svgWrap = container.append('div').attr('class', 'relative bg-white rounded-xl border border-brand-400/20 overflow-hidden')
-
-  const svg = svgWrap.append('svg')
-    .attr('viewBox', `0 0 ${SVG_W} ${SVG_H}`)
-    .attr('class', 'w-full')
-    .style('min-height', '780px')
-
-  // defs
-  const defs = svg.append('defs')
-  defs.append('pattern')
-    .attr('id', 'kg-grid')
-    .attr('width', 40).attr('height', 40)
-    .attr('patternUnits', 'userSpaceOnUse')
-    .append('path')
-    .attr('d', 'M 40 0 L 0 0 0 40')
-    .attr('fill', 'none').attr('stroke', '#5eb6b9').attr('stroke-width', 0.5).attr('stroke-opacity', 0.3)
-
-  defs.append('filter').attr('id', 'kg-glow')
-    .append('feGaussianBlur').attr('stdDeviation', 3)
-
-  svg.append('rect').attr('width', '100%').attr('height', '100%').attr('fill', 'url(#kg-grid)')
-
-  // 分类环带
-  categoryRings.value.forEach((ring) => {
-    svg.append('ellipse')
-      .attr('cx', SVG_CX).attr('cy', SVG_CY)
-      .attr('rx', ring.rx).attr('ry', ring.ry)
-      .attr('fill', 'none').attr('stroke', ring.color)
-      .attr('stroke-width', 1).attr('stroke-dasharray', '4,4')
-      .attr('stroke-opacity', 0.3)
-
-    svg.append('text')
-      .attr('x', SVG_CX + ring.rx - 4).attr('y', SVG_CY - ring.ry + 16)
-      .attr('font-size', 10).attr('fill', ring.color)
-      .attr('fill-opacity', 0.5).attr('text-anchor', 'end')
-      .text(ring.label)
-  })
-
-  // 关联连线
-  renderedEdges.value.forEach((edge) => {
-    const edgeG = svg.append('g')
-    const isHighlighted = selectedBubble.value && (edge.source === selectedBubble.value || edge.target === selectedBubble.value)
-
-    edgeG.append('path')
-      .attr('d', edge.path).attr('fill', 'none')
-      .attr('stroke', edge.color).attr('stroke-width', edge.width)
-      .attr('stroke-dasharray', edge.dash || 'none')
-      .attr('stroke-linecap', 'round')
-      .attr('opacity', isHighlighted ? 1 : 0.5)
-
-    edgeG.append('polygon')
-      .attr('points', edge.arrow).attr('fill', edge.color)
-      .attr('opacity', isHighlighted ? 1 : 0.5)
-
-    edgeG.append('text')
-      .attr('x', edge.midX).attr('y', edge.midY)
-      .attr('font-size', 8).attr('fill', edge.color)
-      .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-      .attr('opacity', 0.6)
-      .attr('class', 'pointer-events-none select-none')
-      .text(edge.label)
-  })
-
-  // 知识点节点
-  positionedNodes.value.forEach((pn) => {
-    const nodeG = svg.append('g')
-      .attr('class', 'cursor-pointer')
-      .style('cursor', 'pointer')
-      .on('click', () => {
-        selectedBubble.value = selectedBubble.value === pn.node.id ? null : pn.node.id
-        reRender()
-      })
-
-    // tooltip
-    nodeG.append('title').text(`${pn.node.label} - ${pn.node.mastery}% (${pn.node.chapter})`)
-
-    // 阴影光晕
-    if (pn.node.mastery >= 75) {
-      nodeG.append('circle')
-        .attr('cx', pn.x).attr('cy', pn.y).attr('r', pn.r + 6)
-        .attr('fill', pn.fill).attr('opacity', 0.15).attr('filter', 'url(#kg-glow)')
-    }
-
-    // 外圈（选中时高亮）
-    const isSelected = selectedBubble.value === pn.node.id
-    nodeG.append('circle')
-      .attr('cx', pn.x).attr('cy', pn.y).attr('r', pn.r + 3)
-      .attr('fill', 'none').attr('stroke', pn.fill).attr('stroke-width', 2)
-      .attr('opacity', isSelected ? 1 : 0)
-      .attr('class', 'transition-opacity duration-200')
-
-    // 主体圆
-    const mainCircle = nodeG.append('circle')
-      .attr('cx', pn.x).attr('cy', pn.y).attr('r', pn.r)
-      .attr('fill', pn.fill).attr('stroke', 'white').attr('stroke-width', 2)
-      .attr('class', 'transition-all duration-200')
-    if (pn.node.mastery >= 80) {
-      mainCircle.style('filter', `drop-shadow(0 2px 6px ${pn.fill}66)`)
-    }
-
-    // 文字 - 知识点名称
-    nodeG.append('text')
-      .attr('x', pn.x).attr('y', pn.y + 1)
-      .attr('font-size', bubbleFontSize(pn.r)).attr('font-weight', 700)
-      .attr('fill', 'white').attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
-      .attr('class', 'pointer-events-none select-none')
-      .text(pn.node.label)
-  })
-
-  // 无节点提示
-  if (positionedNodes.value.length === 0) {
-    svg.append('text')
-      .attr('x', '50%').attr('y', '50%')
-      .attr('font-size', 14).attr('fill', '#5eb6b9')
-      .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-      .text('暂无知识点数据')
-  }
-}
-
-// ===== 选中节点详情 =====
-function renderBubbleDetail(container: d3.Selection<any, any, any, any>) {
-  const node = bubbleNode(selectedBubble.value)
-  if (!node) return
-
-  const detail = container.append('div').attr('class', 'bg-brand-400/5 rounded-xl p-4 border border-brand-400/20 space-y-2')
-
-  const headerRow = detail.append('div').attr('class', 'flex items-center gap-2')
-  headerRow.append('span').attr('class', 'w-3 h-3 rounded-full').style('background', bubbleColor(node.mastery, node.category))
-  headerRow.append('p').attr('class', 'text-sm font-bold text-gray-800').text(node.label)
-  headerRow.append('span').attr('class', 'text-xs px-1.5 py-0.5 rounded bg-brand-400/10 text-brand-600').text(node.chapter)
-
-  detail.append('p').attr('class', 'text-xs text-gray-400').text(node.description)
-
-  const masteryRow = detail.append('div').attr('class', 'flex items-center gap-3 text-xs')
-  masteryRow.append('span').attr('class', 'text-gray-400').text('掌握度')
-  masteryRow.append('div').attr('class', 'flex-1 h-2 bg-brand-400/10 rounded-full overflow-hidden')
-    .append('div').attr('class', 'h-full rounded-full')
-    .style('width', `${node.mastery}%`)
-    .style('background', bubbleColor(node.mastery, node.category))
-  masteryRow.append('span').attr('class', 'font-bold').style('color', bubbleColor(node.mastery, node.category)).text(`${node.mastery}%`)
-
-  // 关联关系
-  const edges = bubbleEdges(selectedBubble.value!)
-  if (edges.length > 0) {
-    const edgeSection = detail.append('div').attr('class', 'pt-1 border-t border-brand-400/20')
-    edgeSection.append('p').attr('class', 'text-[11px] text-gray-400 mb-1').text('关联关系')
-    edges.forEach((edge) => {
-      const edgeRow = edgeSection.append('div').attr('class', 'text-xs text-brand-600 flex items-center gap-1.5')
-      const srcSpan = edgeRow.append('span').attr('class', edge.source === selectedBubble.value ? 'font-semibold' : '').text(nodeLabel(edge.source))
-      edgeRow.append('span').attr('class', 'w-3 h-3 text-gray-400')
-      renderIcon(edgeRow, 'arrowRight', 'w-3 h-3 text-gray-400')
-      const relChip = edgeRow.append('span').attr('class', 'px-1 py-0.5 rounded text-[10px]')
-      const chipClasses = relationChipClass(edge.relation).split(' ')
-      chipClasses.forEach((cls) => relChip.attr('class', (relChip.attr('class') || '') + ' ' + cls))
-      relChip.text(edge.label)
-      edgeRow.append('span').attr('class', 'w-3 h-3 text-gray-400')
-      renderIcon(edgeRow, 'arrowRight', 'w-3 h-3 text-gray-400')
-      const tgtSpan = edgeRow.append('span').attr('class', edge.target === selectedBubble.value ? 'font-semibold' : '').text(nodeLabel(edge.target))
-    })
-  }
-}
-
 </script>

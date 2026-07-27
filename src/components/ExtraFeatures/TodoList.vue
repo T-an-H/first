@@ -32,12 +32,12 @@
         <span class="text-xs font-normal text-gray-400">（{{ pendingEvalReminders.length }}项待评价）</span>
       </p>
       <div v-for="group in evalReminderGroups" :key="group.key"
-        class="flex items-center gap-3 p-3 bg-amber-50 rounded-lg border border-amber-200 shadow-sm group">
+        class="flex items-center gap-3 p-3 bg-brand-50 rounded-lg border border-brand-200 shadow-sm group">
         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-brand-600/15 flex items-center justify-center">
           <ClipboardCheck class="w-4 h-4 text-gray-600" />
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-amber-900 truncate">{{ group.courseTitle }}</p>
+          <p class="text-sm font-medium text-brand-800 truncate">{{ group.courseTitle }}</p>
           <p class="text-xs text-gray-600">{{ group.label }}</p>
         </div>
         <router-link :to="group.link"
@@ -74,9 +74,9 @@
 
     <!-- 手动添加待办 -->
     <div class="flex items-center gap-3">
-      <input type="text" v-model="title" @keydown.enter="handleAdd" placeholder="添加待办事项..." class="flex-1 px-4 py-2.5 rounded-lg border border-brand-400/30 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-none text-sm" />
-      <input type="date" v-model="dueDate" class="px-3 py-2.5 rounded-lg border border-brand-400/30 focus:border-amber-500 outline-none text-sm" />
-      <button @click="handleAdd" class="flex items-center gap-1.5 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors text-sm font-medium">
+      <input type="text" v-model="title" @keydown.enter="handleAdd" placeholder="添加待办事项..." class="flex-1 px-4 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 outline-none text-sm" />
+      <input type="date" v-model="dueDate" class="px-3 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm" />
+      <button @click="handleAdd" class="flex items-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors text-sm font-medium">
         <Plus class="w-4 h-4" /> 添加
       </button>
     </div>

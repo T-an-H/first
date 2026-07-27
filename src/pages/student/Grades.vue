@@ -98,7 +98,6 @@ import { ref, computed, onMounted, watch, h } from 'vue'
 import { useAppStore } from '@/stores/app'
 import type { DetailedGrade, Grade } from '@/types'
 import { getDefaultGradeConfig } from '@/types'
-import { detailedGrades as mockDetailedGrades } from '@/data/mockData'
 import { Icons, renderIcon } from '@/utils/d3-renderer'
 import * as d3 from 'd3'
 import StatCard from '@/components/StatCard.vue'
@@ -168,8 +167,7 @@ interface GradeEntry {
 
 function getDetail(courseId: string): DetailedGrade | undefined {
   if (!student.value) return undefined
-  const dg = store.detailedGrades.length > 0 ? store.detailedGrades : mockDetailedGrades
-  return dg.find((d) => d.studentId === student.value!.id && d.courseId === courseId)
+  return store.detailedGrades.find((d) => d.studentId === student.value!.id && d.courseId === courseId)
 }
 
 function calcRegular(entry: GradeEntry): number {
@@ -186,7 +184,7 @@ function calcRegular(entry: GradeEntry): number {
 }
 
 const gradeEntries = computed<GradeEntry[]>(() => {
-  const gradients = ['from-brand-600 to-brand-600', 'from-brand-600 to-brand-600', 'from-brand-600 to-brand-600', 'from-brand-600 to-brand-600', 'from-rose-500 to-red-500', 'from-brand-600 to-brand-600']
+  const gradients = ['from-emerald-500 to-teal-600', 'from-blue-500 to-indigo-600', 'from-brand-600 to-brand-700', 'from-rose-500 to-red-600', 'from-purple-500 to-violet-600', 'from-cyan-500 to-blue-600']
   return filteredGrades.value.map((g, i) => {
     const course = store.courses.find((c) => c.id === g.courseId)
     const d = getDetail(g.courseId)
@@ -234,7 +232,7 @@ const regularItems = (entry: GradeEntry) => {
   if (d?.teacherScore !== undefined) {
     items.push({
       label: '教师评', score: d.teacherScore, weight: cfg.teacherScoreWeight,
-      icon: GraduationCap, iconColor: 'text-amber-500', bar: 'bg-brand-600', border: 'border-amber-100', color: 'text-brand-600',
+      icon: GraduationCap, iconColor: 'text-brand-600', bar: 'bg-brand-600', border: 'border-brand-50', color: 'text-brand-600',
     })
   }
   if (d?.mentorScore !== undefined) {
@@ -260,11 +258,11 @@ const examItems = (entry: GradeEntry) => {
 }
 
 const getGradeColor = (score: number) => {
-  if (score >= 90) return 'text-brand-600'
-  if (score >= 80) return 'text-brand-600'
-  if (score >= 70) return 'text-brand-600'
-  if (score >= 60) return 'text-orange-600'
-  return 'text-brand-600'
+  if (score >= 90) return 'text-emerald-600'
+  if (score >= 80) return 'text-blue-600'
+  if (score >= 70) return 'text-brand-700'
+  if (score >= 60) return 'text-brand-700'
+  return 'text-red-500'
 }
 
 const getGradeLevel = (score: number) => {
@@ -276,11 +274,11 @@ const getGradeLevel = (score: number) => {
 }
 
 const getGradeBadge = (score: number) => {
-  if (score >= 90) return 'bg-brand-400/10 text-brand-600'
-  if (score >= 80) return 'bg-brand-600/10 text-brand-600'
-  if (score >= 70) return 'bg-brand-400/10 text-brand-600'
-  if (score >= 60) return 'bg-brand-400/10 text-brand-600'
-  return 'bg-brand-600/10 text-brand-600'
+  if (score >= 90) return 'bg-emerald-50 text-emerald-600'
+  if (score >= 80) return 'bg-blue-50 text-blue-600'
+  if (score >= 70) return 'bg-brand-50 text-brand-700'
+  if (score >= 60) return 'bg-brand-50 text-brand-700'
+  return 'bg-red-50 text-red-500'
 }
 
 const avgScore = computed(() => {

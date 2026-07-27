@@ -5,6 +5,10 @@
       <button @click="handleCreate" class="flex items-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-800 text-white rounded-lg transition-colors text-sm font-medium">
         <Plus class="w-4 h-4" /> 新建
       </button>
+      <label class="flex items-center gap-1.5 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium cursor-pointer">
+        <Upload class="w-4 h-4" /> 导入文档
+        <input type="file" accept=".txt,.md,.json,.csv" @change="handleImport" class="hidden" />
+      </label>
     </div>
 
     <div v-if="myDocs.length === 0" class="text-center py-12 text-gray-400">
@@ -47,7 +51,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Plus, FileText, Edit3, Save, Trash2 } from 'lucide-vue-next'
+import { Plus, FileText, Edit3, Save, Trash2, Upload } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import type { OnlineDoc } from '@/types'
 
@@ -76,6 +80,33 @@ const handleCreate = () => {
     lastEditedBy: store.currentUser || '未知',
   })
   newTitle.value = ''
+}
+
+const handleImport = (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    const content = e.target?.result as string
+    store.addOnlineDoc({
+      id: Date.now().toString(),
+      title: file.name.replace(/\.[^/.]+$/, ''),
+      content: content,
+      createdBy: store.currentUser || '未知',
+      createdAt: new Date().toISOString(),
+      lastEditedAt: new Date().toISOString(),
+      lastEditedBy: store.currentUser || '未知',
+    })
+    alert(`文档 "${file.name}" 导入成功！`)
+  }
+  reader.onerror = () => {
+    alert('文件读取失败，请重试')
+  }
+  reader.readAsText(file)
+  
+  target.value = ''
 }
 
 const handleSave = (id: string) => {
