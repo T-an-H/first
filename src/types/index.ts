@@ -195,6 +195,8 @@ export interface CloudFile {
   uploadedAt: string;
   uploadedBy: string;
   courseId?: string;
+  /** 可见班级列表（为空则仅自己可见） */
+  visibleToClassNames?: string[];
 }
 
 export interface TodoItem {
