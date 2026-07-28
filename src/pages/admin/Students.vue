@@ -63,11 +63,18 @@
           <h1 class="text-2xl font-bold text-gray-900">{{ selectedClass }}</h1>
           <p class="text-gray-500 mt-1">{{ filteredStudents.length }} 名学生</p>
         </div>
-        <button @click="loadClassStudents" class="px-4 py-2.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-2">
-          <RefreshCw class="w-4 h-4" />
-          刷新
-        </button>
+        <div class="flex items-center gap-2">
+          <button @click="triggerImport" class="px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors flex items-center gap-2">
+            <Upload class="w-4 h-4" />
+            Excel 导入
+          </button>
+          <button @click="loadClassStudents" class="px-4 py-2.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-2">
+            <RefreshCw class="w-4 h-4" />
+            刷新
+          </button>
+        </div>
       </div>
+      <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" @change="handleImportFile" class="hidden" />
 
       <!-- 搜索学生 -->
       <div class="relative max-w-md">
@@ -116,12 +123,75 @@
         </table>
       </div>
     </template>
+
+    <!-- ====== 重复数据弹窗 ====== -->
+    <Teleport to="body">
+      <div v-if="showDuplicateModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showDuplicateModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
+          <div class="px-5 py-4 border-b border-gray-200 flex-shrink-0">
+            <h3 class="text-base font-semibold text-gray-800">发现完全重复数据</h3>
+            <p class="text-xs text-gray-400 mt-1">以下 {{ duplicateRows.length }} 条数据与已有学生信息完全一致，请选择处理方式</p>
+          </div>
+          <div class="px-5 py-3 overflow-y-auto flex-1 space-y-2">
+            <div v-for="(row, i) in duplicateRows" :key="i"
+              class="flex items-center justify-between p-3 rounded-lg border border-gray-100">
+              <div class="text-sm">
+                <span class="font-medium text-gray-800">{{ row.name }}</span>
+                <span class="text-gray-400 ml-2">{{ row.studentId || '-' }}</span>
+                <span class="text-gray-400 ml-2">{{ row.className || '-' }}</span>
+              </div>
+              <label class="flex items-center gap-2 text-sm cursor-pointer">
+                <input type="checkbox" v-model="row._import" class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                <span :class="row._import ? 'text-blue-600' : 'text-gray-400'">导入</span>
+              </label>
+            </div>
+          </div>
+          <div class="px-5 py-3 border-t border-gray-200 flex items-center justify-between flex-shrink-0">
+            <button @click="toggleAllDuplicates" class="text-sm text-gray-500 hover:text-gray-700">
+              {{ allDuplicatesSelected ? '取消全选' : '全选' }}
+            </button>
+            <div class="flex items-center gap-2">
+              <button @click="showDuplicateModal = false" class="px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">取消</button>
+              <button @click="confirmImport" class="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                确认导入（{{ selectedDuplicateCount }} 条）
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ====== 导入成功弹窗 ====== -->
+    <Teleport to="body">
+      <div v-if="showResultModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showResultModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl max-w-sm w-full mx-4 p-6 text-center">
+          <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+            <CheckCircle class="w-6 h-6 text-green-600" />
+          </div>
+          <h3 class="text-base font-semibold text-gray-800 mb-1">导入完成</h3>
+          <p class="text-sm text-gray-500">
+            {{ importResult.added }} 条新增 · {{ importResult.updated }} 条更新
+          </p>
+          <button @click="showResultModal = false" class="mt-4 px-6 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+            知道了
+          </button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
+
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Users, ArrowLeft, ArrowRight, RefreshCw, LoaderCircle, Search } from 'lucide-vue-next'
+import { Users, ArrowLeft, ArrowRight, RefreshCw, LoaderCircle, Search, Upload, CheckCircle } from 'lucide-vue-next'
 import { fetchClasses, fetchStudents } from '@/api'
+import { useAppStore } from '@/stores/app'
+import * as XLSX from 'xlsx'
+import type { Student, StudentImportRow } from '@/types'
+
+const store = useAppStore()
 
 const classes = ref<any[]>([])
 const loading = ref(false)
@@ -130,6 +200,16 @@ const students = ref<any[]>([])
 const loadingStudents = ref(false)
 const classSearch = ref('')
 const studentSearch = ref('')
+
+// 导入相关
+const importFileInput = ref<HTMLInputElement | null>(null)
+const showDuplicateModal = ref(false)
+const showResultModal = ref(false)
+const duplicateRows = ref<(StudentImportRow & { _import: boolean })[]>([])
+const importResult = ref({ added: 0, updated: 0 })
+
+/** 用户可导入的行（含非重复数据 + 用户勾选的重复数据） */
+let pendingImportRows: StudentImportRow[] = []
 
 // 班级搜索过滤
 const filteredClasses = computed(() => {
@@ -177,5 +257,180 @@ async function loadClassStudents() {
   }
 }
 
+// ====== Excel 导入 ======
+function triggerImport() {
+  importFileInput.value?.click()
+}
+
+function handleImportFile(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      const data = new Uint8Array(reader.result as ArrayBuffer)
+      const workbook = XLSX.read(data, { type: 'array' })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+      processImportRows(rows)
+    } catch (err) {
+      console.error('解析 Excel 失败:', err)
+      alert('文件解析失败，请确保文件格式正确')
+    }
+  }
+  reader.readAsArrayBuffer(file)
+  if (importFileInput.value) importFileInput.value.value = ''
+}
+
+/** 将 Excel 行映射为标准字段 */
+function normalizeRow(row: any): StudentImportRow {
+  const fieldMap: Record<string, keyof StudentImportRow> = {
+    '姓名': 'name', 'name': 'name',
+
+    '学号': 'studentId', 'student_id': 'studentId', 'studentid': 'studentId', '编号': 'studentId',
+
+    '班级': 'className', 'class_name': 'className', 'classname': 'className', 'class': 'className',
+
+    '电话': 'phone', '手机': 'phone', '手机号': 'phone', 'phone': 'phone',
+
+    '邮箱': 'email', 'email': 'email', '邮件': 'email',
+
+    '入学成绩': 'enrollmentScore', 'enrollment_score': 'enrollmentScore', 'enrollmentscore': 'enrollmentScore',
+    '成绩': 'enrollmentScore', '高考成绩': 'enrollmentScore',
+
+    '入学日期': 'joinDate', 'join_date': 'joinDate', 'joindate': 'joinDate', '日期': 'joinDate',
+
+    '状态': 'status', 'status': 'status',
+  }
+
+  const result: any = {}
+  for (const [key, val] of Object.entries(row)) {
+    const normalizedKey = fieldMap[key.trim()]
+    if (normalizedKey) {
+      result[normalizedKey] = val
+    }
+  }
+  // 转换 enrollmentScore 为数字
+  if (result.enrollmentScore !== undefined) {
+    result.enrollmentScore = Number(result.enrollmentScore) || undefined
+  }
+  return result as StudentImportRow
+}
+
+function processImportRows(rows: any[]) {
+  const existingStudents = store.students
+  const dups: (StudentImportRow & { _import: boolean })[] = []
+  const normal: StudentImportRow[] = []
+
+  for (const row of rows) {
+    const normalized = normalizeRow(row)
+    // 姓名必填
+    if (!normalized.name) continue
+
+    // 查找是否完全重复
+    const isDuplicate = existingStudents.some((s) => {
+      return (
+        s.name === normalized.name &&
+        (s.studentId || '') === (normalized.studentId || '') &&
+        (s.className || '') === (normalized.className || '')
+      )
+    })
+
+    if (isDuplicate) {
+      dups.push({ ...normalized, _import: false })
+    } else {
+      normal.push(normalized)
+    }
+  }
+
+  pendingImportRows = normal
+
+  if (dups.length > 0) {
+    duplicateRows.value = dups
+    showDuplicateModal.value = true
+  } else {
+    // 无重复，直接导入
+    executeImport(pendingImportRows)
+  }
+}
+
+const allDuplicatesSelected = computed(() => {
+  return duplicateRows.value.length > 0 && duplicateRows.value.every((r) => r._import)
+})
+
+const selectedDuplicateCount = computed(() => {
+  return duplicateRows.value.filter((r) => r._import).length
+})
+
+function toggleAllDuplicates() {
+  const newVal = !allDuplicatesSelected.value
+  duplicateRows.value.forEach((r) => (r._import = newVal))
+}
+
+function confirmImport() {
+  // 合并用户确认的重复行 + 正常行
+  const acceptedDups = duplicateRows.value.filter((r) => r._import)
+  showDuplicateModal.value = false
+  executeImport([...pendingImportRows, ...acceptedDups])
+}
+
+function executeImport(rows: StudentImportRow[]) {
+  let added = 0
+  let updated = 0
+  const existingStudents = store.students
+
+  for (const row of rows) {
+    const existing = existingStudents.find((s) => {
+      // 按学号匹配（学号唯一）
+      if (row.studentId && s.studentId === row.studentId) return true
+      // 无学号时按姓名+班级匹配
+      if (!row.studentId && s.name === row.name) {
+        if (row.className) return s.className === row.className
+        return true
+      }
+      return false
+    })
+
+    if (existing) {
+      // 更新已有学生
+      store.updateStudent(existing.id, {
+        name: row.name,
+        studentId: row.studentId || existing.studentId,
+        className: row.className || existing.className,
+        phone: row.phone || existing.phone,
+        email: row.email || existing.email,
+        enrollmentScore: row.enrollmentScore ?? existing.enrollmentScore,
+        joinDate: row.joinDate || existing.joinDate,
+      })
+      updated++
+    } else {
+      // 新增学生
+      const newStudent: Student = {
+        id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: row.name,
+        phone: row.phone || '',
+        email: row.email || '',
+        avatar: '',
+        joinDate: row.joinDate || '',
+        status: 'active',
+        studentId: row.studentId,
+        className: row.className,
+        enrollmentScore: row.enrollmentScore,
+      }
+      store.addStudent(newStudent)
+      added++
+    }
+  }
+
+  importResult.value = { added, updated }
+  showResultModal.value = true
+  // 刷新页面学生列表
+  setTimeout(() => loadClassStudents(), 500)
+}
+
 onMounted(loadClasses)
 </script>
+
+<style scoped>
+</style>
