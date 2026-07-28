@@ -121,7 +121,7 @@ const MOCK_USERS: Record<string, { password: string; name: string; role: string;
 
 /** Mock 跳转地址 */
 function mockPortal(role: string, subRole?: string): string {
-  if (role === 'admin') return '/admin/categories'
+  if (role === 'admin') return '/admin/schedules'
   if (role === 'teacher') {
     if (subRole === 'mentor') return '/mentor/courses'
     if (subRole === 'leader') return '/leader/courses'
@@ -140,29 +140,23 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
 
-  try {
-    // 优先尝试后端登录
-    const res = await unifiedLogin(account.value, password.value)
+  // 直接使用 Mock 登录（演示模式），无需后端
+  const mock = MOCK_USERS[account.value.trim()]
+  if (!mock || mock.password !== password.value.trim()) {
+    error.value = '账号或密码错误'
+    loading.value = false
+    return
+  }
+  localStorage.setItem('isDemoMode', 'true')
+  let role = mock.role
+  if (role === 'teacher' && mock.sub_role) role = mock.sub_role
+  store.login(mock.name, role as any)
+  router.push(mockPortal(mock.role, mock.sub_role))
+
+  // 后台静默尝试连接后端（不阻塞登录）
+  unifiedLogin(account.value, password.value).then(res => {
     localStorage.setItem('token', res.token)
     localStorage.setItem('userInfo', JSON.stringify(res.user))
-    let role = res.user.role
-    if (role === 'teacher' && res.user.sub_role) role = res.user.sub_role
-    store.login(res.user.name, role)
-    router.push(res.portal)
-  } catch (_e: any) {
-    // 后端不可用时，走 Mock 登录（演示模式）
-    const mock = MOCK_USERS[account.value.trim()]
-    if (!mock || mock.password !== password.value.trim()) {
-      error.value = '账号或密码错误（演示模式）'
-      loading.value = false
-      return
-    }
-    localStorage.setItem('isDemoMode', 'true')
-    let role = mock.role
-    if (role === 'teacher' && mock.sub_role) role = mock.sub_role
-    store.login(mock.name, role as any)
-    router.push(mockPortal(mock.role, mock.sub_role))
-  }
-
+  }).catch(() => {})
 }
 </script>

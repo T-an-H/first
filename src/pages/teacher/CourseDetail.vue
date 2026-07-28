@@ -315,8 +315,8 @@
                       <tr class="bg-gray-50 border-b border-gray-200">
                         <th class="w-10 py-2 px-2">
                           <input type="checkbox"
-                            :checked="isAllSelected"
-                            @change="toggleAll"
+                            :checked="isGroupSelected(gi)"
+                            @change="toggleGroup(gi)"
                             class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                         </th>
                         <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs">学生</th>
@@ -384,6 +384,10 @@
             <!-- 底部 -->
             <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-start justify-between gap-4">
               <div class="flex flex-wrap items-center gap-2">
+                <button @click="toggleAllClass"
+                  :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${selectedUnsubmittedCount === 0 && !isAllClassSelected ? 'opacity-50 cursor-not-allowed' : ''} border-gray-300 text-gray-600 hover:bg-gray-100`">
+                  {{ isAllClassSelected ? '取消全选' : '全选本班' }}
+                </button>
                 <span class="text-xs text-gray-500 font-medium">一键等级评价（选中 {{ selectedUnsubmittedCount }} 名学生）：</span>
                 <div class="flex flex-wrap gap-1.5">
                   <button v-for="level in LEVEL_OPTIONS" :key="level.label"
@@ -405,7 +409,7 @@
                   :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasSubmittable ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
                   :disabled="!hasSubmittable">
                   <CheckCircle class="w-4 h-4" />
-                  全部提交（{{ submittableCount }}人）
+                  提交评价（{{ submittableCount }}人）
                 </button>
                 <button @click="closeEvalPopup()"
                   class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">关闭</button>
@@ -1514,7 +1518,14 @@ const filteredEvalTableSections = computed(() => {
 
 const hasEvalInputs = computed(() => Object.keys(evalScoreInputs.value).length > 0)
 
-const isAllSelected = computed(() => {
+function isGroupSelected(gi: number): boolean {
+  const group = currentEvalClassSection.value?.groups[gi]
+  if (!group) return false
+  const all = group.students.filter(s => !s.submitted).map(s => s.student.id)
+  return all.length > 0 && all.every(id => selectedStudentIds.value.includes(id))
+}
+
+const isAllClassSelected = computed(() => {
   const all = currentEvalClassSection.value
     ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
     : []
@@ -2410,7 +2421,8 @@ const handleBatchEval = (level: string) => {
   })
   evalScoreInputs.value = {}
   store.markSessionEvalRemindersCompleted(courseId.value, session)
-
+  // 保存后同步评价到详细成绩（实时更新总分）
+  store.syncEvalToDetailedGrade(courseId.value)
 }
 
 function handleSaveEvalScores() {
@@ -2441,7 +2453,10 @@ function handleSaveEvalScores() {
     }
   })
   evalScoreInputs.value = {}
-
+  // 保存后同步评价到详细成绩（实时更新总分）
+  if (courseId.value) {
+    store.syncEvalToDetailedGrade(courseId.value)
+  }
 }
 
 function handleSubmitAll() {
@@ -2449,40 +2464,67 @@ function handleSubmitAll() {
   const session = selectedBatchSession.value
   const type: EvalType = isMentor.value ? 'mentor' : 'teacher'
 
+  // 1. 先保存所有待处理的输入
   handleSaveEvalScores()
 
-  const allStudents = store.enrollments
-    .filter((e) => e.courseId === courseId.value && e.status !== 'dropped')
-    .map((e) => e.studentId)
-  for (const studentId of allStudents) {
-    if (store.isSessionLocked(courseId.value || '', session) ||
-        store.isTeacherEvalSubmitted(courseId.value || '', studentId, session, type)) continue
-    const hasEval = store.evaluations.some(
-      (e) => e.courseId === courseId.value && e.studentId === studentId && e.type === type && e.sessionNumber === session
-    )
-    if (hasEval) {
-      store.submitTeacherEval(courseId.value, studentId, session, type)
+  // 2. 只提交当前弹窗班级中有草稿评价的学生
+  const section = currentEvalClassSection.value
+  if (!section) return
+
+  let count = 0
+  for (const group of section.groups) {
+    for (const s of group.students) {
+      if (s.submitted) continue
+      const hasEval = store.evaluations.some(
+        (e) => e.courseId === courseId.value && e.studentId === s.student.id && e.type === type && e.sessionNumber === session
+      )
+      if (hasEval) {
+        store.submitTeacherEval(courseId.value, s.student.id, session, type)
+        count++
+      }
     }
   }
 
   store.markSessionEvalRemindersCompleted(courseId.value, session)
-
+  // 提交后同步评价到详细成绩
+  store.syncEvalToDetailedGrade(courseId.value)
 }
 
-const toggleAll = () => {
+function toggleGroup(gi: number) {
+  const group = currentEvalClassSection.value?.groups[gi]
+  if (!group) return
+  const all = group.students.filter(s => !s.submitted).map(s => s.student.id)
+  if (isGroupSelected(gi)) {
+    selectedStudentIds.value = selectedStudentIds.value.filter(id => !all.includes(id))
+  } else {
+    for (const id of all) {
+      if (!selectedStudentIds.value.includes(id)) {
+        selectedStudentIds.value = [...selectedStudentIds.value, id]
+      }
+    }
+  }
+}
+
+function toggleAllClass() {
   const all = currentEvalClassSection.value
     ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
     : []
-  if (isAllSelected.value) {
+  if (isAllClassSelected.value) {
     selectedStudentIds.value = selectedStudentIds.value.filter(id => !all.includes(id))
   } else {
-    all.forEach(id => { if (!selectedStudentIds.value.includes(id)) selectedStudentIds.value.push(id) })
+    for (const id of all) {
+      if (!selectedStudentIds.value.includes(id)) {
+        selectedStudentIds.value = [...selectedStudentIds.value, id]
+      }
+    }
   }
 }
 
 function closeEvalPopup() {
   showEvalPopup.value = false
   selectedEvalClass.value = ''
+  selectedStudentIds.value = []
+  evalScoreInputs.value = {}
 }
 
 function closeGradePopup() {
@@ -2534,6 +2576,36 @@ const isFinalSessionExpired = computed(() => {
 watch(evalFilterClass, () => { evalFilterGroup.value = '' })
 watch(gradeFilterClass, () => { gradeFilterGroup.value = '' })
 
+// 弹窗打开时，从已保存评价预填评分输入框，方便修改
+watch(showEvalPopup, (show) => {
+  if (show && courseId.value && selectedEvalClass.value) {
+    prefillEvalInputs()
+  }
+  if (!show) {
+    evalScoreInputs.value = {}
+  }
+})
+
+function prefillEvalInputs() {
+  const section = currentEvalClassSection.value
+  if (!section || !courseId.value) return
+  const session = selectedBatchSession.value
+  const type: EvalType = isMentor.value ? 'mentor' : 'teacher'
+  const inputs: Record<string, number> = {}
+  for (const group of section.groups) {
+    for (const s of group.students) {
+      const ev = store.evaluations.find(
+        (e) => e.courseId === courseId.value && e.studentId === s.student.id &&
+              e.type === type && e.sessionNumber === session
+      )
+      if (ev) {
+        inputs[s.student.id] = ev.score
+      }
+    }
+  }
+  evalScoreInputs.value = inputs
+}
+
 function getSessionTitle(session: number): string {
   if (!courseId.value) return ''
   if (store.isSessionLocked(courseId.value, session)) return '该轮次已锁定，不可修改'
@@ -2545,13 +2617,21 @@ function getSessionTitle(session: number): string {
 const hasSubmittable = computed(() => submittableCount.value > 0)
 
 const submittableCount = computed(() => {
-  // 当弹窗打开时只统计当前班级，否则统计全部
+  // 当前弹窗班级中，有草稿（已保存但未提交）或未提交输入的未提交学生数量
   if (selectedEvalClass.value) {
     const section = currentEvalClassSection.value
     if (!section) return 0
-    return section.groups.reduce((a, g) => a + g.students.filter(s => !s.submitted && evalScoreInputs.value[s.student.id] !== undefined).length, 0)
+    return section.groups.reduce((a, g) => a + g.students.filter(s => {
+      if (s.submitted) return false
+      if (evalScoreInputs.value[s.student.id] !== undefined) return true
+      return s.hasDraft
+    }).length, 0)
   }
-  return evalTableSections.value.reduce((a, cb) => a + cb.groups.reduce((b, g) => b + g.students.filter(s => !s.submitted && evalScoreInputs.value[s.student.id] !== undefined).length, 0), 0)
+  return evalTableSections.value.reduce((a, cb) => a + cb.groups.reduce((b, g) => b + g.students.filter(s => {
+    if (s.submitted) return false
+    if (evalScoreInputs.value[s.student.id] !== undefined) return true
+    return s.hasDraft
+  }).length, 0), 0)
 })
 
 const handleProcessOverdue = () => {

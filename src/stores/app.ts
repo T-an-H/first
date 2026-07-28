@@ -1196,6 +1196,27 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('detailedGrades', detailedGrades.value)
   }
 
+  /** 将教师评价同步到详细成绩表，实现实时成绩更新 */
+  function syncEvalToDetailedGrade(courseId: string) {
+    const typeMap: Record<string, keyof DetailedGrade> = { teacher: 'teacherScore', mentor: 'mentorScore' }
+    for (const [evalType, gradeField] of Object.entries(typeMap)) {
+      const studentScores = new Map<string, number[]>()
+      for (const ev of evaluations.value) {
+        if (ev.courseId !== courseId || ev.type !== evalType) continue
+        if (!studentScores.has(ev.studentId)) studentScores.set(ev.studentId, [])
+        studentScores.get(ev.studentId)!.push(ev.score)
+      }
+      detailedGrades.value = detailedGrades.value.map((dg) => {
+        if (dg.courseId !== courseId) return dg
+        const scores = studentScores.get(dg.studentId)
+        if (!scores || scores.length === 0) return dg
+        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        return { ...dg, [gradeField]: avg }
+      })
+    }
+    saveToStorage('detailedGrades', detailedGrades.value)
+  }
+
   function getDetailedGrades(courseId: string): DetailedGrade[] {
     return detailedGrades.value.filter((d) => d.courseId === courseId)
   }
@@ -1423,7 +1444,7 @@ export const useAppStore = defineStore('app', () => {
     checkEvalReminders,
     recalculateProgress,
     saveGradeConfig, getGradeConfig,
-    addDetailedGrade, updateDetailedGrade, getDetailedGrades,
+    addDetailedGrade, updateDetailedGrade, getDetailedGrades, syncEvalToDetailedGrade,
     calcTotalScore,
     getMentorCourseIds, getLeaderCourses, getLeaderStudents,
     getStudentTier, determineTier, submitAITierTest,

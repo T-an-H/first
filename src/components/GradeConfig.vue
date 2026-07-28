@@ -87,8 +87,3 @@ const handleSave = () => {
 }
 </script>
 
-<style scoped>
-input[type='range'] {
-  @apply flex-1 h-2 rounded-full appearance-none cursor-pointer accent-brand-600;
-}
-</style>
