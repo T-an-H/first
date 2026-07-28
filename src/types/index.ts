@@ -90,6 +90,18 @@ export interface Student {
   enrollmentScore?: number;
 }
 
+/** 学生 Excel 导入行 */
+export interface StudentImportRow {
+  name: string;
+  studentId?: string;
+  className?: string;
+  phone?: string;
+  email?: string;
+  enrollmentScore?: number;
+  joinDate?: string;
+  status?: string;
+}
+
 export interface Schedule {
   id: string;
   courseId: string;
