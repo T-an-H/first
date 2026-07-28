@@ -147,13 +147,21 @@
           </div>
           <div v-for="enroll in studentEnrollments" :key="enroll.courseId"
             class="border border-brand-400/20 rounded-lg p-3 mb-2 last:mb-0">
-            <div class="flex items-center justify-between mb-1.5">
+            <div class="flex items-center justify-between mb-1">
               <span class="text-sm font-medium text-gray-800">{{ getCourseName(enroll.courseId) }}</span>
-              <span class="text-xs text-gray-400">{{ enroll.progress }}%</span>
             </div>
-            <div class="h-1.5 bg-brand-400/10 rounded-full overflow-hidden">
-              <div class="h-full rounded-full bg-brand-600 transition-all"
-                :style="{ width: `${enroll.progress}%` }" />
+            <div class="text-sm">
+              <template v-if="getFinalScore(detailStudent!.id, enroll.courseId) !== null">
+                <span class="font-semibold text-brand-600">{{ getFinalScore(detailStudent!.id, enroll.courseId) }}分</span>
+                <span class="text-gray-400 ml-1">（最终成绩）</span>
+              </template>
+              <template v-else-if="getRegularScore(detailStudent!.id, enroll.courseId)">
+                <span class="font-semibold text-gray-700">{{ getRegularScore(detailStudent!.id, enroll.courseId) }}分</span>
+                <span class="text-gray-400 ml-1">（平时成绩，待最终评定）</span>
+              </template>
+              <template v-else>
+                <span class="text-gray-400">成绩未出</span>
+              </template>
             </div>
           </div>
         </div>
@@ -230,5 +238,31 @@ const studentEnrollments = computed(() => {
 
 function getCourseName(courseId: string): string {
   return store.courses.find((c) => c.id === courseId)?.title || '未知'
+}
+
+/** 获取学生某课程的最终成绩（grade.score），若未出则返回 null */
+function getFinalScore(studentId: string, courseId: string): number | null {
+  const g = store.grades.find((g) => g.studentId === studentId && g.courseId === courseId)
+  return g?.score ?? null
+}
+
+/** 获取学生某课程的平时成绩（detailedGrade 中所有已评子项按权重计算），用于最终成绩未出时展示 */
+function getRegularScore(studentId: string, courseId: string): number | null {
+  const dg = store.detailedGrades.find((d) => d.studentId === studentId && d.courseId === courseId)
+  if (!dg) return null
+  const cfg = store.getGradeConfig(courseId)
+  const regularSubs: { score: number | undefined; weight: number }[] = [
+    { score: dg.selfEvalScore, weight: cfg.selfEvalWeight },
+    { score: dg.peerReviewScore, weight: cfg.peerReviewWeight },
+    { score: dg.interGroupScore, weight: cfg.interGroupEvalWeight },
+    { score: dg.teacherScore, weight: cfg.teacherScoreWeight },
+    { score: dg.mentorScore, weight: cfg.mentorScoreWeight },
+  ]
+  const valid = regularSubs.filter((s) => s.score !== undefined && s.weight > 0)
+  if (valid.length === 0) return null
+  const weightedSum = valid.reduce((sum, s) => sum + (s.score ?? 0) * s.weight, 0)
+  const totalWeight = valid.reduce((sum, s) => sum + s.weight, 0)
+  if (totalWeight === 0) return null
+  return Math.round(weightedSum / totalWeight * cfg.regularWeight / 100)
 }
 </script>
