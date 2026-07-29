@@ -154,7 +154,7 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== Actions ======
 
-  function login(username: string, role: UserRole, isTeacherFromDb?: boolean) {
+  function login(username: string, role: UserRole, isTeacherFromDb?: boolean, isMentorFromDb?: boolean) {
     localStorage.setItem('isLoggedIn', JSON.stringify(true))
     localStorage.setItem('currentUser', JSON.stringify(username))
     localStorage.setItem('currentRole', JSON.stringify(role))
@@ -164,8 +164,15 @@ export const useAppStore = defineStore('app', () => {
 
     // 检测双重身份：如果以 mentor/leader 登录，检测是否同时有其他角色
     const detected: UserRole[] = []
-    if (role === 'leader' && isTeacherFromDb) {
+    if (role === 'leader') {
+      if (isTeacherFromDb) detected.push('teacher')
+      if (isMentorFromDb) detected.push('mentor')
+    }
+    if (role === 'mentor' && isTeacherFromDb) {
       detected.push('teacher')
+    }
+    if (role === 'teacher' && isMentorFromDb) {
+      detected.push('mentor')
     }
     secondaryRoles.value = detected
     localStorage.setItem('secondaryRoles', JSON.stringify(detected))
