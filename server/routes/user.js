@@ -25,6 +25,7 @@ function getPortal(role, subRole) {
     return '/teacher/courses';
   }
   if (role === 'student') return '/student/courses';
+  if (role === 'leader') return '/leader/courses';
   return '/';
 }
 
@@ -43,7 +44,7 @@ router.post('/login', async (req, res) => {
 
     // 查 users 表（要查 password 用于比对）
     const [rows] = await pool.execute(
-      'SELECT id, account, name, role, sub_role, status, password FROM users WHERE account = ?',
+      'SELECT id, account, name, department, role, sub_role, status, password FROM users WHERE account = ?',
       [account]
     );
 
@@ -72,6 +73,9 @@ router.post('/login', async (req, res) => {
 
     const portal = getPortal(user.role, user.sub_role);
 
+    // 判断是否有教师身份：角色为 teacher 的都有教师权限
+    const hasTeacherAccess = user.role === 'teacher';
+
     res.json({
       success: true,
       message: '登录成功',
@@ -79,8 +83,10 @@ router.post('/login', async (req, res) => {
       user: {
         account: user.account,
         name: user.name,
+        department: user.department || '',
         role: user.role,
         sub_role: user.sub_role,
+        isTeacher: hasTeacherAccess,
       },
       portal,
     });

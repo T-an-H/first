@@ -1,12 +1,13 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
+import { saveEvaluation as apiSaveEval, deleteEvaluation as apiDeleteEval, submitTeacherEval as apiSubmitEval, saveEvalConfig as apiSaveConfig, saveEvalReminders as apiSaveReminders, updateEvalReminder as apiUpdateReminder } from '@/api'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
   StudentGroup, EvalAnomaly, EvalReminder, GradeWeightConfig, DetailedGrade,
   Mentor, Leader, AITierQuestion, StudentTierRecord, EvalType,
-  Homework, HomeworkSubmission
+  Homework, HomeworkSubmission, Department
 } from '@/types'
 import { getDefaultGradeConfig, TEMPLATE_EVAL_TYPES } from '@/types'
 import {
@@ -31,7 +32,10 @@ import {
   homeworkSubmissions as mockHomeworkSubmissions,
   examScores as mockExamScores,
   supplementaryGrades as mockSupplementaryGrades,
-  supplementaryAll
+  supplementaryAll,
+  departments as mockDepartments,
+  departmentClasses as mockDepartmentClasses,
+  MOCK_VERSION,
 } from '@/data/mockData'
 
 type UserRole = 'admin' | 'teacher' | 'student' | 'mentor' | 'leader' | null
@@ -53,12 +57,32 @@ const saveToStorage = (key: string, data: unknown) => {
   localStorage.setItem(key, JSON.stringify(data))
 }
 
+// ====== Mock 数据版本检查：版本变化时清除旧 localStorage ======
+const MOCK_VERSION_KEY = 'mockDataVersion'
+try {
+  const savedVersion = localStorage.getItem(MOCK_VERSION_KEY)
+  if (savedVersion !== MOCK_VERSION) {
+    // 版本变化，清除所有可重置的旧数据，让下次加载走 mock fallback
+    const resetKeys = [
+      'departments', 'departmentClasses', 'categories', 'courses',
+      'schedules', 'students', 'enrollments', 'teachers', 'grades',
+      'cloudFiles', 'todos', 'onlineDocs', 'notes',
+      'evaluations', 'evalConfigs', 'studentGroups', 'evalReminders',
+      'gradeConfigs', 'detailedGrades', 'homework', 'homeworkSubmissions',
+      'examScores', 'examWeights', 'teacherSubmittedEvals', 'lockedSessions',
+      'studentTiers',
+    ]
+    resetKeys.forEach((k) => localStorage.removeItem(k))
+    localStorage.setItem(MOCK_VERSION_KEY, MOCK_VERSION)
+  }
+} catch { /* ignore */ }
+
 export const useAppStore = defineStore('app', () => {
   // ====== State ======
   const courses = ref<Course[]>(loadFromStorage('courses', mockCourses))
   const categories = ref<Category[]>(loadFromStorage('categories', mockCategories))
   const students = ref<Student[]>(loadFromStorage('students', mockStudents))
-  const schedules = ref<Schedule[]>(loadFromStorage('schedules', [...mockSchedules, ...supplementaryAll.supplementarySchedules]))
+  const schedules = ref<Schedule[]>(loadFromStorage('schedules', [...mockSchedules, ...supplementaryAll.supplementarySchedules, ...supplementaryAll.adminDemoSchedules]))
   const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', [...mockEnrollments, ...supplementaryAll.supplementaryEnrollments]))
   const teachers = ref<Teacher[]>(loadFromStorage('teachers', mockTeachers))
   const grades = ref<Grade[]>(loadFromStorage('grades', [...mockGrades, ...mockSupplementaryGrades]))
@@ -85,6 +109,15 @@ export const useAppStore = defineStore('app', () => {
   const leaders = ref<Leader[]>([...mockLeaders])
   // 次要角色（用于 leader+teacher/mentor 双重身份）
   const secondaryRoles = ref<UserRole[]>(loadFromStorage<UserRole[]>('secondaryRoles', []))
+
+  // ====== 学院系统 ======
+  const departments = ref<Department[]>(loadFromStorage<Department[]>('departments', mockDepartments))
+  const departmentClasses = ref<Record<string, string[]>>(
+    loadFromStorage<Record<string, string[]>>('departmentClasses', mockDepartmentClasses)
+  )
+  const selectedDepartmentId = ref<string | null>(
+    loadFromStorage<string | null>('selectedDepartmentId', null)
+  )
 
   // 教师已提交的评价记录（string[]，key: `${courseId}||${studentId}||${session}||${type}`）
   const teacherSubmittedEvals = ref<string[]>(
@@ -119,7 +152,7 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== Actions ======
 
-  function login(username: string, role: UserRole) {
+  function login(username: string, role: UserRole, isTeacherFromDb?: boolean) {
     localStorage.setItem('isLoggedIn', JSON.stringify(true))
     localStorage.setItem('currentUser', JSON.stringify(username))
     localStorage.setItem('currentRole', JSON.stringify(role))
@@ -129,17 +162,8 @@ export const useAppStore = defineStore('app', () => {
 
     // 检测双重身份：如果以 mentor/leader 登录，检测是否同时有其他角色
     const detected: UserRole[] = []
-    if (role === 'leader') {
-      // 检测 leader 是否同时也是教师或导师
-      const leaderData = leaders.value.find((l) => l.name === username)
-      if (leaderData) {
-        if (leaderData.asTeacher && teachers.value.some((t) => t.name === username)) {
-          detected.push('teacher')
-        }
-        if (leaderData.asMentor && mentors.value.some((m) => m.name === username)) {
-          detected.push('mentor')
-        }
-      }
+    if (role === 'leader' && isTeacherFromDb) {
+      detected.push('teacher')
     }
     secondaryRoles.value = detected
     localStorage.setItem('secondaryRoles', JSON.stringify(detected))
@@ -154,6 +178,75 @@ export const useAppStore = defineStore('app', () => {
     currentUser.value = null
     currentRole.value = null
     secondaryRoles.value = []
+  }
+
+  // ====== 学院操作 ======
+
+  function setSelectedDepartment(id: string | null) {
+    selectedDepartmentId.value = id
+    saveToStorage('selectedDepartmentId', id)
+  }
+
+  function getSelectedDepartment(): Department | null {
+    if (!selectedDepartmentId.value) return null
+    return departments.value.find((d) => d.id === selectedDepartmentId.value) || null
+  }
+
+  function addDepartment(dept: Department) {
+    departments.value = [...departments.value, dept]
+    departmentClasses.value = { ...departmentClasses.value, [dept.id]: [] }
+    saveToStorage('departments', departments.value)
+    saveToStorage('departmentClasses', departmentClasses.value)
+  }
+
+  function updateDepartment(id: string, data: Partial<Department>) {
+    departments.value = departments.value.map((d) => (d.id === id ? { ...d, ...data } : d))
+    saveToStorage('departments', departments.value)
+  }
+
+  function deleteDepartment(id: string) {
+    departments.value = departments.value.filter((d) => d.id !== id)
+    // 同时清理关联的分类和班级映射
+    categories.value = categories.value.filter((c) => c.departmentId !== id)
+    const classes = { ...departmentClasses.value }
+    delete classes[id]
+    departmentClasses.value = classes
+    saveToStorage('departments', departments.value)
+    saveToStorage('categories', categories.value)
+    saveToStorage('departmentClasses', departmentClasses.value)
+    if (selectedDepartmentId.value === id) {
+      selectedDepartmentId.value = null
+      saveToStorage('selectedDepartmentId', null)
+    }
+  }
+
+  /** 获取某学院的课程分类 */
+  function getDepartmentCategories(deptId: string): Category[] {
+    return categories.value.filter((c) => c.departmentId === deptId)
+  }
+
+  /** 获取某学院的班级列表 */
+  function getDepartmentClasses(deptId: string): string[] {
+    return departmentClasses.value[deptId] || []
+  }
+
+  /** 为某学院添加班级 */
+  function addDepartmentClass(deptId: string, className: string) {
+    const current = departmentClasses.value[deptId] || []
+    if (!current.includes(className)) {
+      departmentClasses.value = { ...departmentClasses.value, [deptId]: [...current, className] }
+      saveToStorage('departmentClasses', departmentClasses.value)
+    }
+  }
+
+  /** 为某学院移除班级 */
+  function removeDepartmentClass(deptId: string, className: string) {
+    const current = departmentClasses.value[deptId] || []
+    departmentClasses.value = {
+      ...departmentClasses.value,
+      [deptId]: current.filter((c) => c !== className),
+    }
+    saveToStorage('departmentClasses', departmentClasses.value)
   }
 
   function addCourse(course: Course) {
@@ -218,6 +311,8 @@ export const useAppStore = defineStore('app', () => {
       )
       saveToStorage('teachers', teachers.value)
     }
+    // 同步到数据库
+    fetch(`http://localhost:3000/api/courses/${id}`, { method: 'DELETE' }).catch(() => {})
   }
 
   function addCategory(category: Category) {
@@ -399,6 +494,7 @@ export const useAppStore = defineStore('app', () => {
     }
     evaluations.value = [...evaluations.value, ev]
     saveToStorage('evaluations', evaluations.value)
+    apiSaveEval(ev).catch(() => {})
   }
 
   function updateEvaluation(id: string, data: Partial<Evaluation>) {
@@ -412,11 +508,13 @@ export const useAppStore = defineStore('app', () => {
     }
     evaluations.value = evaluations.value.map((e) => (e.id === id ? { ...e, ...data } : e))
     saveToStorage('evaluations', evaluations.value)
+    if (ev) apiSaveEval({ ...ev, ...data } as Evaluation).catch(() => {})
   }
 
   function deleteEvaluation(id: string) {
     evaluations.value = evaluations.value.filter((e) => e.id !== id)
     saveToStorage('evaluations', evaluations.value)
+    apiDeleteEval(id).catch(() => {})
   }
 
   function setEvalConfig(config: EvaluationConfig) {
@@ -427,6 +525,7 @@ export const useAppStore = defineStore('app', () => {
       evalConfigs.value = [...evalConfigs.value, config]
     }
     saveToStorage('evalConfigs', evalConfigs.value)
+    apiSaveConfig(config).catch(() => {})
   }
 
   function addStudentGroup(group: StudentGroup) {
@@ -553,6 +652,7 @@ export const useAppStore = defineStore('app', () => {
       teacherSubmittedEvals.value = [...teacherSubmittedEvals.value, key]
       saveToStorage('teacherSubmittedEvals', teacherSubmittedEvals.value)
     }
+    apiSubmitEval({ courseId, studentId, sessionNumber: session, type }).catch(() => {})
   }
 
   /** 检查某条教师评价是否已提交 */
@@ -1129,6 +1229,7 @@ export const useAppStore = defineStore('app', () => {
       return r
     })
     saveToStorage('evalReminders', evalReminders.value)
+    apiUpdateReminder(`${courseId}||${studentId}||${sessionNumber}`, 'completed').catch(() => {})
   }
 
   /** 标记某课程某轮次所有评价提醒为已完成 */
@@ -1410,6 +1511,7 @@ export const useAppStore = defineStore('app', () => {
     isLoggedIn, currentUser, currentRole,
     hasEvalReminders,
     mentors, leaders, secondaryRoles,
+    departments, departmentClasses, selectedDepartmentId,
     examScores,
     examWeights,
     lockedSessions,
@@ -1449,5 +1551,10 @@ export const useAppStore = defineStore('app', () => {
     getMentorCourseIds, getLeaderCourses, getLeaderStudents,
     getStudentTier, determineTier, submitAITierTest,
     isSecondClassStarted, getPendingAITierTests, autoAssignOverdueBasicTier,
+    // department actions
+    setSelectedDepartment, getSelectedDepartment,
+    addDepartment, updateDepartment, deleteDepartment,
+    getDepartmentCategories, getDepartmentClasses,
+    addDepartmentClass, removeDepartmentClass,
   }
 })

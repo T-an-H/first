@@ -9,15 +9,27 @@
   </div>
 </template>
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { watch, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import Sidebar from './Sidebar.vue'
 
 const store = useAppStore()
 const router = useRouter()
+const route = useRoute()
 
 if (!store.isLoggedIn) router.replace('/login')
+
+// 管理员必须选择学院后才能使用管理功能
+watch(() => store.currentRole, () => {
+  checkDepartment()
+}, { immediate: true })
+
+function checkDepartment() {
+  if (store.currentRole === 'admin' && !store.selectedDepartmentId && route.path !== '/admin') {
+    router.replace('/admin')
+  }
+}
 
 onMounted(() => {
   store.checkAndGenerateSessionReminders()

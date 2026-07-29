@@ -103,12 +103,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-vue-next'
 import { getNow, isVirtualToday, getVirtualMonday } from '@/lib/date'
+import { fetchSchedules } from '@/api'
 
 const store = useAppStore()
+
+// 从数据库加载排课
+const dbSchedules = ref<any[]>([])
+onMounted(async () => {
+  try {
+    const res = await fetchSchedules()
+    if (res.success) {
+      dbSchedules.value = res.schedules
+      store.schedules = res.schedules
+    }
+  } catch { /* ignore */ }
+})
 
 // ---- 周导航 ----
 const weekStart = ref(getVirtualMonday())
@@ -153,14 +166,21 @@ const weekNumber = computed(() => {
 const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
 
 // ---- 课表数据 ----
-/** 根据角色获取当前用户的课程安排：教师按 teacher 字段，导师按 mentor 的 courseIds，有教学权限的院长按课程分类 */
+/** 根据角色获取当前用户的课程安排 */
 const userSchedules = computed(() => {
-  if (isLeaderWithTeaching.value) {
-    const leaderCourseIds = store.getLeaderCourses(store.currentUser || '').map((c) => c.id)
-    return store.schedules.filter((s) => leaderCourseIds.includes(s.courseId))
+  const currentUser = store.currentUser || ''
+  const role = store.currentRole
+
+  // 领导：查带头衔的课程 或 自己教的课程
+  if (role === 'leader') {
+    const leaderCourseIds = store.getLeaderCourses(currentUser).map((c) => c.id)
+    return store.schedules.filter((s) =>
+      leaderCourseIds.includes(s.courseId) || s.teacher === currentUser
+    )
   }
-  if (store.currentRole === 'teacher') {
-    return store.schedules.filter((s) => s.teacher === store.currentUser)
+  // 教师
+  if (role === 'teacher') {
+    return store.schedules.filter((s) => s.teacher === currentUser)
   }
   if (store.currentRole === 'mentor') {
     const mentorCourseIds = store.getMentorCourseIds(store.currentUser)

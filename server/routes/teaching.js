@@ -48,6 +48,55 @@ router.put('/students/:id', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+// ==================== 成绩查询 ====================
+
+/** GET /api/teaching/scores/:courseId - 获取某课程所有成绩 */
+router.get('/scores/:courseId', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM exam_scores WHERE course_id = ? ORDER BY exam_name',
+      [req.params.courseId]
+    );
+    const scores = rows.map((r) => ({
+      id: r.id,
+      courseId: r.course_id,
+      studentId: r.student_id,
+      examName: r.exam_name,
+      score: Number(r.score),
+      fullScore: r.full_score,
+      weight: r.weight,
+      type: r.type,
+      status: r.status,
+      gradedAt: r.graded_at || '',
+    }));
+    res.json({ success: true, scores });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+/** GET /api/teaching/scores/student/:studentId - 获取某学生的所有成绩 */
+router.get('/scores/student/:studentId', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT es.*, c.title AS course_title FROM exam_scores es JOIN courses c ON es.course_id = c.id WHERE es.student_id = ? ORDER BY c.title',
+      [req.params.studentId]
+    );
+    const scores = rows.map((r) => ({
+      id: r.id,
+      courseId: r.course_id,
+      courseTitle: r.course_title,
+      studentId: r.student_id,
+      examName: r.exam_name,
+      score: Number(r.score),
+      fullScore: r.full_score,
+      weight: r.weight,
+      type: r.type,
+      status: r.status,
+      gradedAt: r.graded_at || '',
+    }));
+    res.json({ success: true, scores });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 // ==================== 成绩 (Exam Scores) ====================
 
 /** POST /api/teaching/scores/bulk - 批量导入成绩 */

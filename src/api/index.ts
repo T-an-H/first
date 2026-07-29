@@ -143,6 +143,68 @@ export async function bulkImportGroups(groups) {
   });
 }
 
+// ==================== 评价系统 ====================
+
+/** 获取评价配置 */
+export async function fetchEvalConfig(courseId) {
+  return request(`/eval/config/${courseId}`);
+}
+
+/** 保存评价配置 */
+export async function saveEvalConfig(config) {
+  return request('/eval/config', { method: 'POST', body: JSON.stringify(config) });
+}
+
+/** 保存一条评价 */
+export async function saveEvaluation(ev) {
+  return request('/eval/save', { method: 'POST', body: JSON.stringify(ev) });
+}
+
+/** 批量保存评价 */
+export async function batchSaveEvaluations(evaluations) {
+  return request('/eval/batch', { method: 'POST', body: JSON.stringify({ evaluations }) });
+}
+
+/** 删除评价 */
+export async function deleteEvaluation(id) {
+  return request(`/eval/${id}`, { method: 'DELETE' });
+}
+
+/** 标记教师评价已提交 */
+export async function submitTeacherEval(data) {
+  return request('/eval/submit', { method: 'POST', body: JSON.stringify(data) });
+}
+
+/** 批量保存提醒 */
+export async function saveEvalReminders(reminders) {
+  return request('/eval/reminders', { method: 'POST', body: JSON.stringify({ reminders }) });
+}
+
+/** 更新提醒状态 */
+export async function updateEvalReminder(id, status) {
+  return request(`/eval/reminders/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+}
+
+/** 获取某课程成绩 */
+export async function fetchCourseScores(courseId) {
+  return request(`/teaching/scores/${courseId}`);
+}
+
+/** 获取学生所有成绩 */
+export async function fetchStudentScores(studentId) {
+  return request(`/teaching/scores/student/${studentId}`);
+}
+
+/** 获取某院系所有课程 */
+export async function fetchDepartmentCourses(department) {
+  return request(`/courses/department/${encodeURIComponent(department)}`);
+}
+
+/** 获取某院系所有学生 */
+export async function fetchDepartmentStudents(department) {
+  return request(`/students/department/${encodeURIComponent(department)}`);
+}
+
 /** 更新一条排课 */
 export async function updateSchedule(id, data) {
   return request(`/schedules/${id}`, {

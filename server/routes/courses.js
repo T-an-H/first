@@ -10,8 +10,23 @@ const router = Router();
 /** GET /api/courses - 获取所有课程 */
 router.get('/', async (req, res) => {
   try {
-    const [rows] = await pool.execute('SELECT * FROM courses ORDER BY status DESC, title');
-    res.json({ success: true, courses: rows });
+    const { department } = req.query;
+    let sql = 'SELECT * FROM courses';
+    const params = [];
+
+    if (department) {
+      sql += ' WHERE department = ?';
+      params.push(department);
+    }
+
+    sql += ' ORDER BY status DESC, title';
+    const [rows] = await pool.execute(sql, params);
+    const courses = rows.map((r) => ({
+      ...r,
+      categoryId: r.category_id,
+      categoryName: r.category_name,
+    }));
+    res.json({ success: true, courses });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
@@ -20,10 +35,17 @@ router.get('/', async (req, res) => {
 /** GET /api/courses/teacher/:name - 获取某教师的所有课程 */
 router.get('/teacher/:name', async (req, res) => {
   try {
-    const [rows] = await pool.execute(
-      'SELECT * FROM courses WHERE teacher = ? OR mentor = ? ORDER BY status DESC, title',
-      [req.params.name, req.params.name]
-    );
+    const { department } = req.query;
+    let sql = 'SELECT * FROM courses WHERE (teacher = ? OR mentor = ?)';
+    const params = [req.params.name, req.params.name];
+
+    if (department) {
+      sql += ' AND department = ?';
+      params.push(department);
+    }
+
+    sql += ' ORDER BY status DESC, title';
+    const [rows] = await pool.execute(sql, params);
     res.json({ success: true, courses: rows });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -65,6 +87,31 @@ router.get('/:id/students', async (req, res) => {
     res.json({ success: true, students: result });
   } catch (e) {
     console.error('获取课程学生失败:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+/** GET /api/courses/department/:dept - 获取某院系的所有课程 */
+router.get('/department/:dept', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM courses WHERE department = ? ORDER BY status DESC, title',
+      [req.params.dept]
+    );
+    res.json({ success: true, courses: rows });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+/** DELETE /api/courses/:id - 删除课程 */
+router.delete('/:id', async (req, res) => {
+  try {
+    await pool.execute('DELETE FROM courses WHERE id = ?', [req.params.id]);
+    // 同时删除相关排课
+    await pool.execute('DELETE FROM schedules WHERE course_id = ?', [req.params.id]);
+    res.json({ success: true, message: '删除成功' });
+  } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });

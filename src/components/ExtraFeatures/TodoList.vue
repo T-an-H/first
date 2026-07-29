@@ -179,8 +179,8 @@ const evalReminderGroups = computed(() => {
     ...g,
     label: `第${g.session}次评价 · ${g.types.map((t) => EvalTypeLabels[t as keyof typeof EvalTypeLabels] || t).join('、')}`,
     link: store.currentRole === 'teacher'
-      ? `/teacher/courses`
-      : `/student/courses`,
+      ? `/teacher/courses/${g.key.split('||')[0]}`
+      : `/student/courses/${g.key.split('||')[0]}`,
   }))
 })
 
