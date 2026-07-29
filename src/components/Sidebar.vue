@@ -20,7 +20,6 @@ const adminNavItems = [
 const teacherNavItems = [
   { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
   { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
-  { to: '/teacher/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
@@ -35,7 +34,6 @@ const studentNavItems = [
 const mentorNavItems = [
   { to: '/mentor/courses', icon: 'bookOpen' as const, label: '我的课程' },
   { to: '/mentor/schedule', icon: 'calendar' as const, label: '课程表' },
-  { to: '/mentor/grades', icon: 'award' as const, label: '成绩查询' },
   { to: '/mentor/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
@@ -58,28 +56,10 @@ const hasLeaderAccess = computed(() => {
   return store.currentRole === 'leader' || store.secondaryRoles.includes('leader')
 })
 
-const hasPendingEvalTodos = computed(() => {
-  if (store.currentRole === 'student') {
-    const student = store.students.find((s) => s.name === store.currentUser)
-    if (!student) return false
-    return store.evalReminders.some((r) => r.studentId === student.id && r.status !== 'completed')
-  }
-  if (store.currentRole === 'teacher' || store.currentRole === 'mentor') {
-    return store.evalReminders.some((r) => r.studentId === store.currentUser && r.status !== 'completed')
-  }
-  return false
-})
-
 const showExtraBadge = (item: { to: string; label: string }) => {
   if (item.label !== '额外功能') return false
-  if (hasPendingEvalTodos.value) return true
-  if (store.currentRole === 'teacher' && store.getPendingConfigCourses().length > 0) return true
-  // AI 分层测试待办红点（学生端）
-  if (store.currentRole === 'student') {
-    const student = store.students.find((s) => s.name === store.currentUser)
-    if (student && store.getPendingAITierTests(student.id).length > 0) return true
-  }
-  return false
+  if (!store.currentUser) return false
+  return store.todos.some((t) => t.createdBy === store.currentUser && !t.completed)
 }
 
 // ===== D3 渲染 =====
@@ -203,7 +183,7 @@ onMounted(() => {
 
 // 路由变化或状态变化时重新渲染
 watch(
-  () => [route.path, store.currentRole, store.secondaryRoles, store.evalReminders.length],
+  () => [route.path, store.currentRole, store.secondaryRoles, store.evalReminders.length, JSON.stringify(store.todos.map(t => ({id: t.id, c: t.completed})))],
   () => { renderSidebar() },
   { flush: 'post' },
 )

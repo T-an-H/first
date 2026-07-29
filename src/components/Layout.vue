@@ -9,17 +9,28 @@
   </div>
 </template>
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useRouter } from 'vue-router'
 import Sidebar from './Sidebar.vue'
 
 const store = useAppStore()
 const router = useRouter()
+const route = useRoute()
 
 if (!store.isLoggedIn) router.replace('/login')
 
 onMounted(() => {
   store.checkAndGenerateSessionReminders()
+  store.generateAutoTodos()
 })
+
+// 每次切换页面时重新生成自动待办（让红点实时更新）
+watch(
+  () => route.path,
+  () => {
+    store.generateAutoTodos()
+  },
+)
 </script>

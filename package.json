@@ -17,6 +17,7 @@
     "cors": "^2.8.6",
     "d3": "^7.9.0",
     "date-fns": "^4.1.0",
+    "echarts": "^6.1.0",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "lucide-vue-next": "^0.511.0",
