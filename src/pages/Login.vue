@@ -81,7 +81,9 @@
           <div class="bg-brand-50 border border-brand-200 rounded-lg p-3 text-xs text-brand-700">
             <p class="font-medium mb-1">测试账号（密码统一：666666）</p>
             <p>管理员：admin</p>
-            <p>教师：teacher-wang、teacher-li</p>
+            <p>授课教师：teacher-wang、teacher-li 等</p>
+            <p>企业导师：mentor-zhang</p>
+            <p>学院领导：leader-liu~leader-zheng（含兼教师/导师）</p>
             <p>学生：S2024001（张明）、202511053250（李傲天）</p>
           </div>
         </form>
@@ -115,6 +117,8 @@ const MOCK_USERS: Record<string, { password: string; name: string; role: string;
   'leader-zhou':    { password: '666666', name: '周院长', role: 'teacher', sub_role: 'leader' },
   'leader-wu':      { password: '666666', name: '吴院长', role: 'teacher', sub_role: 'leader' },
   'leader-zheng':   { password: '666666', name: '郑院长', role: 'teacher', sub_role: 'leader' },
+  'leader-chen':    { password: '666666', name: '陈院长', role: 'teacher', sub_role: 'leader' },
+  'leader-zhang':   { password: '666666', name: '张院长', role: 'teacher', sub_role: 'leader' },
   S2024001:         { password: '666666', name: '张明', role: 'student' },
   '202511053250':    { password: '666666', name: '李傲天', role: 'student' },
 }
@@ -150,7 +154,17 @@ const handleLogin = async () => {
   localStorage.setItem('isDemoMode', 'true')
   let role = mock.role
   if (role === 'teacher' && mock.sub_role) role = mock.sub_role
-  store.login(mock.name, role as any)
+
+  // 检测双重角色：领导是否同时是授课教师/企业导师
+  let isTeacherFromDb = false
+  let isMentorFromDb = false
+  if (mock.sub_role === 'leader') {
+    const leaderData = store.leaders.find(l => l.name === mock.name)
+    if (leaderData?.asTeacher) isTeacherFromDb = true
+    if (leaderData?.asMentor) isMentorFromDb = true
+  }
+
+  store.login(mock.name, role as any, isTeacherFromDb, isMentorFromDb)
   router.push(mockPortal(mock.role, mock.sub_role))
 
   // 后台静默尝试连接后端（不阻塞登录）

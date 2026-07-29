@@ -31,9 +31,9 @@
 
     <!-- Tab: 评论管理 -->
     <div v-if="activeTab === 'comments'" class="space-y-6">
-      <!-- 评价方案配置 -->
+      <!-- 评价方案配置（始终展开） -->
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <button @click="(isReadOnly || evalConfigLocked || isMentor) ? null : (showSettings = !showSettings)" class="w-full flex items-center justify-between">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
             <Settings class="w-5 h-5 text-gray-400" />
             <h2 class="font-semibold text-gray-900">评价方案配置</h2>
@@ -46,10 +46,8 @@
               {{ selectedConfig ? EvalTemplateLabels[selectedConfig.template] : '默认方案' }} ·
               {{ selectedConfig ? EvalFrequencyLabels[selectedConfig.frequency] : '默认频率' }}
             </span>
-            <span v-if="!isReadOnly && !evalConfigLocked && !isMentor" class="text-xs text-gray-400 hover:text-gray-600">{{ showSettings ? '收起 ▲' : '展开 ▼' }}</span>
-            <span v-if="isReadOnly || evalConfigLocked || isMentor" class="text-xs text-gray-300">仅查看</span>
           </div>
-        </button>
+        </div>
 
         <!-- 锁定提示 -->
         <div v-if="evalConfigLocked" class="mt-3 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
@@ -58,7 +56,8 @@
           <span v-else>第一节课已开始，评价方案未配置，现按默认方案实施，已锁定不可修改。</span>
         </div>
 
-        <div class="flex flex-wrap gap-2 mt-3 mb-1">
+        <!-- 评价类型标签（始终展示） -->
+        <div class="flex flex-wrap gap-2 mt-3">
           <template v-for="t in ALL_EVAL_TYPES" :key="t">
             <span v-if="!selectedConfig || !TEMPLATE_EVAL_TYPES[selectedConfig.template].includes(t)"
               class="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-300 border border-gray-200">
@@ -76,7 +75,8 @@
           </template>
         </div>
 
-        <template v-if="showSettings && !isReadOnly && !evalConfigLocked && !isMentor">
+        <!-- 教师可编辑：直接展示配置界面 -->
+        <template v-if="!isReadOnly && !evalConfigLocked && !isMentor">
           <div class="border-t border-gray-100 mt-3 pt-4 space-y-4">
             <div>
               <p class="text-sm font-medium text-gray-700 mb-2">评价模板</p>
@@ -134,8 +134,9 @@
             </div>
           </div>
         </template>
-        <!-- 课程结束 / 锁定 readonly 展示 -->
-        <template v-else-if="(isReadOnly || evalConfigLocked) && showSettings">
+
+        <!-- 只读/锁定展示 -->
+        <template v-else>
           <div class="border-t border-gray-100 mt-3 pt-4 text-sm text-gray-400 text-center py-4">
             <EyeOff class="w-5 h-5 inline mr-1" />
             {{ isReadOnly ? '已结束课程不可修改配置' : '第一节课已开始，评价方案已锁定不可修改' }}
@@ -1399,7 +1400,6 @@ const isWeightLocked = computed(() => {
 
 // ---- 状态 ----
 const activeTab = ref<string>('comments')
-const showSettings = ref(false)
 const studentSearch = ref('')
 
 // ---- 学生管理 ----
