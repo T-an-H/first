@@ -10,7 +10,6 @@
 </template>
 <script setup lang="ts">
 import { onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useRouter, useRoute } from 'vue-router'
 import Sidebar from './Sidebar.vue'

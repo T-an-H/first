@@ -47,6 +47,7 @@ import { ref, computed, onMounted } from 'vue'
 import { Plus, Circle, CheckCircle, X } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import { getNow } from '@/lib/date'
+import { EvalTypeLabels } from '@/types'
 
 const store = useAppStore()
 const title = ref('')
