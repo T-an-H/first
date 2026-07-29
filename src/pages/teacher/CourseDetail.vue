@@ -1398,7 +1398,7 @@ const isWeightLocked = computed(() => {
 })
 
 // ---- 状态 ----
-const activeTab = ref<string>('schedule')
+const activeTab = ref<string>('comments')
 const showSettings = ref(false)
 const studentSearch = ref('')
 
