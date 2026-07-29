@@ -1,8 +1,16 @@
+/** 学院/院系 */
+export interface Department {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface Category {
   id: string;
   name: string;
   color: string;
   courseCount: number;
+  departmentId: string;
 }
 
 export interface Course {

@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
 
     // 查列表
     const [rows] = await pool.execute(
-      `SELECT id, student_id, name, phone, email, class_name, status, created_at
+      `SELECT id, student_id, name, phone, email, class_name, department, status, created_at
        FROM students ${whereClause}
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
@@ -84,6 +84,7 @@ router.get('/', async (req, res) => {
       phone: s.phone,
       email: s.email,
       className: s.class_name,
+      department: s.department || '',
       status: s.status,
       joinDate: fmtDate(s.created_at),
       avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.name)}`,
@@ -106,7 +107,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, student_id, name, phone, email, class_name, status, created_at FROM students WHERE id = ?',
+      'SELECT id, student_id, name, phone, email, class_name, department, status, created_at FROM students WHERE id = ?',
       [req.params.id]
     );
 
@@ -131,6 +132,31 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('获取学生详情失败:', error);
     res.status(500).json({ success: false, message: '获取学生详情失败' });
+  }
+});
+
+/** GET /api/students/department/:dept - 获取某院系所有学生 */
+router.get('/department/:dept', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT id, student_id, name, phone, email, class_name, department, status, created_at FROM students WHERE department = ? ORDER BY class_name, name',
+      [req.params.dept]
+    );
+    const students = rows.map((s) => ({
+      id: String(s.id),
+      name: s.name,
+      studentId: s.student_id,
+      phone: s.phone,
+      email: s.email,
+      className: s.class_name,
+      department: s.department || '',
+      status: s.status,
+      joinDate: fmtDate(s.created_at),
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s.name)}`,
+    }));
+    res.json({ success: true, students });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 

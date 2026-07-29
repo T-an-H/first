@@ -12,11 +12,15 @@ const router = createRouter({
     {
       path: '/admin',
       component: Layout,
-      redirect: 'schedules',
       children: [
         {
-          path: 'schedules',
-          name: 'AdminSchedules',
+          path: '',
+          name: 'AdminDeptSelect',
+          component: () => import('@/pages/admin/DepartmentSelect.vue'),
+        },
+        {
+          path: 'categories',
+          name: 'AdminCategories',
           component: () => import('@/pages/admin/Schedules.vue'),
         },
         {
@@ -157,6 +161,11 @@ const router = createRouter({
     {
       path: '/',
       redirect: '/login',
+    },
+    // 向后兼容：旧的 /admin/schedules → 新的 /admin/categories
+    {
+      path: '/admin/schedules',
+      redirect: '/admin/categories',
     },
     {
       path: '/:pathMatch(.*)*',

@@ -28,62 +28,64 @@
             : 'border-brand-400/30 opacity-60 hover:opacity-70'
         ]"
       >
-        <!-- 封面渐变区域 -->
-        <div class="relative h-[136px]" :style="{ background: getCourseGradient(course.id) }">
-          <!-- 封面图 -->
-          <img
-            v-if="course.cover"
-            :src="course.cover"
-            :alt="course.title"
-            :class="[
-              'w-full h-full object-cover transition-transform duration-300',
-              course.status === 'active' ? 'group-hover:scale-105' : 'grayscale'
-            ]"
-          />
-          <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-
+        <!-- 渐变顶栏（无封面图，只做颜色区分） -->
+        <div class="relative h-[100px]" :style="{ background: getCourseGradient(course.id) }">
           <!-- 已结束水印 -->
           <div v-if="course.status !== 'active'" class="absolute inset-0 flex items-center justify-center">
             <span class="text-white/50 text-lg font-bold tracking-widest -rotate-12 select-none">已结束</span>
           </div>
 
-          <!-- 状态标签 - 右上角叠加 -->
+          <!-- 状态标签 - 右上角 -->
           <span :class="`absolute top-3 right-3 z-10 text-xs px-2.5 py-1 rounded-full font-medium ${
             course.status === 'active'
-              ? 'bg-brand-400/10 text-gray-800 backdrop-blur-sm'
-              : 'bg-brand-400/10 text-gray-400 backdrop-blur-sm'
+              ? 'bg-white/20 text-white backdrop-blur-sm'
+              : 'bg-white/10 text-white/60 backdrop-blur-sm'
           }`">
-            <span class="inline-block w-1.5 h-1.5 rounded-full mr-1" :class="course.status === 'active' ? 'bg-brand-600' : 'bg-brand-400'"></span>
+            <span class="inline-block w-1.5 h-1.5 rounded-full mr-1" :class="course.status === 'active' ? 'bg-white' : 'bg-white/40'"></span>
             {{ course.status === 'active' ? '进行中' : '已结束' }}
           </span>
 
-          <!-- 课程标题 & 统计信息叠加 -->
+          <!-- 课程标题 -->
           <div class="absolute bottom-3 left-4 right-4">
             <h3 class="text-white font-bold text-lg leading-tight truncate">{{ course.title }}</h3>
-            <div class="flex items-center gap-2 mt-1.5">
-              <span class="text-xs text-white/80 bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                <Users class="w-3 h-3 inline mr-0.5 -mt-0.5" />
-                {{ studentCount(course.id) }} 名学生
-              </span>
-              <span class="text-xs text-white/80 bg-white/20 px-2 py-0.5 rounded-full backdrop-blur-sm">
-                {{ course.duration || '-' }} 课时
-              </span>
-            </div>
           </div>
         </div>
 
         <!-- 卡片内容区域 -->
-        <div class="p-4 space-y-3">
-          <!-- 课程简介 -->
+        <div class="p-5 space-y-4">
+          <!-- 老师名字 -->
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <User class="w-4 h-4 text-gray-400" />
+            <span>授课老师：<strong>{{ course.teacher }}</strong></span>
+            <span class="ml-auto text-xs text-gray-400">
+              <Users class="w-3.5 h-3.5 inline mr-0.5 -mt-0.5" />
+              {{ studentCount(course.id) }} 名学生
+            </span>
+          </div>
+
+          <!-- 课程介绍 -->
           <div>
-            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">课程简介</p>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">课程介绍</p>
             <p class="text-sm text-gray-600 line-clamp-2 leading-relaxed">
               {{ course.description || '暂无描述' }}
             </p>
           </div>
 
+          <!-- 课程进度 -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">课程进度</span>
+              <span class="text-sm font-semibold text-brand-600">{{ getCourseProgress(course.id) }}%</span>
+            </div>
+            <div class="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full rounded-full bg-brand-400 transition-all duration-500"
+                :style="{ width: getCourseProgress(course.id) + '%' }">
+              </div>
+            </div>
+          </div>
+
           <!-- 底部操作 -->
-          <div class="flex items-center justify-between pt-1">
+          <div class="flex items-center justify-between pt-1 border-t border-gray-100">
             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border"
               :class="course.status === 'active' ? 'bg-brand-600/10 text-gray-600 border-brand-400' : 'bg-brand-400/10 text-gray-400 border-brand-400/30'">
               <BookOpen class="w-3.5 h-3.5" />
@@ -439,7 +441,7 @@ import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 import {
-  BookOpen, ChevronDown, ChevronUp, Users, ClipboardCheck,
+  BookOpen, ChevronDown, ChevronUp, User, Users, ClipboardCheck,
   Search, Settings, RefreshCw, AlertTriangle, Eye, EyeOff,
   FileText, Upload, Trash2, ArrowRight, ArrowLeft, Pencil, Plus, X
 } from 'lucide-vue-next'
@@ -479,8 +481,12 @@ onMounted(async () => {
     const res = await fetchTeacherCourses(store.currentUser || '')
     if (res.success) {
       dbCourses.value = res.courses
-      // 更新 store 让其他部分也能使用
+      // 更新 store（即使为空也覆盖）
       store.courses = res.courses
+      // 保存一份到 localStorage 用于离线展示
+      if (res.courses.length > 0) {
+        localStorage.setItem('courses', JSON.stringify(res.courses))
+      }
     }
   } catch (e) {
     console.error('加载课程失败:', e)
@@ -493,6 +499,8 @@ const sortedAndFilteredCourses = computed(() => {
   let list: Course[]
   if (dbCourses.value.length > 0) {
     list = dbCourses.value as any
+  } else if (loading.value) {
+    return []
   } else if (isLeaderWithTeaching.value) {
     list = store.getLeaderCourses(store.currentUser || '')
   } else if (isMentor.value) {
@@ -794,6 +802,13 @@ const anomalies = computed(() => {
 
 function studentCount(courseId: string) {
   return store.enrollments.filter((e) => e.courseId === courseId && e.status !== 'dropped').length
+}
+
+function getCourseProgress(courseId: string): number {
+  const courseEnrollments = store.enrollments.filter(e => e.courseId === courseId && e.status !== 'dropped')
+  if (courseEnrollments.length === 0) return 0
+  const avg = courseEnrollments.reduce((sum, e) => sum + e.progress, 0) / courseEnrollments.length
+  return Math.round(avg)
 }
 
 function goDetail(courseId: string) {

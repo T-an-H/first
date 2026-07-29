@@ -60,6 +60,59 @@ onMounted(() => {
   store.generateAutoTodos()
 })
 
+/** 待配置的课程（仅教师端） */
+const pendingConfigCourses = computed(() => store.getPendingConfigCourses())
+
+/** 当前用户的待办评价提醒（未完成的） */
+const pendingEvalReminders = computed(() => {
+  if (!store.currentUser) return []
+  if (store.currentRole === 'teacher') {
+    return store.evalReminders.filter(
+      (r) => r.studentId === store.currentUser && r.status !== 'completed'
+    )
+  }
+  if (store.currentRole === 'student') {
+    const student = store.students.find((s) => s.name === store.currentUser)
+    if (!student) return []
+    return store.evalReminders.filter(
+      (r) => r.studentId === student.id && r.status !== 'completed'
+    )
+  }
+  return []
+})
+
+/** 当前学生待完成的 AI 分层测试 */
+const pendingAITierTests = computed(() => {
+  if (store.currentRole !== 'student' || !store.currentUser) return []
+  const student = store.students.find((s) => s.name === store.currentUser)
+  if (!student) return []
+  return store.getPendingAITierTests(student.id)
+})
+
+/** 当前用户各评价提醒的分组 */
+const evalReminderGroups = computed(() => {
+  const groups = new Map<string, { courseTitle: string; session: number; types: string[]; key: string }>()
+  for (const r of pendingEvalReminders.value) {
+    const key = `${r.courseId}||${r.sessionNumber}`
+    if (!groups.has(key)) {
+      groups.set(key, { courseTitle: r.courseTitle, session: r.sessionNumber, types: [], key })
+    }
+    // 从 reminderId 中提取 type: session-reminder-{courseId}-{targetId}-{type}-{session}
+    const parts = r.id.split('-')
+    const type = parts[parts.length - 2]
+    if (type && !groups.get(key)!.types.includes(type)) {
+      groups.get(key)!.types.push(type)
+    }
+  }
+  return Array.from(groups.values()).map((g) => ({
+    ...g,
+    label: `第${g.session}次评价 · ${g.types.map((t) => EvalTypeLabels[t as keyof typeof EvalTypeLabels] || t).join('、')}`,
+    link: store.currentRole === 'teacher'
+      ? `/teacher/courses/${g.key.split('||')[0]}`
+      : `/student/courses/${g.key.split('||')[0]}`,
+  }))
+})
+
 const handleAdd = () => {
   if (!title.value.trim()) return
   store.addTodo({

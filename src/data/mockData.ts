@@ -1,11 +1,35 @@
-import type { Category, Course, Student, Schedule, Enrollment, Teacher, Grade, Evaluation, EvaluationConfig, StudentGroup, Mentor, Leader } from '@/types';
+import type { Category, Course, Student, Schedule, Enrollment, Teacher, Grade, Evaluation, EvaluationConfig, StudentGroup, Mentor, Leader, Department } from '@/types';
+
+/** Mock 数据版本号 — 修改后自动覆盖 localStorage 旧数据 */
+export const MOCK_VERSION = '2.0';
+
+export const departments: Department[] = [
+  { id: 'dept-1', name: '计算机学院', color: '#3b82f6' },
+  { id: 'dept-2', name: '数理学院', color: '#10b981' },
+  { id: 'dept-3', name: '外国语学院', color: '#f59e0b' },
+];
+
+/** 班级 → 学院映射 */
+export const departmentClasses: Record<string, string[]> = {
+  'dept-1': ['1班', '2班', '3班'],
+  'dept-2': ['3班', '4班'],
+  'dept-3': ['5班'],
+};
 
 export const categories: Category[] = [
-  { id: 'cat-1', name: '编程开发', color: '#3b82f6', courseCount: 7 },
-  { id: 'cat-2', name: '数据科学', color: '#10b981', courseCount: 4 },
-  { id: 'cat-3', name: '设计创意', color: '#f59e0b', courseCount: 2 },
-  { id: 'cat-4', name: '商务管理', color: '#8b5cf6', courseCount: 4 },
-  { id: 'cat-5', name: '语言学习', color: '#ec4899', courseCount: 3 },
+  // 计算机学院
+  { id: 'cat-1', name: '编程开发', color: '#3b82f6', courseCount: 7, departmentId: 'dept-1' },
+  { id: 'cat-3', name: '设计创意', color: '#f59e0b', courseCount: 2, departmentId: 'dept-1' },
+  { id: 'cat-4', name: '商务管理', color: '#8b5cf6', courseCount: 4, departmentId: 'dept-1' },
+  { id: 'cat-8', name: '前端设计', color: '#a855f7', courseCount: 0, departmentId: 'dept-1' },
+  { id: 'cat-9', name: '后端架构', color: '#84cc16', courseCount: 0, departmentId: 'dept-1' },
+  // 数理学院
+  { id: 'cat-2', name: '数据科学', color: '#10b981', courseCount: 4, departmentId: 'dept-2' },
+  { id: 'cat-6', name: '高等数学', color: '#ef4444', courseCount: 0, departmentId: 'dept-2' },
+  { id: 'cat-7', name: '大学物理', color: '#06b6d4', courseCount: 0, departmentId: 'dept-2' },
+  // 外国语学院
+  { id: 'cat-5', name: '语言学习', color: '#ec4899', courseCount: 3, departmentId: 'dept-3' },
+  { id: 'cat-10', name: '商务翻译', color: '#f97316', courseCount: 0, departmentId: 'dept-3' },
 ];
 
 export const courses: Course[] = [
@@ -145,6 +169,7 @@ export const teachers: Teacher[] = [
   { id: 't-9', name: '钱老师', phone: '138****1009', email: 'qian@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qian', courseIds: ['course-15', 'course-19'] },
   { id: 't-10', name: '吴老师', phone: '138****1010', email: 'wu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wu', courseIds: ['course-16', 'course-20'] },
   { id: 't-11', name: '郑老师', phone: '137****2011', email: 'zheng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zheng', courseIds: [] },
+  { id: 't-12', name: '刘院长', phone: '139****3001', email: 'liuhead@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liuhead', courseIds: ['course-22'] },
 ];
 
 /** 企业导师 */
@@ -613,6 +638,39 @@ export const supplementarySchedules: Schedule[] = [
   { id: 'sch-95', courseId: 'course-20', title: '产品经理实战', startDate: '2026-08-16', endDate: '2026-08-16', timeSlot: '14:00-16:00', room: 'B203', teacher: '吴老师' },
 ];
 
+// ====== 管理员端演示排课（按分类名匹配 title） ======
+export const adminDemoSchedules: Schedule[] = [
+  // 高等数学（cat-6，数理学院）
+  { id: 'dmo-1', courseId: 'cat-6', title: '高等数学', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '08:00-10:00', room: '教1-101', teacher: '李老师' },
+  { id: 'dmo-2', courseId: 'cat-6', title: '高等数学', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '10:15-12:15', room: '教1-101', teacher: '李老师' },
+  { id: 'dmo-3', courseId: 'cat-6', title: '高等数学', startDate: '2026-07-30', endDate: '2026-07-30', timeSlot: '08:00-10:00', room: '教1-102', teacher: '张老师' },
+  { id: 'dmo-4', courseId: 'cat-6', title: '高等数学', startDate: '2026-08-01', endDate: '2026-08-01', timeSlot: '09:00-11:00', room: '教1-101', teacher: '李老师' },
+  { id: 'dmo-5', courseId: 'cat-6', title: '高等数学', startDate: '2026-08-04', endDate: '2026-08-04', timeSlot: '14:00-16:00', room: '教1-201', teacher: '张老师' },
+
+  // 大学物理（cat-7，数理学院）
+  { id: 'dmo-6', courseId: 'cat-7', title: '大学物理', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '08:00-10:00', room: '物-301', teacher: '赵老师' },
+  { id: 'dmo-7', courseId: 'cat-7', title: '大学物理', startDate: '2026-07-31', endDate: '2026-07-31', timeSlot: '14:00-16:00', room: '物-302', teacher: '赵老师' },
+  { id: 'dmo-8', courseId: 'cat-7', title: '大学物理', startDate: '2026-08-05', endDate: '2026-08-05', timeSlot: '08:00-10:00', room: '物-301', teacher: '钱老师' },
+
+  // 前端设计（cat-8，计算机学院）
+  { id: 'dmo-9', courseId: 'cat-8', title: '前端设计', startDate: '2026-07-28', endDate: '2026-07-28', timeSlot: '09:00-12:00', room: '实-201', teacher: '陈老师' },
+  { id: 'dmo-10', courseId: 'cat-8', title: '前端设计', startDate: '2026-07-30', endDate: '2026-07-30', timeSlot: '14:00-17:00', room: '实-202', teacher: '陈老师' },
+  { id: 'dmo-11', courseId: 'cat-8', title: '前端设计', startDate: '2026-08-03', endDate: '2026-08-03', timeSlot: '09:00-12:00', room: '实-201', teacher: '周老师' },
+  { id: 'dmo-12', courseId: 'cat-8', title: '前端设计', startDate: '2026-08-06', endDate: '2026-08-06', timeSlot: '09:00-12:00', room: '实-201', teacher: '陈老师' },
+
+  // 后端架构（cat-9，计算机学院）
+  { id: 'dmo-13', courseId: 'cat-9', title: '后端架构', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '09:00-12:00', room: '实-301', teacher: '王老师' },
+  { id: 'dmo-14', courseId: 'cat-9', title: '后端架构', startDate: '2026-07-31', endDate: '2026-07-31', timeSlot: '14:00-17:00', room: '实-302', teacher: '王老师' },
+  { id: 'dmo-15', courseId: 'cat-9', title: '后端架构', startDate: '2026-08-03', endDate: '2026-08-03', timeSlot: '09:00-12:00', room: '实-301', teacher: '刘老师' },
+  { id: 'dmo-16', courseId: 'cat-9', title: '后端架构', startDate: '2026-08-05', endDate: '2026-08-05', timeSlot: '14:00-17:00', room: '实-301', teacher: '王老师' },
+  { id: 'dmo-17', courseId: 'cat-9', title: '后端架构', startDate: '2026-08-07', endDate: '2026-08-07', timeSlot: '09:00-12:00', room: '实-302', teacher: '刘老师' },
+
+  // 商务翻译（cat-10，外国语学院）
+  { id: 'dmo-18', courseId: 'cat-10', title: '商务翻译', startDate: '2026-07-29', endDate: '2026-07-29', timeSlot: '14:00-16:00', room: '外-201', teacher: '孙老师' },
+  { id: 'dmo-19', courseId: 'cat-10', title: '商务翻译', startDate: '2026-08-01', endDate: '2026-08-01', timeSlot: '09:00-11:00', room: '外-202', teacher: '赵老师' },
+  { id: 'dmo-20', courseId: 'cat-10', title: '商务翻译', startDate: '2026-08-05', endDate: '2026-08-05', timeSlot: '14:00-16:00', room: '外-201', teacher: '孙老师' },
+];
+
 // ========== 补充选课数据（enr-48起） ==========
 
 export const supplementaryEnrollments: Enrollment[] = [
@@ -1006,4 +1064,5 @@ export const supplementaryAll = {
   supplementaryTodos,
   supplementaryEvalReminders,
   supplementaryEvalAnomalies,
+  adminDemoSchedules,
 } as const;

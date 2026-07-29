@@ -125,7 +125,7 @@
               </td>
               <td class="px-4 py-3 text-right">
                 <button @click.stop="openCourseModal(course)" class="text-xs text-blue-500 hover:underline mr-3">编辑</button>
-                <button @click.stop="store.deleteCourse(course.id)" class="text-xs text-red-400 hover:underline">删除</button>
+                <button @click.stop="handleDeleteCourse(course)" class="text-xs text-red-400 hover:underline">删除</button>
               </td>
             </tr>
             <tr v-if="filteredCourses.length === 0">
@@ -432,6 +432,15 @@ function handleDeleteCategory(cat: Category) {
   if (selectedCategory.value?.id === cat.id) {
     selectedCategory.value = null
   }
+}
+
+function handleDeleteCourse(course: any) {
+  if (!confirm(`确定要删除课程"${course.title}"吗？`)) return
+  store.deleteCourse(course.id)
+  // 同时从 apiCourses 中移除
+  apiCourses.value = apiCourses.value.filter((c: any) => c.id !== course.id)
+  // 重新加载分类数据
+  loadData()
 }
 
 // ====== Course detail modal ======

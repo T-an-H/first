@@ -12,6 +12,7 @@ import scheduleRoutes from './routes/schedules.js';
 import categoryRoutes from './routes/categories.js';
 import courseRoutes from './routes/courses.js';
 import teachingRoutes from './routes/teaching.js';
+import evalRoutes from './routes/eval.js';
 
 const app = express();
 const PORT = 3000;
@@ -54,6 +55,9 @@ app.use('/api/courses', courseRoutes);
 
 // 教学数据路由（选课/成绩/分组）
 app.use('/api/teaching', teachingRoutes);
+
+// 评价管理路由
+app.use('/api/eval', evalRoutes);
 
 // ====== 启动服务器 ======
 app.listen(PORT, () => {

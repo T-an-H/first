@@ -102,6 +102,7 @@ import { Icons, renderIcon } from '@/utils/d3-renderer'
 import * as d3 from 'd3'
 import StatCard from '@/components/StatCard.vue'
 import Modal from '@/components/Modal.vue'
+import { fetchStudentScores } from '@/api'
 
 // 使用 Icons 映射创建 Vue 组件，替代 lucide-vue-next
 function iconView(name: keyof typeof Icons) {
@@ -128,6 +129,47 @@ const Briefcase = iconView('briefcase')
 
 const store = useAppStore()
 const semester = ref('')
+
+// 从数据库加载成绩
+onMounted(async () => {
+  // 先确保课程数据已加载（让课程名称可以正确显示）
+  try {
+    const res = await fetch('http://localhost:3000/api/courses')
+    const data = await res.json()
+    if (data.success) store.courses = data.courses
+  } catch { /* ignore */ }
+
+  const s = store.students.find((x) => x.name === store.currentUser)
+  if (s?.id) {
+    try {
+      const res = await fetchStudentScores(s.id)
+      if (res.success && res.scores.length > 0) {
+        // 清除该学生的旧 mock 成绩
+        store.grades = store.grades.filter((g) => g.studentId !== s.id)
+
+        // 将数据库成绩转换为 Grade 格式
+        const byCourse = new Map<string, { scores: any[]; totalScore: number }>()
+        for (const sc of res.scores) {
+          if (!byCourse.has(sc.courseId)) byCourse.set(sc.courseId, { scores: [], totalScore: 0 })
+          byCourse.get(sc.courseId)!.scores.push(sc)
+        }
+        for (const [courseId, data] of byCourse) {
+          const avg = data.scores.reduce((a: number, s: any) => a + Number(s.score), 0) / data.scores.length
+          store.grades.push({
+            id: `db-grade-${courseId}-${s.id}`,
+            studentId: s.id,
+            courseId,
+            score: Math.round(avg),
+            semester: '',
+            comment: '',
+            gradedAt: data.scores[0].gradedAt || '',
+            totalScore: Math.round(avg),
+          })
+        }
+      }
+    } catch { /* ignore */ }
+  }
+})
 
 // 弹窗状态
 const modalOpen = ref(false)

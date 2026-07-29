@@ -267,14 +267,63 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Upload, Loader2, CheckCircle, Search, X } from 'lucide-vue-next'
 import ScoreDetail from '@/components/ScoreDetail.vue'
 import type { DetailedGrade, Enrollment } from '@/types'
 import { getNow } from '@/lib/date'
+import { fetchCourseScores, fetchTeacherCourses } from '@/api'
 
 const store = useAppStore()
+
+const selectedCourse = ref('all')
+const showStats = ref(true)
+const selectedSemester = ref('all')
+const gradeFilterClass = ref('')
+const gradeFilterGroup = ref('')
+const gradeSearch = ref('')
+const showGradePopup = ref(false)
+const detailTarget = ref<{ studentName: string; courseTitle: string; courseId: string; studentId: string } | null>(null)
+const printRef = ref<HTMLElement | null>(null)
+const selectedGradeClass = ref('')
+const selectedStudent = ref<any>(null)
+const showDetail = ref(false)
+
+// 从数据库加载的成绩数据
+const dbScores = ref<any[]>([])
+const loadingScores = ref(false)
+
+// 监听课程选择，从数据库加载成绩
+watch(() => selectedCourse.value, async (courseId) => {
+  if (!courseId || courseId === 'all') return
+  loadingScores.value = true
+  try {
+    const res = await fetchCourseScores(courseId)
+    if (res.success) {
+      dbScores.value = res.scores
+      // 回填到 store 供其他组件使用
+      for (const s of res.scores) {
+        const existing = store.examScores.findIndex((x: any) => x.id === s.id)
+        if (existing >= 0) {
+          store.examScores[existing] = s
+        } else {
+          store.examScores.push(s)
+        }
+      }
+    }
+  } catch { /* ignore */ } finally {
+    loadingScores.value = false
+  }
+})
+
+onMounted(async () => {
+  // 加载教师课程
+  try {
+    const res = await fetchTeacherCourses(store.currentUser || '')
+    if (res.success) store.courses = res.courses
+  } catch { /* ignore */ }
+})
 
 const GRADE_COLORS = [
   { range: [90, 100], label: '优秀', color: 'bg-emerald-100 text-emerald-800', bar: 'bg-emerald-500' },
@@ -291,18 +340,6 @@ const SEMESTERS = [
   { label: '2026年秋季(当前)', start: '2026-09-01', end: '2027-01-31' },
   { label: '全部学期', start: '', end: '' },
 ]
-
-// ====== State ======
-const selectedCourse = ref('all')
-const showStats = ref(true)
-const selectedSemester = ref('all')
-const gradeFilterClass = ref('')
-const gradeFilterGroup = ref('')
-const gradeSearch = ref('')
-const showGradePopup = ref(false)
-const detailTarget = ref<{ studentName: string; courseTitle: string; courseId: string; studentId: string } | null>(null)
-const printRef = ref<HTMLElement | null>(null)
-const selectedGradeClass = ref('')
 
 // ====== Export to system state ======
 const isExporting = ref(false)

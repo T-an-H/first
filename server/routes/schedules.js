@@ -110,6 +110,19 @@ router.post('/bulk', async (req, res) => {
           s.timeSlot,
         ]
       );
+
+      // 自动创建课程（如果不存在）
+      try {
+        const [courseExist] = await pool.execute('SELECT id FROM courses WHERE id = ? OR title = ?', [lookupId, s.title]);
+        if (courseExist.length === 0) {
+          await pool.execute(
+            'INSERT INTO courses (id, title, teacher, department, status) VALUES (?, ?, ?, ?, ?)',
+            [lookupId, s.title, s.teacher || '', s.department || null, 'active']
+          );
+        }
+      } catch (e) {
+        console.error('自动创建课程失败:', e.message);
+      }
       inserted++;
     }
 
