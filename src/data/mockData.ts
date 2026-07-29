@@ -460,14 +460,14 @@ export const examScores: import('@/types').ExamScore[] = [
   { id: 'es-11', courseId: 'course-1', studentId: 'stu-24', examName: '期中考试', score: 82, fullScore: 100, weight: 30, type: 'midterm_exam', status: 'submitted', createdAt: '2026-07-12', gradedAt: '2026-07-14' },
   { id: 'es-12', courseId: 'course-1', studentId: 'stu-24', examName: '项目答辩', score: 80, fullScore: 100, weight: 20, type: 'final_project', status: 'submitted', createdAt: '2026-07-19', gradedAt: '2026-07-21' },
 
-  // ====== course-2（Python）/ 期末测试 + 项目 ======
-  { id: 'es-13', courseId: 'course-2', studentId: 'stu-3', examName: '期末测试', score: 78, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
+  // ====== course-2（Python）/ 期末考试 + 项目 ======
+  { id: 'es-13', courseId: 'course-2', studentId: 'stu-3', examName: '期末考试', score: 78, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
   { id: 'es-14', courseId: 'course-2', studentId: 'stu-3', examName: '数据分析项目', score: 72, fullScore: 100, weight: 30, type: 'final_project', status: 'submitted', createdAt: '2026-07-18', gradedAt: '2026-07-20' },
-  { id: 'es-15', courseId: 'course-2', studentId: 'stu-4', examName: '期末测试', score: 82, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
+  { id: 'es-15', courseId: 'course-2', studentId: 'stu-4', examName: '期末考试', score: 82, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
   { id: 'es-16', courseId: 'course-2', studentId: 'stu-4', examName: '数据分析项目', score: 80, fullScore: 100, weight: 30, type: 'final_project', status: 'submitted', createdAt: '2026-07-18', gradedAt: '2026-07-20' },
-  { id: 'es-17', courseId: 'course-2', studentId: 'stu-16', examName: '期末测试', score: 68, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
+  { id: 'es-17', courseId: 'course-2', studentId: 'stu-16', examName: '期末考试', score: 68, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
   { id: 'es-18', courseId: 'course-2', studentId: 'stu-16', examName: '数据分析项目', score: 72, fullScore: 100, weight: 30, type: 'final_project', status: 'submitted', createdAt: '2026-07-18', gradedAt: '2026-07-20' },
-  { id: 'es-19', courseId: 'course-2', studentId: 'stu-23', examName: '期末测试', score: 60, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
+  { id: 'es-19', courseId: 'course-2', studentId: 'stu-23', examName: '期末考试', score: 60, fullScore: 100, weight: 40, type: 'final_exam', status: 'submitted', createdAt: '2026-07-16', gradedAt: '2026-07-18' },
   { id: 'es-20', courseId: 'course-2', studentId: 'stu-23', examName: '数据分析项目', score: 65, fullScore: 100, weight: 30, type: 'final_project', status: 'submitted', createdAt: '2026-07-18', gradedAt: '2026-07-20' },
 
   // ====== course-3（UI/UX）/ 期中 + 期末 ======

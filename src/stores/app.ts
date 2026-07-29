@@ -45,6 +45,8 @@ const loadFromStorage = <T>(key: string, fallback: T): T => {
     const stored = localStorage.getItem(key)
     if (!stored) return fallback
     const parsed = JSON.parse(stored)
+    // 类型校验：如果 fallback 是数组，确保 parsed 也是数组（防止脏数据污染）
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) return fallback
     // 数组类型：如果 localStorage 存的是空数组，也用 fallback（防止 stale 空数组覆盖 mock 数据）
     if (Array.isArray(parsed) && parsed.length === 0 && Array.isArray(fallback)) return fallback
     return parsed
@@ -167,6 +169,8 @@ export const useAppStore = defineStore('app', () => {
     }
     secondaryRoles.value = detected
     localStorage.setItem('secondaryRoles', JSON.stringify(detected))
+    // 登录后立即生成自动待办
+    generateAutoTodos()
   }
 
   function logout() {
@@ -411,6 +415,7 @@ export const useAppStore = defineStore('app', () => {
   function updateTodo(id: string, data: Partial<TodoItem>) {
     todos.value = todos.value.map((t) => (t.id === id ? { ...t, ...data } : t))
     saveToStorage('todos', todos.value)
+    generateAutoTodos()
   }
 
   function deleteTodo(id: string) {
@@ -476,6 +481,7 @@ export const useAppStore = defineStore('app', () => {
   function submitHomework(submission: HomeworkSubmission) {
     homeworkSubmissions.value = [...homeworkSubmissions.value, submission]
     saveToStorage('homeworkSubmissions', homeworkSubmissions.value)
+    generateAutoTodos()
   }
 
   function getHomeworkSubmission(homeworkId: string, studentId: string): HomeworkSubmission | undefined {
@@ -699,6 +705,46 @@ export const useAppStore = defineStore('app', () => {
     let result = examScores.value.filter((s) => s.courseId === courseId)
     if (examName) result = result.filter((s) => s.examName === examName)
     return result
+  }
+
+  /** 清理指定课程中同 studentId+同 examName 的重复成绩记录，仅保留第一条 */
+  function deduplicateExamScores(courseId: string) {
+    const courseScores = examScores.value.filter((s) => s.courseId === courseId)
+    const seen = new Set<string>()
+    const deduped: import('@/types').ExamScore[] = []
+    for (const s of courseScores) {
+      const key = `${s.studentId}|${s.examName}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        deduped.push(s)
+      }
+    }
+    if (deduped.length < courseScores.length) {
+      const otherScores = examScores.value.filter((s) => s.courseId !== courseId)
+      examScores.value = [...otherScores, ...deduped]
+      saveToStorage('examScores', examScores.value)
+    }
+  }
+
+  /** 将指定课程中非标准名称的笔试成绩统一为标准名称（期末测试→期末考试等） */
+  function normalizeWrittenExamNames(courseId: string) {
+    const nameMap: Record<string, string | undefined> = {
+      '期末测试': '期末考试',
+      '期末笔试': '期末考试',
+      '期中笔试': '期中考试',
+    }
+    let changed = false
+    examScores.value = examScores.value.map((s) => {
+      if (s.courseId === courseId) {
+        const targetName = nameMap[s.examName]
+        if (targetName && s.examName !== targetName) {
+          changed = true
+          return { ...s, examName: targetName }
+        }
+      }
+      return s
+    })
+    if (changed) saveToStorage('examScores', examScores.value)
   }
 
   /** 获取课程已定义的考试/项目名称列表 */
@@ -977,6 +1023,7 @@ export const useAppStore = defineStore('app', () => {
     if (changed) {
       saveToStorage('evalReminders', evalReminders.value)
     }
+    generateAutoTodos()
   }
 
   /**
@@ -998,6 +1045,8 @@ export const useAppStore = defineStore('app', () => {
     }
     // 同步检查逾期提醒
     checkAndMarkOverdueReminders()
+    // 触发自动待办生成
+    generateAutoTodos()
   }
 
   /**
@@ -1229,6 +1278,8 @@ export const useAppStore = defineStore('app', () => {
       return r
     })
     saveToStorage('evalReminders', evalReminders.value)
+    // 触发自动待办清理
+    generateAutoTodos()
     apiUpdateReminder(`${courseId}||${studentId}||${sessionNumber}`, 'completed').catch(() => {})
   }
 
@@ -1241,6 +1292,7 @@ export const useAppStore = defineStore('app', () => {
       return r
     })
     saveToStorage('evalReminders', evalReminders.value)
+    generateAutoTodos()
   }
 
   function checkEvalReminders() {
@@ -1404,6 +1456,7 @@ export const useAppStore = defineStore('app', () => {
       },
     }
     saveToStorage('configCompleted', configCompleted.value)
+    generateAutoTodos()
   }
 
   /** 获取有未完成配置的课程列表（排除已锁定课程，仅当前教师自己的课程） */
@@ -1494,7 +1547,183 @@ export const useAppStore = defineStore('app', () => {
     }
     studentTiers.value = { ...studentTiers.value, [resultKey]: record }
     saveToStorage('studentTiers', studentTiers.value)
+    generateAutoTodos()
     return record
+  }
+
+  /**
+   * 全自动待办生成：扫描所有源（评价提醒/配置任务/AI分层测试/作业），
+   * 自动创建或清理对应的待办事项。
+   * 教师端：评价待办 + 配置待办
+   * 学生端：评价待办 + AI分层测试待办 + 作业待办
+   * 企业导师端：评价待办
+   */
+  function generateAutoTodos() {
+    const now = getNow()
+    const currentStudentId = (() => {
+      if (currentRole.value !== 'student' || !currentUser.value) return null
+      return students.value.find((s) => s.name === currentUser.value)?.id ?? null
+    })()
+    // 收集当前所有的 auto- 前缀待办 ID（用于去重）
+    const autoTodoIds = new Set(todos.value.map((t) => t.id))
+    const newTodos: TodoItem[] = []
+    let changed = false
+
+    // ── 辅助函数：检查 auto 待办是否已存在 ──
+    const hasAutoTodo = (id: string) => autoTodoIds.has(id) || newTodos.some((t) => t.id === id)
+
+    // ── 1. 评价待办 ──
+    const myPendingEvalReminders = evalReminders.value.filter((r) => {
+      if (r.status === 'completed' || r.status === 'overdue') return false
+      if (currentRole.value === 'teacher') return r.studentId === currentUser.value
+      if (currentRole.value === 'mentor') return r.studentId === currentUser.value
+      if (currentRole.value === 'student' && currentStudentId) return r.studentId === currentStudentId
+      return false
+    })
+    for (const r of myPendingEvalReminders) {
+      const todoId = `auto-eval-${r.courseId}-${r.sessionNumber}`
+      if (hasAutoTodo(todoId)) continue
+      // 判断哪些类型与该角色相关
+      const roleType = currentRole.value === 'teacher' ? '教师评' : currentRole.value === 'mentor' ? '导师评' : ''
+      const title = currentRole.value === 'student'
+        ? `[评价] ${r.courseTitle} 第${r.sessionNumber}次评价`
+        : `[评价] ${r.courseTitle} 第${r.sessionNumber}次评价 (${roleType})`
+      newTodos.push({
+        id: todoId,
+        title,
+        completed: false,
+        createdAt: now.toISOString().split('T')[0],
+        dueDate: r.deadline || undefined,
+        createdBy: currentUser.value || 'system',
+      })
+      changed = true
+    }
+
+    // ── 2. 配置待办（仅教师） ──
+    if (currentRole.value === 'teacher') {
+      const pendingConfigs = getPendingConfigCourses()
+      for (const cfg of pendingConfigs) {
+        const todoId = `auto-config-${cfg.courseId}`
+        if (hasAutoTodo(todoId)) continue
+        newTodos.push({
+          id: todoId,
+          title: `[配置] ${cfg.courseTitle} - 未配置：${cfg.missing.join('、')}`,
+          completed: false,
+          createdAt: now.toISOString().split('T')[0],
+          createdBy: currentUser.value || 'system',
+        })
+        changed = true
+      }
+    }
+
+    // ── 3. AI 分层测试待办（仅学生） ──
+    if (currentRole.value === 'student' && currentStudentId) {
+      const pendingAITests = getPendingAITierTests(currentStudentId)
+      for (const test of pendingAITests) {
+        const todoId = `auto-ai-tier-${test.courseId}-${currentStudentId}`
+        if (hasAutoTodo(todoId)) continue
+        newTodos.push({
+          id: todoId,
+          title: `[AI分层] ${test.courseTitle} - 请在第二节课前完成分层测试`,
+          completed: false,
+          createdAt: now.toISOString().split('T')[0],
+          dueDate: test.deadline,
+          createdBy: currentUser.value || 'system',
+        })
+        changed = true
+      }
+    }
+
+    // ── 4. 作业待办（仅学生） ──
+    if (currentRole.value === 'student' && currentStudentId) {
+      const pendingHomework = homework.value.filter((h) => {
+        const submission = homeworkSubmissions.value.find(
+          (s) => s.homeworkId === h.id && s.studentId === currentStudentId
+        )
+        return !submission
+      })
+      for (const hw of pendingHomework) {
+        const todoId = `auto-homework-${hw.id}-${currentStudentId}`
+        if (hasAutoTodo(todoId)) continue
+        newTodos.push({
+          id: todoId,
+          title: `[作业] ${hw.title}`,
+          completed: false,
+          createdAt: hw.createdAt || now.toISOString().split('T')[0],
+          dueDate: hw.dueDate,
+          createdBy: currentUser.value || 'system',
+        })
+        changed = true
+      }
+    }
+
+    // ── 5. 清理：当底层源已完成时，标记对应 auto-todo 为已完成 ──
+    todos.value = todos.value.map((t) => {
+      if (t.completed) return t
+
+      // 评价待办清理
+      if (t.id.startsWith('auto-eval-')) {
+        const parts = t.id.split('-') // ['auto', 'eval', courseId, sessionNum]
+        if (parts.length >= 4) {
+          const courseId = parts[2]
+          const sessionNum = parseInt(parts[3])
+          const related = evalReminders.value.filter(
+            (r) => r.courseId === courseId && r.sessionNumber === sessionNum
+          )
+          if (related.length > 0 && related.every((r) => r.status === 'completed')) {
+            changed = true
+            return { ...t, completed: true }
+          }
+        }
+      }
+
+      // 配置待办清理
+      if (t.id.startsWith('auto-config-')) {
+        const courseId = t.id.replace('auto-config-', '')
+        const pending = getPendingConfigCourses()
+        if (!pending.some((c) => c.courseId === courseId)) {
+          changed = true
+          return { ...t, completed: true }
+        }
+      }
+
+      // AI 分层待办清理
+      if (t.id.startsWith('auto-ai-tier-')) {
+        const key = t.id.replace('auto-ai-tier-', '')
+        if (studentTiers.value[key]) {
+          changed = true
+          return { ...t, completed: true }
+        }
+      }
+
+      // 作业待办清理
+      if (t.id.startsWith('auto-homework-')) {
+        const key = t.id.replace('auto-homework-', '') // homeworkId-studentId
+        const sepIdx = key.lastIndexOf('-')
+        if (sepIdx > 0) {
+          const hwId = key.substring(0, sepIdx)
+          const stuId = key.substring(sepIdx + 1)
+          const submission = homeworkSubmissions.value.find(
+            (s) => s.homeworkId === hwId && s.studentId === stuId
+          )
+          if (submission) {
+            changed = true
+            return { ...t, completed: true }
+          }
+        }
+      }
+
+      return t
+    })
+
+    // ── 写入新待办并保存 ──
+    if (newTodos.length > 0) {
+      todos.value = [...todos.value, ...newTodos]
+      changed = true
+    }
+    if (changed) {
+      saveToStorage('todos', todos.value)
+    }
   }
 
   // 初始化：根据排课自动重算所有课程的进度
@@ -1535,12 +1764,12 @@ export const useAppStore = defineStore('app', () => {
     getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
-    addExamScore, updateExamScore, submitExamScores, getExamScoresForCourse, getExamNames,
+    addExamScore, updateExamScore, submitExamScores, getExamScoresForCourse, getExamNames, deduplicateExamScores, normalizeWrittenExamNames,
     setExamWeight, getExamWeight, getExamWeightsForCourse,
     hasFinalExamSubmitted, isEvalConfigEditable, isWeightConfigEditable,
     lockSession, isSessionLocked, getSessionScheduleRangeIndex, getSessionEndDate, isSessionTime, isFinalSessionDeadlinePassed, autoLockPreviousSession, autoLockExpiredSessions,
     generateSessionReminders, checkAndGenerateSessionReminders, getSessionDeadline, checkAndMarkOverdueReminders,
-    generateEvalReminders, pushNearDeadlineEvalReminders, processSessionOverdue,
+    generateAutoTodos, generateEvalReminders, pushNearDeadlineEvalReminders, processSessionOverdue,
     markEvalReminderCompleted, markSessionEvalRemindersCompleted,
     isFirstClassStarted, markConfigCompleted, getPendingConfigCourses,
     checkEvalReminders,
