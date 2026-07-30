@@ -7,6 +7,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import type { Schedule } from '@/types'
+import { EvalTemplateLabels, EvalFrequencyLabels, EvalTypeLabels, EvalTypeColors, TEMPLATE_EVAL_TYPES } from '@/types'
+import type { EvalType } from '@/types'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
 import { getNow } from '@/lib/date'
@@ -26,6 +28,8 @@ const courseSchedules = computed(() =>
 const sortedCourseSchedules = computed(() =>
   [...courseSchedules.value].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
 )
+
+const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
 
 const activeTab = ref<string>('schedule')
 
@@ -147,7 +151,7 @@ function renderCourseDetail(root: HTMLElement) {
   const tabs = [
     { key: 'schedule', label: '课程管理', icon: 'calendar' },
     { key: 'comments', label: '评论管理', icon: 'clipboardCheck' },
-  ]
+  ] as const
   tabs.forEach((t) => {
     tabBar.append('button')
       .attr('class', `px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${tab === t.key ? 'bg-white text-blue-600 border border-b-0 border-brand-400/20 -mb-px' : 'text-gray-500 hover:text-gray-700'}`)
@@ -211,6 +215,27 @@ function renderCourseDetail(root: HTMLElement) {
     renderIcon(evalHeader, 'clipboardCheck').attr('class', 'w-5 h-5 text-gray-400')
     evalHeader.append('h2').attr('class', 'font-semibold text-gray-900').text('企业导师评价')
     evalHeader.append('span').attr('class', 'text-xs text-gray-400').text(`${students.length}名学生`)
+
+    // 展示当前评价方案（只读）
+    const evalConfig = store.evalConfigs.find((c) => c.courseId === courseId.value)
+    if (evalConfig) {
+      const schemeDiv = evalDiv.append('div').attr('class', 'mb-4 p-3 rounded-lg bg-brand-400/5 border border-brand-400/15')
+      const schemeHeader = schemeDiv.append('div').attr('class', 'flex items-center justify-between mb-2')
+      const left = schemeHeader.append('div').attr('class', 'flex items-center gap-2')
+      renderIcon(left, 'eye').attr('class', 'w-4 h-4 text-brand-600')
+      left.append('span').attr('class', 'text-xs font-medium text-brand-700').text('当前评价方案')
+      schemeHeader.append('span').attr('class', 'text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 border border-brand-200')
+        .text(`${EvalTemplateLabels[evalConfig.template]} · ${EvalFrequencyLabels[evalConfig.frequency]}`)
+
+      const tagsDiv = schemeDiv.append('div').attr('class', 'flex flex-wrap gap-1.5')
+      ALL_EVAL_TYPES.forEach((t: EvalType) => {
+        const enabled = TEMPLATE_EVAL_TYPES[evalConfig.template].includes(t)
+        const hidden = (t === 'intra_group' || t === 'inter_group') && !(evalConfig as any).courseHasGroups || t === 'mentor' && !evalConfig.hasMentor
+        const tag = tagsDiv.append('span')
+          .attr('class', `text-xs px-2 py-0.5 rounded-full border ${!enabled ? 'bg-gray-100 text-gray-300 border-gray-200' : hidden ? 'bg-brand-50 text-brand-600 border-brand-200' : EvalTypeColors[t]}`)
+        tag.text(`${EvalTypeLabels[t]}${!enabled ? ' ✗' : ''}`)
+      })
+    }
 
     if (students.length === 0) {
       evalDiv.append('div').attr('class', 'text-center py-8 text-gray-400').text('该课程暂无学生')
@@ -302,6 +327,7 @@ function renderCourseDetail(root: HTMLElement) {
       })
     }
   }
+}
 
 onMounted(() => {
   const el = document.getElementById('mentor-course-detail-root')

@@ -378,6 +378,7 @@ function confirmImport() {
 function executeImport(rows: StudentImportRow[]) {
   let added = 0
   let updated = 0
+  let newStudents: Student[] = []
   const existingStudents = store.students
 
   for (const row of rows) {
@@ -419,14 +420,35 @@ function executeImport(rows: StudentImportRow[]) {
         enrollmentScore: row.enrollmentScore,
       }
       store.addStudent(newStudent)
+      newStudents.push(newStudent)
       added++
     }
   }
 
   importResult.value = { added, updated }
   showResultModal.value = true
-  // 刷新页面学生列表
-  setTimeout(() => loadClassStudents(), 500)
+
+  // 同步到当前页面学生列表
+  const updatedIds = new Set<string>()
+  for (const s of students.value) {
+    if (store.students.find((ns) => ns.id === s.id)) {
+      updatedIds.add(s.id)
+    }
+  }
+  // 将 store 中该班学生合并到页面列表（覆盖 API 数据）
+  const className = selectedClass.value
+  const storeStudents = store.students.filter((s) => s.className === className)
+  const mergedMap = new Map<string, any>()
+  for (const s of students.value) {
+    mergedMap.set(s.id, {
+      ...s,
+      ...store.students.find((ns) => ns.id === s.id),
+    })
+  }
+  for (const s of storeStudents) {
+    mergedMap.set(s.id, s)
+  }
+  students.value = Array.from(mergedMap.values())
 }
 
 onMounted(loadClasses)

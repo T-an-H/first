@@ -294,9 +294,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
+import Modal from '@/components/Modal.vue'
 import { Plus, Search, BookOpen, ArrowLeft, PenLine, Trash2, RefreshCw, Loader2, CheckCircle, Users, Clock, GraduationCap, Award } from 'lucide-vue-next'
 import type { Category, Course } from '@/types'
 import { fetchCategories, fetchCourses, syncCategoriesFromSchedules } from '@/api'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 
@@ -421,7 +423,7 @@ function handleSaveCategory() {
       if (updated) selectedCategory.value = updated
     }
   } else {
-    store.addCategory({ id: Date.now().toString(), name: categoryForm.value.name, color: categoryForm.value.color, courseCount: 0 })
+    store.addCategory({ id: Date.now().toString(), name: categoryForm.value.name, color: categoryForm.value.color, courseCount: 0, departmentId: store.selectedDepartmentId || '' })
   }
   showCategoryModal.value = false
 }

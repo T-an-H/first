@@ -9,7 +9,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { watch, onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useRouter, useRoute } from 'vue-router'
 import Sidebar from './Sidebar.vue'
@@ -33,5 +33,14 @@ function checkDepartment() {
 
 onMounted(() => {
   store.checkAndGenerateSessionReminders()
+  store.generateAutoTodos()
 })
+
+// 每次切换页面时重新生成自动待办（让红点实时更新）
+watch(
+  () => route.path,
+  () => {
+    store.generateAutoTodos()
+  },
+)
 </script>
