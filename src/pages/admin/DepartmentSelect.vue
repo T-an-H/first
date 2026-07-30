@@ -40,9 +40,26 @@
           @click="openAddModal"
           class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-6 hover:border-brand-400 hover:bg-brand-50/30 transition-all cursor-pointer flex flex-col items-center justify-center min-h-[88px]"
         >
-          <Plus class="w-8 h-8 text-gray-300 group-hover:text-brand-500 mb-1" />
+          <Plus class="w-8 h-8 text-gray-300 mb-1" />
           <span class="text-sm text-gray-400">添加学院</span>
         </div>
+
+        <!-- Excel Import Card -->
+        <div
+          @click="triggerImport"
+          class="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-6 hover:border-green-400 hover:bg-green-50/30 transition-all cursor-pointer flex flex-col items-center justify-center min-h-[88px]"
+        >
+          <Upload class="w-8 h-8 text-gray-300 mb-1" />
+          <span class="text-sm text-gray-400">Excel 导入</span>
+        </div>
+      </div>
+
+      <!-- 隐藏的文件选择器 -->
+      <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="handleFileChange" />
+
+      <!-- 导入结果提示 -->
+      <div v-if="importMsg" class="mt-6 text-sm text-center" :class="importMsg.success ? 'text-green-600' : 'text-red-500'">
+        {{ importMsg.text }}
       </div>
 
       <!-- Footer -->
@@ -113,8 +130,9 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { GraduationCap, Plus, ArrowRight, LogOut, Trash2 } from 'lucide-vue-next'
+import { GraduationCap, Plus, ArrowRight, LogOut, Trash2, Upload } from 'lucide-vue-next'
 import type { Department } from '@/types'
+import * as XLSX from 'xlsx'
 
 const store = useAppStore()
 const router = useRouter()
@@ -125,6 +143,51 @@ const form = ref({ name: '', color: '#3b82f6' })
 
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<Department | null>(null)
+
+// ====== Excel 导入 ======
+const fileInput = ref<HTMLInputElement>()
+const importMsg = ref<{ success: boolean; text: string } | null>(null)
+
+function triggerImport() {
+  fileInput.value?.click()
+}
+
+async function handleFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  importMsg.value = null
+
+  try {
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: Record<string, string>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0) {
+      importMsg.value = { success: false, text: 'Excel 文件为空' }
+      return
+    }
+
+    let imported = 0
+    for (const row of rows) {
+      const name = (row['学院名称'] || row['name'] || row['学院'] || '').trim()
+      const color = (row['颜色'] || row['color'] || '#3b82f6').trim()
+      if (!name) continue
+      store.addDepartment({ id: `dept-${Date.now()}-${imported}`, name, color })
+      imported++
+    }
+
+    if (imported === 0) {
+      importMsg.value = { success: false, text: '未能从 Excel 解析到有效学院数据，请确认列名包含"学院名称"' }
+    } else {
+      importMsg.value = { success: true, text: `成功导入 ${imported} 个学院` }
+    }
+  } catch (e: any) {
+    importMsg.value = { success: false, text: '导入失败：' + (e.message || '未知错误') }
+  }
+
+  if (fileInput.value) fileInput.value.value = ''
+}
 
 function selectDepartment(dept: Department) {
   store.setSelectedDepartment(dept.id)

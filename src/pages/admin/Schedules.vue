@@ -11,9 +11,6 @@
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <button @click="switchDepartment" class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-            <RefreshCw class="w-4 h-4" /> 切换学院
-          </button>
           <button @click="openCategoryModal(null)" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
             <Plus class="w-4 h-4" /> 新建课程分类
           </button>
@@ -303,15 +300,13 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { Plus, Search, CalendarX, AlertTriangle, Upload, RefreshCw, BookOpen, ArrowLeft, X } from 'lucide-vue-next'
+import { Plus, Search, CalendarX, AlertTriangle, Upload, BookOpen, ArrowLeft, X } from 'lucide-vue-next'
 import type { Schedule, Category } from '@/types'
 import { bulkImportSchedules, fetchClasses, fetchSchedules, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
-const router = useRouter()
 
 // ====== 当前学院 ======
 const currentDept = computed(() => store.getSelectedDepartment())
@@ -335,10 +330,6 @@ function selectCategory(cat: Category) {
   searchText.value = ''
 }
 
-function switchDepartment() {
-  store.setSelectedDepartment(null)
-  router.push('/admin')
-}
 
 // ====== 分类管理 ======
 const showCategoryModal = ref(false)
