@@ -18,6 +18,8 @@ export interface Course {
   title: string;
   description: string;
   categoryId: string;
+  /** 所属学院（学院即课程分类时使用） */
+  departmentId?: string;
   cover: string;
   credits: number;
   duration: number;
@@ -114,6 +116,10 @@ export interface Schedule {
   id: string;
   courseId: string;
   title: string;
+  /** 周几（如 周一），未设置时由 startDate 推导 */
+  day?: string;
+  /** 上课班级 */
+  className?: string;
   startDate: string;
   endDate: string;
   timeSlot: string;
