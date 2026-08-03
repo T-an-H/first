@@ -2,12 +2,58 @@
   <div class="space-y-6">
     <div id="student-grades-root"></div>
 
-    <!-- 统计卡片 (保留子组件) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard :icon="Award" label="平均成绩" :value="avgScore" :color="avgScore >= 60 ? 'bg-brand-400/10' : 'bg-brand-600'" />
-      <StatCard :icon="TrendingUp" label="最高分" :value="maxScore" color="bg-brand-600" />
-      <StatCard :icon="TrendingDown" label="最低分" :value="minScore" color="bg-brand-600" />
-      <StatCard :icon="BookOpen" label="已评课程" :value="gradedCourses" color="bg-brand-600" />
+    <!-- 成绩直方图 -->
+    <div class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-800">成绩分布</h3>
+        <div class="flex items-center gap-4 text-xs text-gray-500">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm bg-emerald-500"></span>
+            <span>≥90 优秀</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm bg-blue-500"></span>
+            <span>≥80 良好</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm bg-brand-400"></span>
+            <span>≥60 及格</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm bg-red-500"></span>
+            <span><60 不及格</span>
+          </div>
+          <div class="flex items-center gap-1.5 ml-2">
+            <span class="w-0.5 h-3 bg-red-500"></span>
+            <span>平均分 {{ avgScore }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div v-for="(item, idx) in sortedGradeEntries" :key="item.grade.id" class="flex items-center gap-3">
+          <span class="w-28 text-xs text-gray-600 truncate text-right" :title="item.courseName">{{ item.courseName }}</span>
+          <div class="flex-1 h-7 bg-gray-100 rounded-md relative overflow-visible">
+            <div
+              class="h-full rounded-md transition-all duration-500 flex items-center justify-end pr-2"
+              :class="getBarColor(item.totalScore)"
+              :style="{ width: getBarWidth(item.totalScore) }">
+              <span class="text-[10px] font-bold text-white drop-shadow-sm">{{ item.totalScore }}</span>
+            </div>
+            <!-- 平均分标线 -->
+            <div
+              v-if="avgScore > 0"
+              class="absolute top-0 bottom-0 border-r-[3px] border-red-600 pointer-events-none z-20"
+              :style="{ left: avgLinePosition }">
+              <span
+                v-if="idx === 0"
+                class="absolute -top-2.5 -translate-x-1/2 left-0 whitespace-nowrap text-[10px] font-bold text-white bg-red-600 px-1.5 py-0.5 rounded shadow">
+                平均 {{ avgScore }}
+              </span>
+            </div>
+          </div>
+          <span class="w-10 text-sm font-bold text-right" :class="getGradeColor(item.totalScore)">{{ item.totalScore }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- 成绩明细弹窗 (保留子组件) -->
@@ -323,6 +369,25 @@ const getGradeBadge = (score: number) => {
   return 'bg-red-50 text-red-500'
 }
 
+const getBarColor = (score: number) => {
+  if (score >= 90) return 'bg-emerald-500'
+  if (score >= 80) return 'bg-blue-500'
+  if (score >= 60) return 'bg-brand-400'
+  return 'bg-red-500'
+}
+
+const getBarWidth = (score: number) => {
+  const max = maxScore.value || 100
+  const minWidth = 8
+  const width = Math.max(minWidth, (score / max) * 100)
+  return width.toFixed(1) + '%'
+}
+
+const avgLinePosition = computed(() => {
+  if (maxScore.value === 0) return '0%'
+  return ((avgScore.value / maxScore.value) * 100).toFixed(1) + '%'
+})
+
 const avgScore = computed(() => {
   if (gradeEntries.value.length === 0) return 0
   return Math.round(gradeEntries.value.reduce((s, g) => s + g.totalScore, 0) / gradeEntries.value.length)
@@ -336,6 +401,10 @@ const maxScore = computed(() => {
 const minScore = computed(() => {
   if (gradeEntries.value.length === 0) return 0
   return Math.min(...gradeEntries.value.map((g) => g.totalScore))
+})
+
+const sortedGradeEntries = computed(() => {
+  return [...gradeEntries.value].sort((a, b) => b.totalScore - a.totalScore)
 })
 
 const gradedCourses = computed(() => gradeEntries.value.length)
