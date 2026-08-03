@@ -245,6 +245,23 @@ export const enrollments: Enrollment[] = [
   { id: 'enr-47', studentId: 'stu-24', courseId: 'course-18', scheduleId: 'sch-27', enrollDate: '2026-07-20', progress: 0, status: 'enrolled' },
 ];
 
+/** AI 分层记录（key: `${courseId}||${studentId}`，与 store 中 studentTiers 一致） */
+export const studentTiers: Record<string, import('@/types').StudentTierRecord> = {
+  // course-1（React 前端开发实战）
+  'course-1||stu-1': { courseId: 'course-1', studentId: 'stu-1', tier: 'excellent', score: 92, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-22': { courseId: 'course-1', studentId: 'stu-22', tier: 'excellent', score: 95, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-2': { courseId: 'course-1', studentId: 'stu-2', tier: 'advanced', score: 84, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-15': { courseId: 'course-1', studentId: 'stu-15', tier: 'advanced', score: 86, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-17': { courseId: 'course-1', studentId: 'stu-17', tier: 'basic', score: 62, createdAt: '2026-07-11T10:00:00.000Z' },
+  // course-4（TypeScript 高级编程）
+  'course-4||stu-1': { courseId: 'course-4', studentId: 'stu-1', tier: 'excellent', score: 90, createdAt: '2026-07-12T10:00:00.000Z' },
+  'course-4||stu-22': { courseId: 'course-4', studentId: 'stu-22', tier: 'excellent', score: 94, createdAt: '2026-07-12T10:00:00.000Z' },
+  'course-4||stu-6': { courseId: 'course-4', studentId: 'stu-6', tier: 'basic', score: 58, createdAt: '2026-07-12T10:00:00.000Z' },
+  // course-11（Vue 3 组合式 API）
+  'course-11||stu-12': { courseId: 'course-11', studentId: 'stu-12', tier: 'basic', score: 65, createdAt: '2026-07-13T10:00:00.000Z' },
+  'course-11||stu-24': { courseId: 'course-11', studentId: 'stu-24', tier: 'advanced', score: 80, createdAt: '2026-07-13T10:00:00.000Z' },
+}
+
 export const teachers: Teacher[] = [
   { id: 't-1', name: '王老师', phone: '13800001001', email: 'wang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wang', courseIds: ['course-1', 'course-4', 'course-7', 'course-11'] },
   { id: 't-2', name: '李老师', phone: '13800001002', email: 'li@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=li', courseIds: ['course-2', 'course-8'] },

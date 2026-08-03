@@ -18,8 +18,8 @@ const adminNavItems = [
 ]
 
 const teacherNavItems = [
-  { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
   { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
+  { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 

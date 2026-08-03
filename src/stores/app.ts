@@ -31,6 +31,7 @@ import {
   homework as mockHomework,
   homeworkSubmissions as mockHomeworkSubmissions,
   examScores as mockExamScores,
+  studentTiers as mockStudentTiers,
   supplementaryGrades as mockSupplementaryGrades,
   supplementaryAll,
   departments as mockDepartments,
@@ -149,7 +150,7 @@ export const useAppStore = defineStore('app', () => {
 
   // AI 分层记录（key: `${courseId}||${studentId}`）
   const studentTiers = ref<Record<string, StudentTierRecord>>(
-    loadFromStorage<Record<string, StudentTierRecord>>('studentTiers', {})
+    loadFromStorage<Record<string, StudentTierRecord>>('studentTiers', mockStudentTiers)
   )
 
   // ====== Actions ======

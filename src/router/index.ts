@@ -122,7 +122,7 @@ const router = createRouter({
         {
           path: 'courses',
           name: 'MentorCourses',
-          component: () => import('@/pages/mentor/Courses.vue'),
+          component: () => import('@/pages/teacher/Courses.vue'),
         },
         {
           path: 'schedule',
@@ -132,7 +132,7 @@ const router = createRouter({
         {
           path: 'courses/:id',
           name: 'MentorCourseDetail',
-          component: () => import('@/pages/mentor/CourseDetail.vue'),
+          component: () => import('@/pages/teacher/CourseDetail.vue'),
         },
         {
           path: 'extra',

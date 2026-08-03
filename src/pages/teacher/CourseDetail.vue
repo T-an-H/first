@@ -356,7 +356,8 @@
                         <td class="py-2 px-3">
                           <div v-if="!s.submitted" class="flex items-center gap-1">
                             <input type="number" min="0" max="100"
-                              v-model.number="evalScoreInputs[s.student.id]"
+                              :value="evalScoreInputs[s.student.id] ?? ''"
+                              @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) evalScoreInputs[s.student.id] = Math.min(100, Math.max(0, v)); else delete evalScoreInputs[s.student.id] }"
                               placeholder="分数"
                               class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                             <span class="text-xs text-gray-400">分</span>
@@ -506,6 +507,7 @@
                   <div class="flex items-center gap-1.5">
                     <div class="w-1 h-4 rounded-full bg-blue-400"></div>
                     <span class="text-xs font-semibold text-blue-700">项目</span>
+                    <span v-if="midtermProjects.length > 1" :class="midtermProjectTotalShare === 100 ? 'text-blue-400' : 'text-amber-500'" class="text-[10px]">占比合计：{{ midtermProjectTotalShare }}%</span>
                   </div>
                   <button @click="showNewExamModal = true; newExamType = 'midterm_project'" :disabled="isReadOnly"
                     class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -531,9 +533,14 @@
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
                     <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
+                      <div v-if="!midtermProjectShareReady" class="px-3 py-2 bg-amber-50 border-b border-amber-100 text-amber-600 text-[10px] flex items-center gap-1.5">
+                        <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>项目占比合计为 {{ midtermProjectTotalShare }}%，需为 100% 才能录入项目成绩，请先调整占比</span>
+                      </div>
                       <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
-                        @click="selectedGradeClass = classBlock.className; showGradePopup = true"
-                        class="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-b-0">
+                        @click="midtermProjectShareReady && (selectedGradeClass = classBlock.className, showGradePopup = true)"
+                        class="flex items-center justify-between px-3 py-2 transition-colors border-b border-gray-50 last:border-b-0"
+                        :class="midtermProjectShareReady ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-not-allowed opacity-60'">
                         <div class="flex items-center gap-2">
                           <span class="text-xs font-semibold text-gray-700 min-w-[4rem]">班级 {{ classBlock.className || '未分班' }}</span>
                           <div class="flex flex-wrap gap-1">
@@ -562,6 +569,7 @@
                   <div class="w-1 h-4 rounded-full bg-emerald-400"></div>
                   <span class="text-xs font-semibold text-emerald-700">笔试成绩</span>
                   <span class="text-[10px] text-emerald-300 ml-1">(固定，仅1次)</span>
+                  <span v-if="isMentor" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">导师仅查看</span>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermExams" :key="e.name" class="px-4 py-3">
@@ -614,6 +622,7 @@
                   <div class="flex items-center gap-1.5">
                     <div class="w-1 h-4 rounded-full bg-blue-400"></div>
                     <span class="text-xs font-semibold text-blue-700">项目</span>
+                    <span v-if="finalProjects.length > 1" :class="finalProjectTotalShare === 100 ? 'text-blue-400' : 'text-amber-500'" class="text-[10px]">占比合计：{{ finalProjectTotalShare }}%</span>
                   </div>
                   <button @click="showNewExamModal = true; newExamType = 'final_project'" :disabled="isReadOnly"
                     class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
@@ -639,9 +648,14 @@
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
                     <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
+                      <div v-if="!finalProjectShareReady" class="px-3 py-2 bg-amber-50 border-b border-amber-100 text-amber-600 text-[10px] flex items-center gap-1.5">
+                        <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>项目占比合计为 {{ finalProjectTotalShare }}%，需为 100% 才能录入项目成绩，请先调整占比</span>
+                      </div>
                       <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
-                        @click="selectedGradeClass = classBlock.className; showGradePopup = true"
-                        class="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-b-0">
+                        @click="finalProjectShareReady && (selectedGradeClass = classBlock.className, showGradePopup = true)"
+                        class="flex items-center justify-between px-3 py-2 transition-colors border-b border-gray-50 last:border-b-0"
+                        :class="finalProjectShareReady ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-not-allowed opacity-60'">
                         <div class="flex items-center gap-2">
                           <span class="text-xs font-semibold text-gray-700 min-w-[4rem]">班级 {{ classBlock.className || '未分班' }}</span>
                           <div class="flex flex-wrap gap-1">
@@ -670,6 +684,7 @@
                   <div class="w-1 h-4 rounded-full bg-emerald-400"></div>
                   <span class="text-xs font-semibold text-emerald-700">笔试成绩</span>
                   <span class="text-[10px] text-emerald-300 ml-1">(固定，仅1次)</span>
+                  <span v-if="isMentor" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">导师仅查看</span>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalExams" :key="e.name" class="px-4 py-3">
@@ -793,7 +808,7 @@
               </div>
               <div>
                 <label class="text-xs text-gray-500 font-medium mb-1 block">满分</label>
-                <input v-model.number="newExamFullScore" type="number" min="1" max="200" value="100"
+                <input v-model.number="newExamFullScore" type="number" min="1" max="100" value="100"
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
               </div>
               <div>
@@ -832,9 +847,9 @@
                 <div class="flex items-center gap-1">
                   <label class="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100">
                     <FileSpreadsheet class="w-3 h-3" /> 导入
-                    <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly" />
+                    <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly || (isMentor && currentExamIsWritten)" />
                   </label>
-                  <button @click="openDownloadTemplateModal()"
+                  <button @click="handleDownloadTemplate()"
                     class="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
                     <FileSpreadsheet class="w-3 h-3" /> 模板
                   </button>
@@ -885,15 +900,18 @@
                         </td>
                         <td class="py-2 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
                         <td class="py-2 px-3">
-                          <div v-if="!isExamSubmitted(student!.id)" class="flex items-center gap-1">
-                            <input type="number" min="0" :max="currentExamFullScore" step="0.5"
+                          <div v-if="!isExamSubmitted(student!.id) && !(isMentor && currentExamIsWritten)" class="flex items-center gap-1">
+                            <input type="number" min="0" max="100" step="0.5"
                               :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
-                              @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(currentExamFullScore, Math.max(0, v)); else delete examInputs[student!.id] }"
+                              @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(100, Math.max(0, v)); else delete examInputs[student!.id] }"
                               :placeholder="getStudentExamScore(student!.id) !== null ? String(getStudentExamScore(student!.id)) : '分数'"
                               class="w-full max-w-[100px] px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                             <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
                           </div>
-                          <span v-else class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
+                          <span v-else-if="isExamSubmitted(student!.id)" class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
+                          <span v-else-if="isMentor && currentExamIsWritten" class="text-xs font-medium text-gray-500">
+                            {{ getStudentExamScore(student!.id) !== null ? getStudentExamScore(student!.id) + '分' : '未录入' }}
+                          </span>
                         </td>
                         <td class="py-2 px-3 text-xs text-blue-600 font-medium">{{ getStudentExamPercent(student!.id) }}</td>
                         <td class="py-2 px-3">
@@ -911,8 +929,8 @@
                 </div>
               </template>
             </div>
-            <!-- 底部 -->
-            <div v-if="!isReadOnly && !isMentor" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <!-- 底部：导师在笔试成绩下不显示保存（笔试仅查看）；项目成绩可保存 -->
+            <div v-if="!isReadOnly && (!isMentor || !currentExamIsWritten)" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">已提交 {{ submittedExamCount }} 人</span>
               </div>
@@ -1263,52 +1281,7 @@
     :on-close="() => { showGradeConfig = false }"
   />
 
-  <!-- 下载模板弹窗 -->
-  <Teleport to="body">
-    <div v-if="showDownloadTemplateModal" class="fixed inset-0 z-50 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black/50" @click="showDownloadTemplateModal = false" />
-      <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h3 class="font-semibold text-gray-900 text-lg">下载成绩模板</h3>
-          <button @click="showDownloadTemplateModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
-        </div>
-        <div class="space-y-4">
-          <div>
-            <label class="text-xs text-gray-500 block mb-2 font-medium">选择班级</label>
-            <div class="space-y-2 max-h-48 overflow-y-auto">
-              <label class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
-                :class="downloadTemplateClass === '__all__' ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
-                <input type="radio" v-model="downloadTemplateClass" value="__all__"
-                  class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                <div>
-                  <p class="text-sm font-medium text-gray-900">全部班级</p>
-                  <p class="text-xs text-gray-400">所有已分班或未分班的学生</p>
-                </div>
-              </label>
-              <label v-for="cb in classBlocks" :key="cb.className"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
-                :class="downloadTemplateClass === cb.className ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'">
-                <input type="radio" v-model="downloadTemplateClass" :value="cb.className"
-                  class="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500" />
-                <div>
-                  <p class="text-sm font-medium text-gray-900">{{ cb.className || '未分班' }}</p>
-                  <p class="text-xs text-gray-400">{{ cb.students.length }} 名学生</p>
-                </div>
-              </label>
-            </div>
-          </div>
-          <div class="flex gap-2 pt-2">
-            <button @click="showDownloadTemplateModal = false"
-              class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
-            <button @click="handleDownloadTemplate"
-              class="flex-1 px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg">
-              下载模板
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <!-- 下载模板弹窗（已移除：模板下载固定按当前班级直接下载） -->
 </template>
 
 <script setup lang="ts">
@@ -1335,7 +1308,8 @@ const store = useAppStore()
 const courseId = computed(() => route.params.id as string)
 const course = computed(() => store.courses.find((c) => c.id === courseId.value))
 const isReadOnly = computed(() => course.value?.status !== 'active')
-const isMentor = computed(() => store.currentRole === 'mentor')
+/** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由（我的课程/详情均为导师视图） */
+const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
 
 // 从数据库加载课程学员
 onMounted(async () => {
@@ -1372,7 +1346,23 @@ onMounted(async () => {
     console.error('加载课程学员失败:', e)
   }
   ensureWrittenExams()
+  normalizeProjectShares()
 })
+
+/** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
+function normalizeProjectShares() {
+  if (!courseId.value) return
+  const apply = (projects: { name: string }[]) => {
+    const names = projects.map((p) => p.name)
+    if (names.length === 0) return
+    if (names.some((n) => store.getExamWeight(courseId.value || '', n) > 0)) return
+    const eachShare = Math.floor(100 / names.length)
+    names.forEach((n, i) =>
+      store.setExamWeight(courseId.value!, n, i === names.length - 1 ? 100 - eachShare * (names.length - 1) : eachShare))
+  }
+  apply(midtermProjects.value)
+  apply(finalProjects.value)
+}
 
 const courseSchedules = computed(() =>
   store.schedules.filter((s) => s.courseId === courseId.value)
@@ -1619,17 +1609,6 @@ const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_project' | 'final_project'>('midterm_project')
 const selectedExam = ref('')
 const gradeSearch = ref('')
-/** 下载模板弹窗 */
-const showDownloadTemplateModal = ref(false)
-const downloadTemplateClass = ref('__all__')
-function openDownloadTemplateModal() {
-  if (!courseId.value || !selectedExam.value) {
-    alert('请先选择一个考试/项目')
-    return
-  }
-  downloadTemplateClass.value = '__all__'
-  showDownloadTemplateModal.value = true
-}
 const examInputs = ref<Record<string, number>>({})
 const selectedStudentIds = ref<string[]>([])
 const evalScoreInputs = ref<Record<string, number>>({})
@@ -1833,6 +1812,16 @@ const midtermExams = computed(() => examsWithTypes.value.filter(e => e.type === 
 const finalProjects = computed(() => examsWithTypes.value.filter(e => e.type === 'final_project'))
 const finalExams = computed(() => examsWithTypes.value.filter(e => e.type === 'final_exam'))
 
+/** 期中/期末项目占比合计（各项目占比之和，便于配置校验） */
+const midtermProjectTotalShare = computed(() =>
+  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+const finalProjectTotalShare = computed(() =>
+  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+
+/** 占比合计是否为 100%（不为 100% 时禁止录入项目成绩） */
+const midtermProjectShareReady = computed(() => midtermProjects.value.length === 0 || midtermProjectTotalShare.value === 100)
+const finalProjectShareReady = computed(() => finalProjects.value.length === 0 || finalProjectTotalShare.value === 100)
+
 function getTypeWeightLabel(type: string): string {
   if (!courseId.value) return '-'
   const cfg = store.getGradeConfig(courseId.value)
@@ -1854,6 +1843,15 @@ const currentExamFullScore = computed(() => {
 const currentExamWeight = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
   return store.getExamWeight(courseId.value, selectedExam.value)
+})
+
+/** 当前选中的是否为笔试（期中/期末考试），用于导师端「笔试成绩仅查看」 */
+const currentExamIsWritten = computed(() => {
+  if (!selectedExam.value) return false
+  const found = examsWithTypes.value.find((e) => e.name === selectedExam.value)
+  if (found) return found.type === 'midterm_exam' || found.type === 'final_exam'
+  // 项目刚创建尚无成绩记录时按名称兜底（笔试固定名为「期中考试/期末考试」）
+  return selectedExam.value === '期中考试' || selectedExam.value === '期末考试'
 })
 
 const filteredGradeStudents = computed(() => {
@@ -2183,12 +2181,11 @@ function handleAddExam() {
     const sameTypeExams = store.getExamScoresForCourse(courseId.value)
       .filter((s) => s.type === type)
     const uniqueNames = Array.from(new Set(sameTypeExams.map((s) => s.examName)))
-    const typeWeight = type === 'midterm_project'
-      ? store.getGradeConfig(courseId.value).midtermWeight
-      : store.getGradeConfig(courseId.value).finalWeight
-    if (uniqueNames.length > 0 && typeWeight > 0) {
-      const eachWeight = Math.floor(typeWeight / uniqueNames.length)
-      uniqueNames.forEach((examName) => store.setExamWeight(courseId.value!, examName, eachWeight))
+    // 默认均分：各项目在该类项目中的占比按项目数平均分配，合计 100%
+    if (uniqueNames.length > 0) {
+      const eachShare = Math.floor(100 / uniqueNames.length)
+      uniqueNames.forEach((examName, i) =>
+        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
     }
   }
 
@@ -2271,8 +2268,9 @@ function handleSaveExamScores() {
   }
   inputsToSave.forEach(([studentId, score]) => {
     const existing = existingScores.find((s) => s.studentId === studentId)
+    const clampedScore = Math.min(100, Math.max(0, score))
     if (existing && existing.status !== 'submitted') {
-      store.updateExamScore(existing.id, { score, gradedAt: getNow().toISOString().split('T')[0] })
+      store.updateExamScore(existing.id, { score: clampedScore, gradedAt: getNow().toISOString().split('T')[0] })
     } else if (!existing) {
       const id = `exam-${courseId.value}-${studentId}-${selectedExam.value}-${Date.now()}`
       store.addExamScore({
@@ -2280,7 +2278,7 @@ function handleSaveExamScores() {
         courseId: courseId.value,
         studentId,
         examName: selectedExam.value,
-        score,
+        score: clampedScore,
         fullScore: currentExamFullScore.value,
         weight: examWeight,
         type: examType,
@@ -2405,7 +2403,7 @@ async function handleExcelImport(event: Event) {
       )
       if (!student) continue
       const existing = existingScores.find((s) => s.studentId === student.id)
-      const score = Math.min(currentExamFullScore.value, Math.max(0, rawScore))
+      const score = Math.min(100, Math.max(0, rawScore))
       if (existing && existing.status !== 'submitted') {
         store.updateExamScore(existing.id, { score, gradedAt: getNow().toISOString().split('T')[0] })
       } else if (!existing) {
@@ -2442,14 +2440,15 @@ async function handleExcelImport(event: Event) {
 
 async function handleDownloadTemplate() {
   if (!courseId.value || !selectedExam.value) return
-  const targetClass = downloadTemplateClass.value
+  const targetClass = selectedGradeClass.value
+  if (!targetClass) {
+    alert('请先选择班级')
+    return
+  }
   try {
     const XLSX = await import('xlsx')
     const data = enrolledStudents.value
-      .filter(({ student }) => {
-        if (targetClass === '__all__') return true
-        return (student!.className || '') === targetClass
-      })
+      .filter(({ student }) => (student!.className || '') === targetClass)
       .map(({ student }) => {
         const row: Record<string, string | number> = {
           '学生姓名': student!.name,
@@ -2460,10 +2459,9 @@ async function handleDownloadTemplate() {
         return row
       })
     if (data.length === 0) {
-      alert('所选班级暂无学生')
+      alert('该班级暂无学生')
       return
     }
-    const suffix = targetClass === '__all__' ? '全部班级' : targetClass
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, '成绩')
@@ -2472,10 +2470,9 @@ async function handleDownloadTemplate() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${selectedExam.value}-${suffix}-成绩模板.xlsx`
+    a.download = `${selectedExam.value}-${targetClass}-成绩模板.xlsx`
     a.click()
     URL.revokeObjectURL(url)
-    showDownloadTemplateModal.value = false
   } catch (err) {
     console.error('下载模板失败:', err)
     alert('下载模板失败')
@@ -2845,6 +2842,7 @@ function handleSaveEvalScores() {
   Object.entries(evalScoreInputs.value).forEach(([studentId, score]) => {
     if (store.isSessionLocked(courseId.value || '', session) ||
         store.isTeacherEvalSubmitted(courseId.value || '', studentId, session, type)) return
+    const clampedScore = Math.min(100, Math.max(0, score))
     const existing = store.evaluations.find(
       (e) => e.courseId === courseId.value && e.studentId === studentId && e.type === type && e.sessionNumber === session
     )
@@ -2854,13 +2852,13 @@ function handleSaveEvalScores() {
       studentId,
       sessionNumber: session,
       type,
-      score,
+      score: clampedScore,
       evaluatorId: store.currentUser || '',
       evaluatorName: store.currentUser || (isMentor.value ? '企业导师' : '教师'),
       createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {
-      store.updateEvaluation(ev.id, { score, createdAt: ev.createdAt })
+      store.updateEvaluation(ev.id, { score: clampedScore, createdAt: ev.createdAt })
     } else {
       store.addEvaluation(ev)
     }
