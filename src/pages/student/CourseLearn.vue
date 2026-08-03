@@ -518,7 +518,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
@@ -536,13 +536,25 @@ const router = useRouter()
 const store = useAppStore()
 const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
-const activeTab = ref('tasks')
+
+// 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
+const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const activeTab = ref<string>(
+  VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
+)
 const selectedFiles = ref<Record<string, File>>({})
 
 onMounted(() => {
   store.pushNearDeadlineEvalReminders()
   if (myStudent.value) {
     store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
+  }
+})
+
+// 路由 query 变化时切换 tab（红点溯源：同一页面内二次跳转）
+watch(() => route.query.tab, (val) => {
+  if (val && VALID_TABS.includes(val as string)) {
+    activeTab.value = val as string
   }
 })
 

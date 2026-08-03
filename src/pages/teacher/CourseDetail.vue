@@ -1437,8 +1437,18 @@ const isWeightLocked = computed(() => {
 })
 
 // ---- 状态 ----
-const activeTab = ref<string>('comments')
+// 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
+const activeTab = ref<string>(
+  tabList.some((t) => t.key === route.query.tab) ? (route.query.tab as string) : 'comments'
+)
 const studentSearch = ref('')
+
+// 路由 query 变化时切换 tab（红点溯源：同一页面内二次跳转）
+watch(() => route.query.tab, (val) => {
+  if (val && tabList.some((t) => t.key === val)) {
+    activeTab.value = val as string
+  }
+})
 
 // ---- 学生管理 ----
 const selectedGroupId = ref<string | null>(null)

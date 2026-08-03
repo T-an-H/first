@@ -35,6 +35,16 @@
             <span class="text-white/50 text-lg font-bold tracking-widest -rotate-12 select-none">已结束</span>
           </div>
 
+          <!-- 待评价红点标记（点击可溯源到评论管理） -->
+          <button
+            v-if="hasPendingEval(course.id)"
+            @click.stop="goEval(course.id)"
+            title="有未完成的评价，点击前往评论管理"
+            class="absolute top-3 left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-red-500 text-white font-medium shadow cursor-pointer hover:bg-red-600 transition-colors">
+            <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+            待评价
+          </button>
+
           <!-- 状态标签 - 右上角 -->
           <span :class="`absolute top-3 right-3 z-10 text-xs px-2.5 py-1 rounded-full font-medium ${
             course.status === 'active'
@@ -894,6 +904,22 @@ function tierLegend(courseId: string) {
 
 function goDetail(courseId: string) {
   router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}`)
+}
+
+/** 当前教师/导师是否有该课程的待完成评价（用于红点溯源） */
+function hasPendingEval(courseId: string) {
+  if (!store.currentUser) return false
+  return store.evalReminders.some(
+    (r) =>
+      r.courseId === courseId &&
+      r.studentId === store.currentUser &&
+      (r.status === 'pending' || r.status === 'overdue')
+  )
+}
+
+/** 待评价红点溯源：直达评论管理（评价填写）tab */
+function goEval(courseId: string) {
+  router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=comments`)
 }
 
 // ===== 评价配置 & 批量操作（模板引用，统一放在此处） =====
