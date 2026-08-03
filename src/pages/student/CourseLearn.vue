@@ -102,19 +102,6 @@
                   </div>
                 </div>
               </div>
-
-              <!-- 分层对比 -->
-              <div>
-                <h3 class="text-sm font-semibold text-gray-800 mb-3">层级对照</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div v-for="ct in tierComparison" :key="ct.level"
-                    class="p-3 rounded-lg border"
-                    :class="ct.level === myTier ? 'border-blue-300 bg-blue-50 ring-1 ring-blue-200' : 'border-brand-400/20'">
-                    <p class="text-xs font-semibold mb-1" :class="ct.color">{{ ct.label }}</p>
-                    <p class="text-xs text-gray-400">{{ ct.desc }}</p>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -639,12 +626,6 @@ const tierBadgeClass = computed(() => {
   }
   return map[myTier.value]
 })
-
-const tierComparison = computed(() => [
-  { level: 'basic' as const, label: '基础层', color: 'text-brand-700', desc: '初步掌握课程基础知识，建议加强练习与复习' },
-  { level: 'advanced' as const, label: '进阶层', color: 'text-blue-600', desc: '较好掌握课程核心知识，可尝试拓展深入学习' },
-  { level: 'excellent' as const, label: '卓越层', color: 'text-emerald-600', desc: '全面掌握课程内容，具备独立项目实践能力' },
-])
 
 // ===== AI 分层测试弹窗 =====
 const aiTestOpen = ref(false)
