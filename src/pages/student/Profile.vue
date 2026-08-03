@@ -7,6 +7,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const student = computed(() => store.students.find((s) => s.name === store.currentUser))
@@ -18,7 +19,24 @@ const inProgress = computed(() => myEnrollments.value.filter((e) => e.status ===
 
 const avgScore = computed(() => {
   if (myGrades.value.length === 0) return 0
-  return Math.round(myGrades.value.reduce((s, g) => s + g.score, 0) / myGrades.value.length)
+  // 与成绩查询页面一致：优先用 calcTotalScore 计算加权总分，无详细成绩时回退
+  const totals = myGrades.value.map((g) => {
+    const d = store.detailedGrades.find((dg) => dg.studentId === g.studentId && dg.courseId === g.courseId)
+    if (d) return store.calcTotalScore(g.courseId, d)
+    return g.totalScore ?? g.score ?? 0
+  })
+  return Math.round(totals.reduce((s, t) => s + t, 0) / totals.length)
+})
+
+// 判断是否已录入期中及期末成绩（用于控制"平均成绩"的显示）
+const hasMidtermAndFinal = computed(() => {
+  if (!student.value) return false
+  return store.detailedGrades.some((dg) => {
+    if (dg.studentId !== student.value!.id) return false
+    const hasMidterm = (dg.midtermExamScore != null && dg.midtermExamScore > 0) || (dg.midtermProjectScore != null && dg.midtermProjectScore > 0)
+    const hasFinal = (dg.finalExamScore != null && dg.finalExamScore > 0) || (dg.finalProjectScore != null && dg.finalProjectScore > 0)
+    return hasMidterm && hasFinal
+  })
 })
 
 const totalCredits = computed(() => {
@@ -30,10 +48,62 @@ const totalCredits = computed(() => {
 
 const avgProgress = computed(() => {
   if (myEnrollments.value.length === 0) return 0
-  return Math.round(myEnrollments.value.reduce((s, e) => s + e.progress, 0) / myEnrollments.value.length)
+  // 实时计算：基于已上课节数 / 总课节数
+  const now = getNow()
+  const progresses = myEnrollments.value.map((e) => {
+    const courseSchedules = store.schedules.filter((s) => s.courseId === e.courseId)
+    if (courseSchedules.length === 0) return 0
+    const startedCount = courseSchedules.filter((s) => new Date(s.startDate) < now).length
+    return Math.round((startedCount / courseSchedules.length) * 100)
+  })
+  return Math.round(progresses.reduce((s, p) => s + p, 0) / progresses.length)
 })
 
 const getCourse = (id: string) => store.courses.find((c) => c.id === id)
+
+// ====== 今日学习轨迹（根据课表，按班级从数据库加载，与课表页面一致） ======
+const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const dbSchedules = ref<any[]>([])
+
+function getTodayLabel(): string {
+  return dayLabels[(new Date().getDay() + 6) % 7]
+}
+
+function getScheduleDay(sch: any): string {
+  if (sch.day) return sch.day
+  if (sch.startDate) {
+    const d = new Date(sch.startDate)
+    if (!isNaN(d.getTime())) return dayLabels[(d.getDay() + 6) % 7]
+  }
+  return '-'
+}
+
+async function loadMySchedules() {
+  try {
+    const studentName = store.currentUser
+    if (!studentName) return
+    // 1. 查询学生信息获取班级
+    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
+    const stuData = await stuRes.json()
+    const myInfo = stuData.students?.[0]
+    if (!myInfo?.className) return
+    // 2. 按班级加载排课（与课表页面 Schedule.vue 数据源一致）
+    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
+    const schData = await schRes.json()
+    if (schData.success) {
+      dbSchedules.value = schData.schedules
+    }
+  } catch (e) {
+    console.error('加载课表失败:', e)
+  }
+}
+
+const todaySchedules = computed(() => {
+  const today = getTodayLabel()
+  return dbSchedules.value
+    .filter((s: any) => getScheduleDay(s) === today)
+    .sort((a: any, b: any) => (a.timeSlot || '').localeCompare(b.timeSlot || ''))
+})
 
 const radarData = computed(() => {
   const result: { label: string; value: number }[] = []
@@ -284,19 +354,6 @@ function renderProfile(root: HTMLElement) {
     span.append('span').text(item.text)
   })
 
-  // 统计数字
-  const statsRow = infoRow.append('div').attr('class', 'flex gap-6')
-  const stats = [
-    { value: enrs.length, label: '已报名', bg: 'bg-blue-50', text: 'text-brand-600' },
-    { value: completed.value, label: '已完成', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    { value: avgScore.value, label: '平均分', bg: 'bg-brand-400/10', text: 'text-brand-700' },
-  ]
-  stats.forEach((st) => {
-    const box = statsRow.append('div').attr('class', `text-center px-4 py-3 ${st.bg} rounded-lg`)
-    box.append('p').attr('class', `text-2xl font-bold ${st.text}`).text(String(st.value))
-    box.append('p').attr('class', 'text-xs text-gray-400 mt-1').text(st.label)
-  })
-
   // 能力雷达图 + 学习统计 两列布局
   const twoCol = container.append('div').attr('class', 'grid grid-cols-1 lg:grid-cols-2 gap-6')
 
@@ -378,7 +435,7 @@ function renderProfile(root: HTMLElement) {
     { label: '学习中课程', value: `${inProgress.value} 门`, color: 'text-gray-900' },
     { label: '已完成课程', value: `${completed.value} 门`, color: 'text-emerald-600' },
     { label: '总学分', value: `${totalCredits.value} 学分`, color: 'text-brand-600' },
-    { label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' },
+    ...(hasMidtermAndFinal.value ? [{ label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' }] : []),
     { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900' },
   ]
   const statBody = statCard.append('div').attr('class', 'space-y-4')
@@ -388,34 +445,30 @@ function renderProfile(root: HTMLElement) {
     row.append('span').attr('class', `font-semibold ${item.color}`).text(item.value)
   })
 
-  // 学习轨迹
+  // 今日学习轨迹
+  const todaySchs = todaySchedules.value
   const trackCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
   const trackTitle = trackCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
   renderIcon(trackTitle, 'bookOpen').attr('class', 'w-5 h-5 text-brand-600')
-  trackTitle.append('span').text('学习轨迹')
+  trackTitle.append('span').text('今日学习轨迹')
 
-  if (enrs.length > 0) {
+  if (todaySchs.length > 0) {
     const trackList = trackCard.append('div').attr('class', 'relative')
-    enrs.forEach((enr, index) => {
+    todaySchs.forEach((sch, index) => {
       const item = trackList.append('div').attr('class', 'flex gap-4 pb-6 relative')
 
-      if (index < enrs.length - 1) {
+      if (index < todaySchs.length - 1) {
         item.append('div').attr('class', 'absolute left-[7px] top-4 bottom-0 w-0.5 bg-blue-200')
       }
 
-      const dotClass = enr.status === 'completed' ? 'bg-brand-600' :
-        enr.status === 'in_progress' ? 'bg-brand-600' : 'bg-blue-500'
-      item.append('div').attr('class', `w-4 h-4 rounded-full mt-1 flex-shrink-0 ${dotClass}`)
+      item.append('div').attr('class', 'w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-brand-600')
 
       const content = item.append('div').attr('class', 'flex-1')
-      content.append('p').attr('class', 'font-medium text-gray-900').text(getCourse(enr.courseId)?.title || '未知课程')
-
-      const statusText = enr.status === 'completed' ? '已完成' : enr.status === 'in_progress' ? '学习中' : '已报名'
-      content.append('p').attr('class', 'text-sm text-gray-400')
-        .text(`${enr.enrollDate} · 进度 ${enr.progress}% · ${statusText}`)
+      content.append('p').attr('class', 'font-medium text-gray-900').text(sch.title || getCourse(sch.courseId)?.title || '未知课程')
+      content.append('p').attr('class', 'text-sm text-gray-400').text(sch.timeSlot || '')
     })
   } else {
-    trackCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('暂无学习记录')
+    trackCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('今日暂无课程安排')
   }
 
   // 详情弹窗 (showDetailModal)
@@ -509,12 +562,13 @@ function reRender() {
   if (el) renderProfile(el)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadMySchedules()
   const el = document.getElementById('student-profile-root')
   if (el) renderProfile(el)
 })
 
-watch([myEnrollments, myGrades], () => {
+watch([myEnrollments, myGrades, todaySchedules, hasMidtermAndFinal, avgProgress], () => {
   const el = document.getElementById('student-profile-root')
   if (el) renderProfile(el)
 }, { deep: true })
