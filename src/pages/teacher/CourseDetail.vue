@@ -135,11 +135,59 @@
           </div>
         </template>
 
-        <!-- 只读/锁定展示 -->
+        <!-- 只读/锁定展示：完整展示当前生效方案（仅保留已选中的选项） -->
         <template v-else>
-          <div class="border-t border-gray-100 mt-3 pt-4 text-sm text-gray-400 text-center py-4">
-            <EyeOff class="w-5 h-5 inline mr-1" />
-            {{ isReadOnly ? '已结束课程不可修改配置' : '第一节课已开始，评价方案已锁定不可修改' }}
+          <div class="border-t border-gray-100 mt-3 pt-4 space-y-4">
+            <div v-if="!selectedConfig" class="flex items-center gap-1.5 text-xs text-gray-400">
+              <EyeOff class="w-3.5 h-3.5" />
+              <span>未配置自定义方案，按以下默认方案实施</span>
+            </div>
+
+            <!-- 评价模板 -->
+            <div>
+              <p class="text-sm font-medium text-gray-700 mb-2">评价模板</p>
+              <div class="p-3 rounded-lg border border-emerald-200 bg-emerald-50/60">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-sm font-medium text-gray-900">{{ EvalTemplateLabels[activeEvalConfig.template] }}</span>
+                  <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">当前生效</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5">{{ EvalTemplateDescs[activeEvalConfig.template] }}</p>
+                <div class="flex flex-wrap gap-1 mt-1.5">
+                  <span v-for="et in TEMPLATE_EVAL_TYPES[activeEvalConfig.template]" :key="et"
+                    class="text-[10px] px-1.5 py-0.5 rounded bg-white text-emerald-700 border border-emerald-200">
+                    {{ EvalTypeLabels[et] }}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 评价频率 -->
+            <div>
+              <p class="text-sm font-medium text-gray-700 mb-2">评价频率</p>
+              <div class="p-3 rounded-lg border border-cyan-200 bg-cyan-50/60">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-sm font-medium text-gray-900">{{ EvalFrequencyLabels[activeEvalConfig.frequency] }}</span>
+                  <span class="text-xs text-cyan-600">共 {{ courseId ? store.getEvalSessions(courseId) : 0 }} 次评价</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5">{{ EvalFrequencyDescs[activeEvalConfig.frequency] }}</p>
+              </div>
+            </div>
+
+            <!-- 企业导师参与评价 -->
+            <div class="flex items-center gap-3">
+              <label class="text-sm font-medium text-gray-700">企业导师参与评价</label>
+              <span :class="`text-xs px-2.5 py-1 rounded-full border ${activeEvalConfig.hasMentor ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`">
+                {{ activeEvalConfig.hasMentor ? '已启用' : '已禁用' }}
+              </span>
+            </div>
+
+            <!-- 逾期未评处理规则 -->
+            <div>
+              <p class="text-sm font-medium text-gray-700 mb-2">逾期未评处理规则</p>
+              <span class="inline-block px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 text-sm">
+                {{ OverdueRuleLabels[activeEvalConfig.overdueRule] }}
+              </span>
+            </div>
           </div>
         </template>
       </div>
@@ -1275,7 +1323,7 @@ import {
   EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
   EvalFrequencyDescs, OverdueRuleLabels, getDefaultGradeConfig
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule, GradeWeightConfig } from '@/types'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3 } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import * as echarts from 'echarts'
@@ -1614,6 +1662,17 @@ const hasGradeData = computed(() => {
 })
 
 const selectedConfig = computed(() => courseId.value ? store.evalConfigs.find((c) => c.courseId === courseId.value) : null)
+/** 当前生效的评价方案（未配置时回退到系统默认方案：简易评价+每2周一次） */
+const activeEvalConfig = computed<EvaluationConfig>(() => {
+  if (selectedConfig.value) return selectedConfig.value
+  return {
+    courseId: courseId.value || '',
+    template: 'simple',
+    frequency: 'biweekly',
+    hasMentor: false,
+    overdueRule: 'average',
+  }
+})
 const baseEnabledTypes = computed<EvalType[]>(() => selectedConfig.value ? TEMPLATE_EVAL_TYPES[selectedConfig.value.template] : [])
 const totalSessions = computed(() => courseId.value ? store.getEvalSessions(courseId.value) : 1)
 const courseHasGroups = computed(() => courseId.value ? store.hasGroups(courseId.value) : false)
