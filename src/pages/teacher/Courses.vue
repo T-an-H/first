@@ -465,7 +465,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 import {
@@ -484,9 +484,11 @@ import { fetchTeacherCourses } from '@/api'
 
 
 const router = useRouter()
+const route = useRoute()
 const store = useAppStore()
 
-const isMentor = computed(() => store.currentRole === 'mentor')
+/** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由 */
+const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
 const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
 
 const searchQuery = ref('')
@@ -553,6 +555,10 @@ const sortedAndFilteredCourses = computed(() => {
 const myCourses = computed(() => {
   if (isLeaderWithTeaching.value) {
     return store.getLeaderCourses(store.currentUser || '')
+  }
+  if (isMentor.value) {
+    const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')
+    return store.courses.filter((c) => mentorCourseIds.includes(c.id))
   }
   return store.courses.filter((c) => c.teacher === store.currentUser)
 })

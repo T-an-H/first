@@ -569,6 +569,7 @@
                   <div class="w-1 h-4 rounded-full bg-emerald-400"></div>
                   <span class="text-xs font-semibold text-emerald-700">笔试成绩</span>
                   <span class="text-[10px] text-emerald-300 ml-1">(固定，仅1次)</span>
+                  <span v-if="isMentor" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">导师仅查看</span>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermExams" :key="e.name" class="px-4 py-3">
@@ -683,6 +684,7 @@
                   <div class="w-1 h-4 rounded-full bg-emerald-400"></div>
                   <span class="text-xs font-semibold text-emerald-700">笔试成绩</span>
                   <span class="text-[10px] text-emerald-300 ml-1">(固定，仅1次)</span>
+                  <span v-if="isMentor" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">导师仅查看</span>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalExams" :key="e.name" class="px-4 py-3">
@@ -845,7 +847,7 @@
                 <div class="flex items-center gap-1">
                   <label class="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100">
                     <FileSpreadsheet class="w-3 h-3" /> 导入
-                    <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly" />
+                    <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly || (isMentor && currentExamIsWritten)" />
                   </label>
                   <button @click="handleDownloadTemplate()"
                     class="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
@@ -898,7 +900,7 @@
                         </td>
                         <td class="py-2 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
                         <td class="py-2 px-3">
-                          <div v-if="!isExamSubmitted(student!.id)" class="flex items-center gap-1">
+                          <div v-if="!isExamSubmitted(student!.id) && !(isMentor && currentExamIsWritten)" class="flex items-center gap-1">
                             <input type="number" min="0" max="100" step="0.5"
                               :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
                               @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(100, Math.max(0, v)); else delete examInputs[student!.id] }"
@@ -906,7 +908,10 @@
                               class="w-full max-w-[100px] px-3 py-2 border border-gray-200 rounded-lg text-sm text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                             <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
                           </div>
-                          <span v-else class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
+                          <span v-else-if="isExamSubmitted(student!.id)" class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
+                          <span v-else-if="isMentor && currentExamIsWritten" class="text-xs font-medium text-gray-500">
+                            {{ getStudentExamScore(student!.id) !== null ? getStudentExamScore(student!.id) + '分' : '未录入' }}
+                          </span>
                         </td>
                         <td class="py-2 px-3 text-xs text-blue-600 font-medium">{{ getStudentExamPercent(student!.id) }}</td>
                         <td class="py-2 px-3">
@@ -924,8 +929,8 @@
                 </div>
               </template>
             </div>
-            <!-- 底部 -->
-            <div v-if="!isReadOnly && !isMentor" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <!-- 底部：导师在笔试成绩下不显示保存（笔试仅查看）；项目成绩可保存 -->
+            <div v-if="!isReadOnly && (!isMentor || !currentExamIsWritten)" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">已提交 {{ submittedExamCount }} 人</span>
               </div>
@@ -1303,7 +1308,8 @@ const store = useAppStore()
 const courseId = computed(() => route.params.id as string)
 const course = computed(() => store.courses.find((c) => c.id === courseId.value))
 const isReadOnly = computed(() => course.value?.status !== 'active')
-const isMentor = computed(() => store.currentRole === 'mentor')
+/** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由（我的课程/详情均为导师视图） */
+const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
 
 // 从数据库加载课程学员
 onMounted(async () => {
@@ -1837,6 +1843,15 @@ const currentExamFullScore = computed(() => {
 const currentExamWeight = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
   return store.getExamWeight(courseId.value, selectedExam.value)
+})
+
+/** 当前选中的是否为笔试（期中/期末考试），用于导师端「笔试成绩仅查看」 */
+const currentExamIsWritten = computed(() => {
+  if (!selectedExam.value) return false
+  const found = examsWithTypes.value.find((e) => e.name === selectedExam.value)
+  if (found) return found.type === 'midterm_exam' || found.type === 'final_exam'
+  // 项目刚创建尚无成绩记录时按名称兜底（笔试固定名为「期中考试/期末考试」）
+  return selectedExam.value === '期中考试' || selectedExam.value === '期末考试'
 })
 
 const filteredGradeStudents = computed(() => {
