@@ -2,9 +2,24 @@
   <div class="space-y-6">
     <!-- ============ Level 0: 学院选择 ============ -->
     <template v-if="!currentDept">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">课程管理</h1>
-        <p class="text-gray-500 mt-1">请选择一个学院进入课程管理</p>
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">课程管理</h1>
+          <p class="text-gray-500 mt-1">请选择一个学院进入课程管理</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="triggerDeptExcelImport" class="flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium">
+            <Upload class="w-4 h-4" /> 导入Excel
+          </button>
+          <button @click="openAddDeptModal" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
+            <Plus class="w-4 h-4" /> 添加学院
+          </button>
+        </div>
+      </div>
+
+      <!-- 学院导入结果提示 -->
+      <div v-if="deptImportMsg" :class="`text-sm p-3 rounded-lg ${deptImportMsg.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`">
+        {{ deptImportMsg.text }}
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -325,6 +340,68 @@
 
     <!-- 隐藏的课程导入文件选择器 -->
     <input ref="courseFileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleCourseFileChange" />
+
+    <!-- 隐藏的学院导入文件选择器 -->
+    <input ref="deptFileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleDeptFileSelect" />
+
+    <!-- 添加学院弹窗 -->
+    <Teleport to="body">
+      <div v-if="showDeptModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showDeptModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">添加学院</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">学院名称</label>
+              <input v-model="deptForm.name" type="text" placeholder="如：计算机学院" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">颜色</label>
+              <div class="flex items-center gap-3">
+                <input v-model="deptForm.color" type="color" class="w-10 h-10 rounded cursor-pointer border" />
+                <span class="text-sm text-gray-500">{{ deptForm.color }}</span>
+              </div>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button @click="handleSaveDept" :disabled="!deptForm.name.trim()" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">保存</button>
+              <button @click="showDeptModal = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 学院 Excel 导入弹窗 -->
+    <Teleport to="body">
+      <div v-if="showDeptImportModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showDeptImportModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">从 Excel 导入学院</h3>
+          <p class="text-sm text-gray-500 mb-4">Excel 文件需要包含"学院名称"列，可选"颜色"列。</p>
+
+          <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-xs text-blue-600 mb-2">📋 没有模板？下载一个标准模板开始：</p>
+            <button @click="downloadDeptTemplate" class="text-xs px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">下载模板</button>
+          </div>
+
+          <div
+            @click="deptFileInput?.click()"
+            @dragover.prevent
+            @drop.prevent="handleDeptDrop"
+            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors"
+          >
+            <Upload class="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p class="text-sm text-gray-600 mb-1">{{ deptImportFile?.name || '点击选择或拖拽 Excel 文件到此处' }}</p>
+            <p class="text-xs text-gray-400">支持 .xlsx 和 .xls 格式</p>
+          </div>
+
+          <div class="flex gap-3 pt-4 mt-4 border-t">
+            <button @click="showDeptImportModal = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
+            <button @click="confirmDeptImport" :disabled="!deptImportFile" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">确认导入</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 新增课程弹窗 -->
     <Teleport to="body">
@@ -982,5 +1059,108 @@ function fmtExcelDate(val: string | number): string {
     return `${year}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`
   }
   return s
+}
+
+// ====== 添加学院 ======
+const showDeptModal = ref(false)
+const deptForm = ref({ name: '', color: '#3b82f6' })
+
+function openAddDeptModal() {
+  deptForm.value = { name: '', color: '#3b82f6' }
+  showDeptModal.value = true
+}
+
+function handleSaveDept() {
+  if (!deptForm.value.name.trim()) return
+  store.addDepartment({
+    id: `dept-${Date.now()}`,
+    name: deptForm.value.name.trim(),
+    color: deptForm.value.color,
+  })
+  showDeptModal.value = false
+}
+
+// ====== Excel 导入学院 ======
+const showDeptImportModal = ref(false)
+const deptImportFile = ref<File | null>(null)
+const deptImportMsg = ref<{ success: boolean; text: string } | null>(null)
+const deptFileInput = ref<HTMLInputElement>()
+
+const presetColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#ef4444', '#14b8a6', '#6366f1', '#84cc16']
+
+function triggerDeptExcelImport() {
+  deptImportFile.value = null
+  deptImportMsg.value = null
+  showDeptImportModal.value = true
+}
+
+function handleDeptFileSelect(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) deptImportFile.value = file
+}
+
+function handleDeptDrop(e: DragEvent) {
+  const file = e.dataTransfer?.files[0]
+  if (file) deptImportFile.value = file
+}
+
+async function confirmDeptImport() {
+  if (!deptImportFile.value) return
+  deptImportMsg.value = null
+
+  try {
+    const data = await deptImportFile.value.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0) {
+      deptImportMsg.value = { success: false, text: 'Excel 文件为空，请检查文件内容' }
+      return
+    }
+
+    const existingNames = new Set(store.departments.map((d) => d.name))
+    let added = 0
+    let skipped = 0
+
+    for (const row of rows) {
+      const name = String(row['学院名称'] || row['院系'] || row['系'] || row['name'] || '').trim()
+      if (!name || existingNames.has(name)) {
+        skipped++
+        continue
+      }
+      const color = String(row['颜色'] || row['color'] || '').trim() || presetColors[store.departments.length % presetColors.length]
+      store.addDepartment({
+        id: `dept-${Date.now()}-${added}`,
+        name,
+        color: color.startsWith('#') ? color : `#${color}`,
+      })
+      existingNames.add(name)
+      added++
+    }
+
+    if (added === 0) {
+      deptImportMsg.value = { success: false, text: `未能导入学院（跳过 ${skipped} 行）：请确保包含"学院名称"列` }
+      return
+    }
+
+    deptImportMsg.value = { success: true, text: `成功导入 ${added} 个学院${skipped ? `，跳过 ${skipped} 行（已存在或无名称）` : ''}` }
+    setTimeout(() => { deptImportMsg.value = null; showDeptImportModal.value = false }, 2000)
+  } catch (err: any) {
+    deptImportMsg.value = { success: false, text: '导入失败：' + (err.message || '未知错误') }
+  }
+}
+
+function downloadDeptTemplate() {
+  const data = [
+    { '学院名称': '计算机学院', '颜色': '#3b82f6' },
+    { '学院名称': '信息工程学院', '颜色': '#10b981' },
+    { '学院名称': '外国语学院', '颜色': '#f59e0b' },
+  ]
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [{ wch: 20 }, { wch: 15 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '学院')
+  XLSX.writeFile(wb, '学院导入模板.xlsx')
 }
 </script>

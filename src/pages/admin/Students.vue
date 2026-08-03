@@ -5,11 +5,11 @@
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">班级管理</h1>
-          <p class="text-gray-500 mt-1">管理所有班级，点击班级查看学生名单（数据来源：MySQL）</p>
+          <p class="text-gray-500 mt-1">管理所有班级，点击班级查看学生名单{{ usingMockData ? '（演示模式）' : '（数据来源：MySQL）' }}</p>
         </div>
-        <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-amber-500' : 'text-green-500'">
-          <span class="w-2 h-2 rounded-full" :class="loading ? 'bg-amber-500 animate-pulse' : 'bg-green-500'"></span>
-          {{ loading ? '加载中...' : `已连接 · ${classes.length} 个班级` }}
+        <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-amber-500' : usingMockData ? 'text-blue-500' : 'text-green-500'">
+          <span class="w-2 h-2 rounded-full" :class="loading ? 'bg-amber-500 animate-pulse' : usingMockData ? 'bg-blue-500' : 'bg-green-500'"></span>
+          {{ loading ? '加载中...' : usingMockData ? `演示数据 · ${classes.length} 个班级` : `已连接 · ${classes.length} 个班级` }}
         </div>
       </div>
 
@@ -92,8 +92,8 @@
             <tr class="bg-gray-50 border-b border-gray-100">
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">姓名</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">学号</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">电话</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">状态</th>
-              <th class="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -107,13 +107,11 @@
                 </div>
               </td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ s.studentId }}</td>
+              <td class="px-4 py-3 text-sm text-gray-600">{{ s.phone || '-' }}</td>
               <td class="px-4 py-3">
                 <span class="text-xs px-2 py-0.5 rounded-full" :class="s.status === 'active' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'">
                   {{ s.status === 'active' ? '正常' : '禁用' }}
                 </span>
-              </td>
-              <td class="px-4 py-3 text-right">
-                <router-link :to="`/admin/students/${s.id}`" class="text-xs text-blue-500 hover:underline">查看详情</router-link>
               </td>
             </tr>
             <tr v-if="filteredStudents.length === 0">
@@ -200,6 +198,7 @@ const students = ref<any[]>([])
 const loadingStudents = ref(false)
 const classSearch = ref('')
 const studentSearch = ref('')
+const usingMockData = ref(false)
 
 // 导入相关
 const importFileInput = ref<HTMLInputElement | null>(null)
@@ -229,11 +228,24 @@ const filteredStudents = computed(() => {
 
 async function loadClasses() {
   loading.value = true
+  usingMockData.value = false
   try {
     const res = await fetchClasses()
-    if (res.success) classes.value = res.classes
+    if (res.success && res.classes.length > 0) {
+      classes.value = res.classes
+    } else {
+      throw new Error('No data from API')
+    }
   } catch (e) {
-    console.error('加载班级失败:', e)
+    console.warn('API加载班级失败，使用本地模拟数据:', e)
+    usingMockData.value = true
+    const classMap = new Map<string, number>()
+    for (const s of store.students) {
+      if (s.className) {
+        classMap.set(s.className, (classMap.get(s.className) || 0) + 1)
+      }
+    }
+    classes.value = Array.from(classMap.entries()).map(([name, count]) => ({ name, count }))
   } finally {
     loading.value = false
   }
@@ -249,9 +261,25 @@ async function loadClassStudents() {
   loadingStudents.value = true
   try {
     const res = await fetchStudents({ class: selectedClass.value, pageSize: '200' })
-    if (res.success) students.value = res.students
+    if (res.success && res.students.length > 0) {
+      students.value = res.students
+    } else {
+      throw new Error('No data from API')
+    }
   } catch (e) {
-    console.error('加载学生失败:', e)
+    console.warn('API加载学生失败，使用本地模拟数据:', e)
+    usingMockData.value = true
+    students.value = store.students
+      .filter((s) => s.className === selectedClass.value)
+      .map((s) => ({
+        id: s.id,
+        name: s.name,
+        studentId: s.studentId,
+        className: s.className,
+        phone: s.phone,
+        email: s.email,
+        status: s.status,
+      }))
   } finally {
     loadingStudents.value = false
   }
