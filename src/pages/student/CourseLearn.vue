@@ -422,14 +422,18 @@
 
           <!-- ===== 综合评价 ===== -->
           <div v-if="activeTab === 'eval_overview'" class="space-y-6">
-            <!-- 综合成绩卡片 -->
+            <!-- 最终综合评价（平时分） -->
             <div>
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">综合评价</h3>
+              <h3 class="text-sm font-semibold text-gray-800 mb-3">最终综合评价 <span class="text-xs font-normal text-gray-400 ml-1">（作为平时分计入总成绩）</span></h3>
               <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
                 <div class="flex items-center justify-between mb-4">
                   <div>
-                    <p class="text-xs text-gray-400 mb-1">课程总评</p>
-                    <p class="text-3xl font-bold text-blue-600">{{ totalScore ?? '-' }}<span class="text-base text-gray-400">分</span></p>
+                    <p class="text-xs text-gray-400 mb-1">
+                      {{ selectedSession === null ? '最终综合评分' : `第 ${selectedSession} 次综合评分` }}
+                    </p>
+                    <p class="text-3xl font-bold text-blue-600">
+                      {{ currentComprehensiveScore ?? '-' }}<span class="text-base text-gray-400">分</span>
+                    </p>
                   </div>
                   <div class="text-right">
                     <p class="text-xs text-gray-400">班级平均</p>
@@ -439,8 +443,8 @@
                 <!-- 分数条对比 -->
                 <div class="relative h-3 bg-brand-400/10 rounded-full overflow-hidden">
                   <div class="absolute top-0 h-full w-0.5 bg-red-400 z-10" :style="{ left: classAvgScore + '%' }" />
-                  <div v-if="totalScore" class="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all"
-                    :style="{ width: Math.min(totalScore, 100) + '%' }" />
+                  <div v-if="currentComprehensiveScore !== null" class="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all"
+                    :style="{ width: Math.min(currentComprehensiveScore, 100) + '%' }" />
                 </div>
                 <div class="flex justify-between text-xs text-gray-400 mt-1">
                   <span>0</span>
@@ -450,9 +454,41 @@
               </div>
             </div>
 
-            <!-- 评价细分 -->
+            <!-- 次数选择器 -->
+            <div v-if="sessionComprehensiveScores.length > 0">
+              <h3 class="text-sm font-semibold text-gray-800 mb-3">查看各次评价</h3>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  @click="selectedSession = null"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all border"
+                  :class="selectedSession === null
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-brand-400/30 hover:border-blue-300 hover:text-blue-600'">
+                  最终
+                  <span v-if="finalComprehensiveScore !== null" class="ml-1 font-bold">({{ finalComprehensiveScore }})</span>
+                </button>
+                <button
+                  v-for="s in sessionComprehensiveScores"
+                  :key="s.session"
+                  @click="selectedSession = s.session"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all border"
+                  :class="selectedSession === s.session
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-brand-400/30 hover:border-blue-300 hover:text-blue-600'">
+                  第{{ s.session }}次
+                  <span v-if="s.score !== null" class="ml-1 font-bold">({{ s.score }})</span>
+                  <span v-else class="ml-1 text-gray-300">(-)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 评价维度细分 -->
             <div>
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">评价维度细分</h3>
+              <h3 class="text-sm font-semibold text-gray-800 mb-3">
+                评价维度细分
+                <span v-if="selectedSession !== null" class="text-xs font-normal text-gray-400 ml-1">· 第 {{ selectedSession }} 次</span>
+                <span v-else class="text-xs font-normal text-gray-400 ml-1">· 全部平均</span>
+              </h3>
               <div class="space-y-3">
                 <div v-for="dim in evalDimensions" :key="dim.label"
                   class="flex items-center gap-3 p-3 rounded-lg border border-brand-400/20">
@@ -1120,25 +1156,113 @@ const classAvgScore = computed(() => {
 
 const currentCfg = computed(() => store.getGradeConfig(courseId))
 
+const gradeIconMap: Record<string, any> = {
+  self: UserCheck,
+  intra_group: Users,
+  inter_group: MessageSquare,
+  teacher: Award,
+  mentor: Sparkles,
+}
+
+const gradeLabelMap: Record<string, string> = {
+  self: '自评',
+  intra_group: '组内互评',
+  inter_group: '组间互评',
+  teacher: '教师评价',
+  mentor: '企业导师',
+}
+
+const gradeWeightKeyMap: Record<string, keyof import('@/types').GradeWeightConfig> = {
+  self: 'selfEvalWeight',
+  intra_group: 'peerReviewWeight',
+  inter_group: 'interGroupEvalWeight',
+  teacher: 'teacherScoreWeight',
+  mentor: 'mentorScoreWeight',
+}
+
+const allEvalTypes = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor'] as const
+type EvalTypeKey = typeof allEvalTypes[number]
+
+const selectedSession = ref<number | null>(null)
+
+const evalSessions = computed(() => {
+  const evals = store.evaluations.filter(
+    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
+  )
+  const sessions = new Set<number>()
+  evals.forEach(e => sessions.add(e.sessionNumber))
+  return Array.from(sessions).sort((a, b) => a - b)
+})
+
+function calcSessionComprehensiveScore(sessionNumber: number) {
+  const cfg = currentCfg.value
+  const evals = store.evaluations.filter(
+    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id && e.sessionNumber === sessionNumber
+  )
+  let totalWeight = 0
+  let weightedSum = 0
+  for (const type of allEvalTypes) {
+    const filtered = evals.filter(e => e.type === type)
+    if (filtered.length === 0) continue
+    const avg = Math.round(filtered.reduce((s, e) => s + e.score, 0) / filtered.length)
+    const weight = (cfg[gradeWeightKeyMap[type]] as number) || 0
+    weightedSum += avg * weight
+    totalWeight += weight
+  }
+  if (totalWeight === 0) return null
+  return Math.round(weightedSum / totalWeight)
+}
+
+const sessionComprehensiveScores = computed(() => {
+  return evalSessions.value.map(sn => ({
+    session: sn,
+    score: calcSessionComprehensiveScore(sn),
+  }))
+})
+
+const finalComprehensiveScore = computed(() => {
+  const validScores = sessionComprehensiveScores.value.filter(s => s.score !== null)
+  if (validScores.length === 0) return null
+  return Math.round(validScores.reduce((s, v) => s + (v.score as number), 0) / validScores.length)
+})
+
+const currentComprehensiveScore = computed(() => {
+  if (selectedSession.value === null) return finalComprehensiveScore.value
+  const found = sessionComprehensiveScores.value.find(s => s.session === selectedSession.value)
+  return found ? found.score : null
+})
+
 const evalDimensions = computed(() => {
   const evals = store.evaluations.filter(
     (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
   )
+
+  const evalsForCalc = selectedSession.value !== null
+    ? evals.filter(e => e.sessionNumber === selectedSession.value)
+    : evals
+
   const calcAvg = (type: string) => {
-    const filtered = evals.filter((e) => e.type === type)
+    const filtered = evalsForCalc.filter((e) => e.type === type)
     if (filtered.length === 0) return null
     return Math.round(filtered.reduce((s, e) => s + e.score, 0) / filtered.length)
   }
 
   const dims: { label: string; icon: string; iconBg: string; iconColor: string; barColor: string; score: number; maxScore: number }[] = []
-  const selfScore = calcAvg('self')
-  if (selfScore !== null) dims.push({ label: '自评', icon: 'userCheck', iconBg: 'bg-brand-600/15', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: selfScore, maxScore: 100 })
-  const peerScore = calcAvg('intra_group')
-  if (peerScore !== null) dims.push({ label: '组内互评', icon: 'users', iconBg: 'bg-brand-600/10', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: peerScore, maxScore: 100 })
-  const interScore = calcAvg('inter_group')
-  if (interScore !== null) dims.push({ label: '组间互评', icon: 'messageSquare', iconBg: 'bg-brand-600/10', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: interScore, maxScore: 100 })
-  const teacherScore = calcAvg('teacher')
-  if (teacherScore !== null) dims.push({ label: '教师评价', icon: 'award', iconBg: 'bg-brand-400/10', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: teacherScore, maxScore: 100 })
+  for (const type of allEvalTypes) {
+    const score = calcAvg(type)
+    if (score !== null) {
+      const weight = (currentCfg.value[gradeWeightKeyMap[type]] as number) || 0
+      dims.push({
+        label: gradeLabelMap[type],
+        icon: gradeIconMap[type],
+        iconBg: 'bg-brand-600/15',
+        iconColor: 'text-brand-600',
+        barColor: 'bg-brand-600',
+        score,
+        maxScore: 100,
+      })
+    }
+  }
 
   return dims
 })
