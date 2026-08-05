@@ -715,13 +715,14 @@ export const useAppStore = defineStore('app', () => {
     return result
   }
 
-  /** 清理指定课程中同 studentId+同 examName 的重复成绩记录，仅保留第一条 */
+  /** 清理指定课程中同 studentId+同 examName+同 type 的重复成绩记录，仅保留第一条 */
   function deduplicateExamScores(courseId: string) {
     const courseScores = examScores.value.filter((s) => s.courseId === courseId)
     const seen = new Set<string>()
     const deduped: import('@/types').ExamScore[] = []
     for (const s of courseScores) {
-      const key = `${s.studentId}|${s.examName}`
+      // 使用 学生+考试名+类型 作为唯一键，避免误删跨类型同名（如期中项目/期末项目同名）记录
+      const key = `${s.studentId}|${s.examName}|${s.type}`
       if (!seen.has(key)) {
         seen.add(key)
         deduped.push(s)

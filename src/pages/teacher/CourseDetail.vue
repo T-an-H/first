@@ -504,10 +504,18 @@
                     <span class="text-xs font-semibold text-blue-700">项目</span>
                     <span v-if="midtermProjects.length > 1" :class="midtermProjectTotalShare === 100 ? 'text-blue-400' : 'text-amber-500'" class="text-[10px]">占比合计：{{ midtermProjectTotalShare }}%</span>
                   </div>
-                  <button @click="showNewExamModal = true; newExamType = 'midterm_project'" :disabled="isReadOnly"
-                    class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Plus class="w-3 h-3" /> 添加项目
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button @click="showNewExamModal = true; newExamType = 'midterm_project'" :disabled="isReadOnly"
+                      class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Plus class="w-3 h-3" /> 添加项目
+                    </button>
+                    <button v-if="midtermProjects.length > 1" @click="toggleMidtermProjectLock()"
+                      :disabled="!canLockProjectWeight('midterm') || isReadOnly"
+                      class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      :class="midtermProjectLocked ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'">
+                      <Lock class="w-3 h-3" /> {{ midtermProjectLocked ? '解锁' : '锁定' }}
+                    </button>
+                  </div>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermProjects" :key="e.name" class="px-4 py-3">
@@ -531,11 +539,6 @@
                             <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
                               @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly" />
-                            <button @click="lockProjectWeight(e.name)"
-                              :disabled="!canLockProjectWeight('midterm')"
-                              class="text-[10px] px-2 py-1 rounded text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
-                              <Lock class="w-3 h-3" />锁定
-                            </button>
                           </template>
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
@@ -638,10 +641,18 @@
                     <span class="text-xs font-semibold text-blue-700">项目</span>
                     <span v-if="finalProjects.length > 1" :class="finalProjectTotalShare === 100 ? 'text-blue-400' : 'text-amber-500'" class="text-[10px]">占比合计：{{ finalProjectTotalShare }}%</span>
                   </div>
-                  <button @click="showNewExamModal = true; newExamType = 'final_project'" :disabled="isReadOnly"
-                    class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Plus class="w-3 h-3" /> 添加项目
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button @click="showNewExamModal = true; newExamType = 'final_project'" :disabled="isReadOnly"
+                      class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                      <Plus class="w-3 h-3" /> 添加项目
+                    </button>
+                    <button v-if="finalProjects.length > 1" @click="toggleFinalProjectLock()"
+                      :disabled="!canLockProjectWeight('final') || isReadOnly"
+                      class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      :class="finalProjectLocked ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'">
+                      <Lock class="w-3 h-3" /> {{ finalProjectLocked ? '解锁' : '锁定' }}
+                    </button>
+                  </div>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalProjects" :key="e.name" class="px-4 py-3">
@@ -665,11 +676,6 @@
                             <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
                               @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly" />
-                            <button @click="lockProjectWeight(e.name)"
-                              :disabled="!canLockProjectWeight('final')"
-                              class="text-[10px] px-2 py-1 rounded text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
-                              <Lock class="w-3 h-3" />锁定
-                            </button>
                           </template>
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
@@ -1669,6 +1675,10 @@ const gradePopupSearch = ref('')
 // 项目占比锁定状态：每个项目独立控制锁定/解锁
 const lockedWeightProjects = ref<Set<string>>(new Set())
 
+// 板块级锁定状态（期中/期末项目整体锁定）
+const midtermProjectLocked = ref(false)
+const finalProjectLocked = ref(false)
+
 function isProjectWeightLocked(examName: string): boolean {
   return lockedWeightProjects.value.has(examName)
 }
@@ -1693,6 +1703,31 @@ function lockProjectWeight(examName: string) {
 
 function unlockProjectWeight(examName: string) {
   lockedWeightProjects.value.delete(examName)
+}
+
+// 板块级锁定/解锁：锁定后该板块所有项目占比不可修改
+function toggleMidtermProjectLock() {
+  if (midtermProjectLocked.value) {
+    midtermProjectLocked.value = false
+    midtermProjects.value.forEach((e) => unlockProjectWeight(e.name))
+  } else {
+    if (canLockProjectWeight('midterm')) {
+      midtermProjectLocked.value = true
+      midtermProjects.value.forEach((e) => lockProjectWeight(e.name))
+    }
+  }
+}
+
+function toggleFinalProjectLock() {
+  if (finalProjectLocked.value) {
+    finalProjectLocked.value = false
+    finalProjects.value.forEach((e) => unlockProjectWeight(e.name))
+  } else {
+    if (canLockProjectWeight('final')) {
+      finalProjectLocked.value = true
+      finalProjects.value.forEach((e) => lockProjectWeight(e.name))
+    }
+  }
 }
 
 // 成绩查询图表引用
@@ -1868,8 +1903,10 @@ const examsWithTypes = computed(() => {
   const scores = store.getExamScoresForCourse(courseId.value)
   const map = new Map<string, { name: string; type: string }>()
   for (const s of scores) {
-    if (!map.has(s.examName)) {
-      map.set(s.examName, { name: s.examName, type: s.type })
+    // 用 名称+类型 作为唯一键，避免跨类型同名（如期中项目/期末项目同名）被吞掉
+    const key = `${s.examName}@@${s.type}`
+    if (!map.has(key)) {
+      map.set(key, { name: s.examName, type: s.type })
     }
   }
   return Array.from(map.values())
@@ -2226,6 +2263,24 @@ function handleAddExam() {
   const name = newExamName.value.trim()
   const type = newExamType.value
 
+  // 同类型下重名检查，避免重复创建同名项目/考试
+  const sameTypeNames = new Set(
+    store.getExamScoresForCourse(courseId.value)
+      .filter((s) => s.type === type)
+      .map((s) => s.examName)
+  )
+  if (sameTypeNames.has(name)) {
+    const typeLabel = type === 'midterm_project' ? '期中项目' : type === 'final_project' ? '期末项目' : '考试'
+    alert(`已存在名为「${name}」的${typeLabel}，请更换名称`)
+    return
+  }
+
+  // 课程无学生时无法创建成绩记录
+  if (enrolledStudents.value.length === 0) {
+    alert('该课程暂无学生，无法添加项目')
+    return
+  }
+
   for (const { student } of enrolledStudents.value) {
     if (!student) continue
     const id = `exam-${courseId.value}-${student.id}-${name}-${Date.now()}`
@@ -2249,35 +2304,10 @@ function handleAddExam() {
       .filter((s) => s.type === type)
     const uniqueNames = Array.from(new Set(sameTypeExams.map((s) => s.examName)))
 
-    if (uniqueNames.length === 1) {
-      store.setExamWeight(courseId.value!, name, 100)
-    } else if (uniqueNames.length > 1) {
-      const existingNames = uniqueNames.filter((n) => n !== name)
-      let currentTotal = 0
-      for (const n of existingNames) {
-        currentTotal += store.getExamWeight(courseId.value!, n)
-      }
-
-      if (currentTotal <= 0) {
-        const eachShare = Math.floor(100 / uniqueNames.length)
-        uniqueNames.forEach((examName, i) =>
-          store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
-      } else {
-        const newProjectWeight = Math.floor(100 / uniqueNames.length)
-        const remaining = 100 - newProjectWeight
-        let assigned = 0
-        existingNames.forEach((n, i) => {
-          if (i === existingNames.length - 1) {
-            store.setExamWeight(courseId.value!, n, Math.max(0, remaining - assigned))
-          } else {
-            const newWeight = Math.round(store.getExamWeight(courseId.value!, n) * remaining / currentTotal)
-            store.setExamWeight(courseId.value!, n, Math.max(0, newWeight))
-            assigned += newWeight
-          }
-        })
-        store.setExamWeight(courseId.value!, name, newProjectWeight)
-      }
-    }
+    // 添加新项目后，所有项目占比默认均分 100%
+    const eachShare = Math.floor(100 / uniqueNames.length)
+    uniqueNames.forEach((examName, i) =>
+      store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
   }
 
   showNewExamModal.value = false
