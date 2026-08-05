@@ -509,8 +509,182 @@
               </p>
             </div>
           </div>
+
+          <!-- ===== 增值评价 ===== -->
+          <div v-if="activeTab === 'value_added'" class="space-y-6">
+          <!-- 说明 -->
+          <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
+            <div class="flex items-center gap-2 mb-2">
+              <TrendingUp class="w-5 h-5 text-blue-600" />
+              <h3 class="text-base font-semibold text-blue-800">增值评价</h3>
+            </div>
+            <p class="text-sm text-blue-600">
+              基于本课程历次评价数据，分析你的学习进步趋势，直观展示学业成长轨迹。
+            </p>
+          </div>
+
+          <!-- 有数据时显示折线图 -->
+          <div v-if="valueAddedData.length > 0" class="space-y-6">
+            <!-- 统计卡片 -->
+            <div class="grid grid-cols-3 gap-4">
+              <div class="bg-white rounded-xl p-4 border border-brand-400/20">
+                <p class="text-xs text-gray-400 mb-1">当前得分</p>
+                <p class="text-2xl font-bold text-gray-900">{{ valueAddedData[valueAddedData.length - 1].score }}</p>
+                <p class="text-xs text-gray-400 mt-1">第{{ valueAddedData.length }}次评价</p>
+              </div>
+              <div v-if="valueAddedStats" class="bg-white rounded-xl p-4 border border-brand-400/20">
+                <p class="text-xs text-gray-400 mb-1">相比上次</p>
+                <p class="text-2xl font-bold" :class="valueAddedStats.change > 0 ? 'text-emerald-600' : valueAddedStats.change < 0 ? 'text-red-500' : 'text-gray-500'">
+                  {{ valueAddedStats.change > 0 ? '+' : '' }}{{ valueAddedStats.change.toFixed(1) }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">{{ valueAddedStats.change > 0 ? '进步' : valueAddedStats.change < 0 ? '退步' : '保持不变' }}</p>
+              </div>
+              <div v-if="valueAddedImprovement" class="bg-white rounded-xl p-4 border border-brand-400/20">
+                <p class="text-xs text-gray-400 mb-1">累计变化</p>
+                <p class="text-2xl font-bold" :class="valueAddedImprovement.totalChange > 0 ? 'text-emerald-600' : valueAddedImprovement.totalChange < 0 ? 'text-red-500' : 'text-gray-500'">
+                  {{ valueAddedImprovement.totalChange > 0 ? '+' : '' }}{{ valueAddedImprovement.totalChange.toFixed(1) }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">共{{ valueAddedData.length }}次评价</p>
+              </div>
+            </div>
+
+            <!-- 折线图 -->
+            <div class="bg-white rounded-xl p-6 border border-brand-400/20">
+              <h3 class="text-sm font-semibold text-gray-800 mb-4">成绩趋势图</h3>
+              <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="w-full" style="min-height: 200px">
+                <!-- 背景网格 -->
+                <defs>
+                  <pattern id="valueAddedGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" stroke-width="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#valueAddedGrid)" />
+                
+                <!-- Y轴 -->
+                <line 
+                  :x1="padding.left" :y1="padding.top" 
+                  :x2="padding.left" :y2="padding.top + innerHeight" 
+                  stroke="#e5e7eb" stroke-width="1" />
+                
+                <!-- X轴 -->
+                <line 
+                  :x1="padding.left" :y1="padding.top + innerHeight" 
+                  :x2="padding.left + innerWidth" :y2="padding.top + innerHeight" 
+                  stroke="#e5e7eb" stroke-width="1" />
+                
+                <!-- Y轴刻度 -->
+                <g v-for="i in 5" :key="'y-tick-' + i">
+                  <line 
+                    :x1="padding.left - 5" 
+                    :y1="padding.top + innerHeight * (1 - (i - 1) / 4)"
+                    :x2="padding.left" 
+                    :y2="padding.top + innerHeight * (1 - (i - 1) / 4)"
+                    stroke="#9ca3af" stroke-width="1" />
+                  <text 
+                    :x="padding.left - 8" 
+                    :y="padding.top + innerHeight * (1 - (i - 1) / 4) + 3"
+                    text-anchor="end" 
+                    font-size="10" 
+                    fill="#9ca3af">
+                    {{ 100 - (i - 1) * 25 }}
+                  </text>
+                </g>
+                
+                <!-- 折线 -->
+                <polyline
+                  :points="linePoints"
+                  fill="none"
+                  stroke="#2563eb"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                
+                <!-- 渐变填充 -->
+                <defs>
+                  <linearGradient id="valueAddedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="#2563eb" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <polygon
+                  :points="areaPoints"
+                  fill="url(#valueAddedGradient)"
+                />
+                
+                <!-- 数据点 -->
+                <g v-for="(point, i) in valueAddedData" :key="'point-' + i">
+                  <circle
+                    :cx="padding.left + (valueAddedData.length > 1 ? i * xStep : innerWidth / 2)"
+                    :cy="padding.top + innerHeight * (1 - point.score / 100)"
+                    r="5"
+                    fill="#2563eb"
+                    stroke="white"
+                    stroke-width="2"
+                    class="cursor-pointer"
+                  >
+                    <title>{{ point.label }}: {{ point.score }}分</title>
+                  </circle>
+                  <text
+                    :x="padding.left + (valueAddedData.length > 1 ? i * xStep : innerWidth / 2)"
+                    :y="padding.top + innerHeight * (1 - point.score / 100) - 12"
+                    text-anchor="middle"
+                    font-size="10"
+                    font-weight="bold"
+                    fill="#2563eb">
+                    {{ point.score }}
+                  </text>
+                  <text
+                    :x="padding.left + (valueAddedData.length > 1 ? i * xStep : innerWidth / 2)"
+                    :y="padding.top + innerHeight + 20"
+                    text-anchor="middle"
+                    font-size="10"
+                    fill="#6b7280">
+                    {{ point.label }}
+                  </text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- 进步建议 -->
+            <div v-if="valueAddedImprovement" class="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-100">
+              <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <TrendingUp class="w-4 h-4 text-emerald-600" />
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-gray-900">
+                    {{ valueAddedImprovement.totalChange > 0 ? '学习状态良好' : valueAddedImprovement.totalChange < 0 ? '需要加强学习' : '保持稳定' }}
+                  </p>
+                  <p class="text-xs text-gray-500 mt-1">
+                    {{ valueAddedImprovement.totalChange > 0 
+                      ? `平均每次进步 ${valueAddedImprovement.avgChangePerSession.toFixed(1)} 分，继续保持！` 
+                      : valueAddedImprovement.totalChange < 0 
+                        ? `平均每次退步 ${Math.abs(valueAddedImprovement.avgChangePerSession).toFixed(1)} 分，建议加强复习。` 
+                        : '成绩保持稳定，继续努力提升！' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 无数据时显示空状态 -->
+          <div v-else class="bg-white rounded-xl p-12 border border-brand-400/20 text-center">
+            <div class="w-16 h-16 rounded-full bg-brand-400/10 flex items-center justify-center mx-auto mb-4">
+              <TrendingUp class="w-8 h-8 text-brand-400" />
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">暂无增值评价数据</h3>
+            <p class="text-sm text-gray-500">完成至少一次课程评价后，系统将自动生成你的增值评价趋势图</p>
+            <button 
+              v-if="activeTab !== 'evaluations'"
+              @click="activeTab = 'evaluations'"
+              class="mt-6 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+              去评价填写
+            </button>
+          </div>
         </div>
-      </div>
+          </div>
+        </div>
 
       <!-- ===== 右侧栏（D3 渲染） ===== -->
       <div class="lg:col-span-1" id="course-learn-sidebar"></div>
@@ -524,7 +698,7 @@ import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
   CheckCircle, Circle, Layers, GitBranch, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
-  Download, Upload
+  Download, Upload, TrendingUp
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
 import type { AITierQuestion, LearningTier, CloudFile } from '@/types'
@@ -538,7 +712,7 @@ const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
-const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview', 'value_added']
 const activeTab = ref<string>(
   VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
 )
@@ -566,6 +740,7 @@ const tabs = [
   { id: 'homework', label: '作业', icon: BookOpen },
   { id: 'evaluations', label: '评价填写', icon: ClipboardCheck },
   { id: 'eval_overview', label: '综合评价', icon: Award },
+  { id: 'value_added', label: '增值评价', icon: TrendingUp },
 ]
 
 const course = computed(() => store.courses.find((c) => c.id === courseId))
@@ -637,6 +812,90 @@ const tierBadgeClass = computed(() => {
     excellent: 'bg-emerald-600/10 text-emerald-600 border border-emerald-400',
   }
   return map[myTier.value]
+})
+
+// ===== 增值评价 =====
+const valueAddedData = computed(() => {
+  if (!myStudent.value) return []
+  const studentId = myStudent.value.id
+  
+  const evals = store.evaluations
+    .filter(ev => ev.courseId === courseId && ev.studentId === studentId && ev.score > 0)
+    .sort((a, b) => a.sessionNumber - b.sessionNumber)
+  
+  if (evals.length === 0) return []
+  
+  return evals.map(ev => ({
+    session: ev.sessionNumber,
+    score: ev.score,
+    label: `第${ev.sessionNumber}次`
+  }))
+})
+
+const valueAddedStats = computed(() => {
+  const data = valueAddedData.value
+  if (data.length < 2) return null
+  
+  const currentScore = data[data.length - 1].score
+  const previousScore = data[data.length - 2].score
+  const change = currentScore - previousScore
+  
+  return {
+    currentScore,
+    previousScore,
+    change,
+    hasTrend: true
+  }
+})
+
+const valueAddedImprovement = computed(() => {
+  const data = valueAddedData.value
+  if (data.length < 2) return null
+  
+  // 计算整体提升/退步趋势
+  let totalChange = 0
+  for (let i = 1; i < data.length; i++) {
+    totalChange += data[i].score - data[i-1].score
+  }
+  
+  return {
+    totalChange,
+    avgChangePerSession: totalChange / (data.length - 1)
+  }
+})
+
+// ===== 增值评价图表计算 =====
+const chartWidth = 500
+const chartHeight = 200
+const padding = { top: 20, right: 20, bottom: 35, left: 45 }
+const innerWidth = chartWidth - padding.left - padding.right
+const innerHeight = chartHeight - padding.top - padding.bottom
+
+const xStep = computed(() => {
+  if (valueAddedData.value.length <= 1) return 0
+  return innerWidth / (valueAddedData.value.length - 1)
+})
+
+const linePoints = computed(() => {
+  return valueAddedData.value.map((point, i) => {
+    const x = padding.left + (valueAddedData.value.length > 1 ? i * xStep.value : innerWidth / 2)
+    const y = padding.top + innerHeight * (1 - point.score / 100)
+    return `${x},${y}`
+  }).join(' ')
+})
+
+const areaPoints = computed(() => {
+  if (valueAddedData.value.length === 0) return ''
+  const points = valueAddedData.value.map((point, i) => {
+    const x = padding.left + (valueAddedData.value.length > 1 ? i * xStep.value : innerWidth / 2)
+    const y = padding.top + innerHeight * (1 - point.score / 100)
+    return `${x},${y}`
+  })
+  // 添加底部两个点形成封闭区域
+  const firstX = padding.left + (valueAddedData.value.length > 1 ? 0 * xStep.value : innerWidth / 2)
+  const lastX = padding.left + (valueAddedData.value.length > 1 ? (valueAddedData.value.length - 1) * xStep.value : innerWidth / 2)
+  const bottomY = padding.top + innerHeight
+  return `${firstX},${bottomY} ${points.join(' ')} ${lastX},${bottomY}`
 })
 
 // ===== AI 分层测试弹窗 =====

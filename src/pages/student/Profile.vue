@@ -137,6 +137,89 @@ const radarData = computed(() => {
   return result
 })
 
+// ====== 增值评价数据 ======
+const selectedTrendCourseIndex = ref(0)
+
+const evalTrendData = computed(() => {
+  if (!student.value) return []
+  const studentId = student.value.id
+  
+  // 获取该学生的所有评价记录
+  const studentEvals = store.evaluations
+    .filter(ev => ev.studentId === studentId && ev.score > 0)
+    .sort((a, b) => {
+      // 先按课程分组，再按 sessionNumber 排序
+      if (a.courseId !== b.courseId) return a.courseId.localeCompare(b.courseId)
+      return a.sessionNumber - b.sessionNumber
+    })
+  
+  if (studentEvals.length === 0) return []
+  
+  // 按课程分组
+  const courseMap = new Map<string, { courseTitle: string; sessions: { session: number; score: number; date: string }[] }>()
+  
+  for (const ev of studentEvals) {
+    const course = getCourse(ev.courseId)
+    if (!course) continue
+    
+    if (!courseMap.has(ev.courseId)) {
+      courseMap.set(ev.courseId, {
+        courseTitle: course.title,
+        sessions: []
+      })
+    }
+    
+    const courseData = courseMap.get(ev.courseId)!
+    courseData.sessions.push({
+      session: ev.sessionNumber,
+      score: ev.score,
+      date: ev.createdAt
+    })
+  }
+  
+  // 转换为图表数据格式
+  const result: { courseId: string; courseTitle: string; points: { x: number; y: number; label: string }[] }[] = []
+  
+  courseMap.forEach((value, key) => {
+    if (value.sessions.length < 1) return // 至少需要1次评价才能显示趋势
+    const points = value.sessions.map(s => ({
+      x: s.session,
+      y: s.score,
+      label: `第${s.session}次`
+    }))
+    result.push({
+      courseId: key,
+      courseTitle: value.courseTitle,
+      points
+    })
+  })
+  
+  return result
+})
+
+// 获取增值评价统计信息
+const evalTrendStats = computed(() => {
+  if (evalTrendData.value.length === 0) return null
+  
+  const stats = evalTrendData.value.map(course => {
+    const points = course.points
+    const currentScore = points[points.length - 1].y
+    const previousScore = points.length > 1 ? points[points.length - 2].y : null
+    const change = previousScore !== null ? currentScore - previousScore : null
+    
+    return {
+      courseId: course.courseId,
+      courseTitle: course.courseTitle,
+      currentScore,
+      previousScore,
+      change,
+      hasTrend: points.length > 1
+    }
+  })
+  
+  return stats
+})
+
 function getAngle(i: number): number {
   const total = radarData.value.length || 6
   return ((360 / total) * i - 90) * Math.PI / 180
@@ -366,7 +449,12 @@ function renderProfile(root: HTMLElement) {
   if (rd.length > 0) {
     const svgWrap = radarCard.append('div')
       .attr('class', 'relative w-80 h-80 mx-auto cursor-pointer')
-      .on('click', () => { showDetailModal.value = true; reRender() })
+      .on('click', () => {
+        const scrollY = window.scrollY
+        showDetailModal.value = true
+        reRender()
+        window.scrollTo(0, scrollY)
+      })
 
     const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
 
@@ -445,6 +533,143 @@ function renderProfile(root: HTMLElement) {
     row.append('span').attr('class', `font-semibold ${item.color}`).text(item.value)
   })
 
+  // 增值评价板块
+  const trendData = evalTrendData.value
+  const trendStats = evalTrendStats.value
+  const trendCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
+  const trendTitle = trendCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
+  renderIcon(trendTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
+  trendTitle.append('span').text('增值评价')
+
+  if (trendData.length > 0) {
+    // 课程切换标签（放在折线图上方）
+    const courseTabs = trendCard.append('div').attr('class', 'flex flex-wrap gap-2 mb-4')
+    
+    trendData.forEach((course, index) => {
+      const isActive = selectedTrendCourseIndex.value === index
+      const tab = courseTabs.append('button')
+        .attr('class', `px-3 py-1.5 text-sm rounded-full transition-colors cursor-pointer ${isActive ? 'bg-brand-700 text-white' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`)
+        .text(course.courseTitle)
+      
+      tab.on('click', () => {
+        selectedTrendCourseIndex.value = index
+        const scrollY = window.scrollY
+        reRender()
+        window.scrollTo(0, scrollY)
+      })
+    })
+    
+    // 当前选中的课程
+    const currentCourse = trendData[selectedTrendCourseIndex.value]
+    const currentStat = trendStats?.[selectedTrendCourseIndex.value]
+    
+    // 绘制当前课程折线图
+    const chartWidth = 400
+    const chartHeight = 120
+    const padding = { top: 20, right: 20, bottom: 30, left: 40 }
+    const innerWidth = chartWidth - padding.left - padding.right
+    const innerHeight = chartHeight - padding.top - padding.bottom
+    
+    const courseSection = trendCard.append('div').attr('class', 'border border-brand-400/10 rounded-lg p-4')
+    const courseHeader = courseSection.append('div').attr('class', 'flex items-center justify-between mb-3')
+    courseHeader.append('h4').attr('class', 'font-semibold text-gray-900').text(currentCourse.courseTitle)
+    
+    // 统计信息
+    if (currentStat && currentStat.hasTrend) {
+      const change = currentStat.change!
+      const changeColor = change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-500' : 'text-gray-500'
+      const changeText = change > 0 ? `进步 ${change.toFixed(1)} 分` : change < 0 ? `退步 ${Math.abs(change).toFixed(1)} 分` : '保持不变'
+      courseHeader.append('span').attr('class', `text-sm font-medium ${changeColor}`).text(changeText)
+    } else {
+      courseHeader.append('span').attr('class', 'text-xs text-gray-400').text('首次评价，暂无对比')
+    }
+    
+    const svgContainer = courseSection.append('div').attr('class', 'flex justify-center')
+    const svg = svgContainer.append('svg')
+      .attr('width', chartWidth)
+      .attr('height', chartHeight)
+      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`)
+    
+    const points = currentCourse.points
+    const maxY = 100
+    const xStep = points.length > 1 ? innerWidth / (points.length - 1) : 0
+    
+    // Y轴
+    svg.append('line')
+      .attr('x1', padding.left).attr('y1', padding.top)
+      .attr('x2', padding.left).attr('y2', padding.top + innerHeight)
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1)
+    
+    // X轴
+    svg.append('line')
+      .attr('x1', padding.left).attr('y1', padding.top + innerHeight)
+      .attr('x2', padding.left + innerWidth).attr('y2', padding.top + innerHeight)
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1)
+    
+    // Y轴刻度
+    for (let i = 0; i <= 4; i++) {
+      const y = padding.top + innerHeight * (1 - i / 4)
+      const val = maxY * (i / 4)
+      svg.append('line')
+        .attr('x1', padding.left - 5).attr('y1', y)
+        .attr('x2', padding.left).attr('y2', y)
+        .attr('stroke', '#9ca3af').attr('stroke-width', 1)
+      svg.append('text')
+        .attr('x', padding.left - 8).attr('y', y + 3)
+        .attr('text-anchor', 'end').attr('font-size', '9').attr('fill', '#9ca3af')
+        .text(val.toString())
+    }
+    
+    // 折线路径
+    const linePoints: string[] = []
+    points.forEach((point, i) => {
+      const x = padding.left + (points.length > 1 ? i * xStep : innerWidth / 2)
+      const y = padding.top + innerHeight * (1 - point.y / 100)
+      linePoints.push(`${x},${y}`)
+    })
+    
+    // 折线
+    if (linePoints.length > 1) {
+      svg.append('polyline')
+        .attr('points', linePoints.join(' '))
+        .attr('fill', 'none')
+        .attr('stroke', '#429fc4')
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+    }
+    
+    // 数据点
+    points.forEach((point, i) => {
+      const x = padding.left + (points.length > 1 ? i * xStep : innerWidth / 2)
+      const y = padding.top + innerHeight * (1 - point.y / 100)
+      
+      svg.append('circle')
+        .attr('cx', x).attr('cy', y)
+        .attr('r', 4)
+        .attr('fill', '#429fc4')
+        .attr('stroke', 'white')
+        .attr('stroke-width', 2)
+      
+      svg.append('text')
+        .attr('x', x).attr('y', y - 10)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '10').attr('fill', '#429fc4').attr('font-weight', 'bold')
+        .text(`${point.y}分`)
+      
+      svg.append('text')
+        .attr('x', x).attr('y', padding.top + innerHeight + 15)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '9').attr('fill', '#6b7280')
+        .text(point.label)
+    })
+  } else {
+    // 无评价数据
+    trendCard.append('div').attr('class', 'text-center py-8')
+      .append('p').attr('class', 'text-gray-400').text('暂无评价数据')
+    trendCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成课程评价后将生成增值评价趋势图')
+  }
+
   // 今日学习轨迹
   const todaySchs = todaySchedules.value
   const trackCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
@@ -474,7 +699,12 @@ function renderProfile(root: HTMLElement) {
   // 详情弹窗 (showDetailModal)
   if (showDetailModal.value) {
     const modalOverlay = container.append('div').attr('class', 'fixed inset-0 z-50 flex items-center justify-center p-4')
-    modalOverlay.append('div').attr('class', 'absolute inset-0 bg-black/50').on('click', () => { showDetailModal.value = false; reRender() })
+    modalOverlay.append('div').attr('class', 'absolute inset-0 bg-black/50').on('click', () => {
+      const scrollY = window.scrollY
+      showDetailModal.value = false
+      reRender()
+      window.scrollTo(0, scrollY)
+    })
 
     const modalBox = modalOverlay.append('div').attr('class', 'relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden')
 
@@ -486,7 +716,12 @@ function renderProfile(root: HTMLElement) {
 
     const closeBtn = modalHeader.append('button')
       .attr('class', 'p-2 hover:bg-brand-400/10 rounded-lg transition-colors')
-      .on('click', () => { showDetailModal.value = false; reRender() })
+      .on('click', () => {
+        const scrollY = window.scrollY
+        showDetailModal.value = false
+        reRender()
+        window.scrollTo(0, scrollY)
+      })
     const closeSvg = closeBtn.append('svg').attr('class', 'w-6 h-6 text-gray-400')
       .attr('fill', 'none').attr('stroke', 'currentColor').attr('viewBox', '0 0 24 24')
     closeSvg.append('path').attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
