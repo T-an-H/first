@@ -475,11 +475,6 @@
 
         <!-- 搜索与过滤 -->
         <div class="flex flex-wrap items-center gap-2 mb-4">
-          <div class="relative w-48">
-            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input v-model="gradeSearch" type="text" placeholder="搜索学生姓名或学号..."
-              class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
-          </div>
           <select v-model="gradeFilterClass"
             class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
             <option value="">全部班级</option>
@@ -524,23 +519,42 @@
                         </button>
                         <div v-if="midtermProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
-                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
-                            class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || isWeightLocked" />
+                          <template v-if="isProjectWeightLocked(e.name)">
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
+                              disabled
+                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
+                            <Lock class="w-3 h-3 text-amber-500" />
+                            <button @click="unlockProjectWeight(e.name)"
+                              class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
+                          </template>
+                          <template v-else>
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
+                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
+                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly" />
+                            <button @click="lockProjectWeight(e.name)"
+                              :disabled="!canLockProjectWeight('midterm')"
+                              class="text-[10px] px-2 py-1 rounded text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                              <Lock class="w-3 h-3" />锁定
+                            </button>
+                          </template>
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
                       </div>
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
                     <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
-                      <div v-if="!midtermProjectShareReady" class="px-3 py-2 bg-amber-50 border-b border-amber-100 text-amber-600 text-[10px] flex items-center gap-1.5">
-                        <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>项目占比合计为 {{ midtermProjectTotalShare }}%，需为 100% 才能录入项目成绩，请先调整占比</span>
+                      <div v-if="!midtermProjectShareReady" class="px-4 py-3 bg-amber-50 border-b border-amber-100 text-amber-700 flex items-center gap-2">
+                        <AlertTriangle class="w-4 h-4 flex-shrink-0" />
+                        <span class="text-xs font-medium">项目占比合计为 {{ midtermProjectTotalShare }}%，需调整至 100% 才能录入成绩</span>
+                      </div>
+                      <div v-else class="px-4 py-3 bg-green-50 border-b border-green-200 text-green-700 flex items-center gap-2">
+                        <CheckCircle class="w-5 h-5 flex-shrink-0 text-green-500" />
+                        <span class="text-sm font-semibold">✓ 占比已配置完成，点击下方班级即可录入项目成绩</span>
                       </div>
                       <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
                         @click="midtermProjectShareReady && (selectedGradeClass = classBlock.className, showGradePopup = true)"
-                        class="flex items-center justify-between px-3 py-2 transition-colors border-b border-gray-50 last:border-b-0"
-                        :class="midtermProjectShareReady ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-not-allowed opacity-60'">
+                        class="flex items-center justify-between px-4 py-3 transition-colors border-b border-gray-50 last:border-b-0"
+                        :class="midtermProjectShareReady ? 'hover:bg-blue-50 cursor-pointer' : 'cursor-not-allowed opacity-60'">
                         <div class="flex items-center gap-2">
                           <span class="text-xs font-semibold text-gray-700 min-w-[4rem]">班级 {{ classBlock.className || '未分班' }}</span>
                           <div class="flex flex-wrap gap-1">
@@ -639,23 +653,42 @@
                         </button>
                         <div v-if="finalProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
-                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
-                            class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || isWeightLocked" />
+                          <template v-if="isProjectWeightLocked(e.name)">
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
+                              disabled
+                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
+                            <Lock class="w-3 h-3 text-amber-500" />
+                            <button @click="unlockProjectWeight(e.name)"
+                              class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
+                          </template>
+                          <template v-else>
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
+                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
+                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly" />
+                            <button @click="lockProjectWeight(e.name)"
+                              :disabled="!canLockProjectWeight('final')"
+                              class="text-[10px] px-2 py-1 rounded text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed">
+                              <Lock class="w-3 h-3" />锁定
+                            </button>
+                          </template>
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
                       </div>
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
                     <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
-                      <div v-if="!finalProjectShareReady" class="px-3 py-2 bg-amber-50 border-b border-amber-100 text-amber-600 text-[10px] flex items-center gap-1.5">
-                        <AlertTriangle class="w-3.5 h-3.5 flex-shrink-0" />
-                        <span>项目占比合计为 {{ finalProjectTotalShare }}%，需为 100% 才能录入项目成绩，请先调整占比</span>
+                      <div v-if="!finalProjectShareReady" class="px-4 py-3 bg-amber-50 border-b border-amber-100 text-amber-700 flex items-center gap-2">
+                        <AlertTriangle class="w-4 h-4 flex-shrink-0" />
+                        <span class="text-xs font-medium">项目占比合计为 {{ finalProjectTotalShare }}%，需调整至 100% 才能录入成绩</span>
+                      </div>
+                      <div v-else class="px-4 py-3 bg-green-50 border-b border-green-200 text-green-700 flex items-center gap-2">
+                        <CheckCircle class="w-5 h-5 flex-shrink-0 text-green-500" />
+                        <span class="text-sm font-semibold">✓ 占比已配置完成，点击下方班级即可录入项目成绩</span>
                       </div>
                       <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
                         @click="finalProjectShareReady && (selectedGradeClass = classBlock.className, showGradePopup = true)"
-                        class="flex items-center justify-between px-3 py-2 transition-colors border-b border-gray-50 last:border-b-0"
-                        :class="finalProjectShareReady ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-not-allowed opacity-60'">
+                        class="flex items-center justify-between px-4 py-3 transition-colors border-b border-gray-50 last:border-b-0"
+                        :class="finalProjectShareReady ? 'hover:bg-blue-50 cursor-pointer' : 'cursor-not-allowed opacity-60'">
                         <div class="flex items-center gap-2">
                           <span class="text-xs font-semibold text-gray-700 min-w-[4rem]">班级 {{ classBlock.className || '未分班' }}</span>
                           <div class="flex flex-wrap gap-1">
@@ -727,11 +760,6 @@
 
         <!-- 搜索与过滤（影响各项目/考试下展开的班级列表） -->
         <div v-if="selectedExam" class="flex flex-wrap items-center gap-2 mb-3">
-          <div class="relative w-48">
-            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-            <input v-model="gradeSearch" type="text" placeholder="搜索学生姓名或学号..."
-              class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
-          </div>
           <select v-model="gradeFilterClass"
             class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
             <option value="">全部班级</option>
@@ -1638,6 +1666,35 @@ const showGradePopup = ref(false)
 const selectedGradeClass = ref('')
 const gradePopupSearch = ref('')
 
+// 项目占比锁定状态：每个项目独立控制锁定/解锁
+const lockedWeightProjects = ref<Set<string>>(new Set())
+
+function isProjectWeightLocked(examName: string): boolean {
+  return lockedWeightProjects.value.has(examName)
+}
+
+function toggleProjectWeight(examName: string) {
+  if (lockedWeightProjects.value.has(examName)) {
+    lockedWeightProjects.value.delete(examName)
+  } else {
+    lockedWeightProjects.value.add(examName)
+  }
+}
+
+function canLockProjectWeight(type: string): boolean {
+  if (type === 'midterm') return midtermProjectTotalShare.value === 100
+  if (type === 'final') return finalProjectTotalShare.value === 100
+  return false
+}
+
+function lockProjectWeight(examName: string) {
+  lockedWeightProjects.value.add(examName)
+}
+
+function unlockProjectWeight(examName: string) {
+  lockedWeightProjects.value.delete(examName)
+}
+
 // 成绩查询图表引用
 const midtermChartRef = ref<HTMLDivElement | null>(null)
 const finalChartRef = ref<HTMLDivElement | null>(null)
@@ -2191,11 +2248,35 @@ function handleAddExam() {
     const sameTypeExams = store.getExamScoresForCourse(courseId.value)
       .filter((s) => s.type === type)
     const uniqueNames = Array.from(new Set(sameTypeExams.map((s) => s.examName)))
-    // 默认均分：各项目在该类项目中的占比按项目数平均分配，合计 100%
-    if (uniqueNames.length > 0) {
-      const eachShare = Math.floor(100 / uniqueNames.length)
-      uniqueNames.forEach((examName, i) =>
-        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
+
+    if (uniqueNames.length === 1) {
+      store.setExamWeight(courseId.value!, name, 100)
+    } else if (uniqueNames.length > 1) {
+      const existingNames = uniqueNames.filter((n) => n !== name)
+      let currentTotal = 0
+      for (const n of existingNames) {
+        currentTotal += store.getExamWeight(courseId.value!, n)
+      }
+
+      if (currentTotal <= 0) {
+        const eachShare = Math.floor(100 / uniqueNames.length)
+        uniqueNames.forEach((examName, i) =>
+          store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
+      } else {
+        const newProjectWeight = Math.floor(100 / uniqueNames.length)
+        const remaining = 100 - newProjectWeight
+        let assigned = 0
+        existingNames.forEach((n, i) => {
+          if (i === existingNames.length - 1) {
+            store.setExamWeight(courseId.value!, n, Math.max(0, remaining - assigned))
+          } else {
+            const newWeight = Math.round(store.getExamWeight(courseId.value!, n) * remaining / currentTotal)
+            store.setExamWeight(courseId.value!, n, Math.max(0, newWeight))
+            assigned += newWeight
+          }
+        })
+        store.setExamWeight(courseId.value!, name, newProjectWeight)
+      }
     }
   }
 
