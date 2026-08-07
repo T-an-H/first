@@ -23,7 +23,8 @@ const avgScore = computed(() => {
   const totals = myGrades.value.map((g) => {
     const d = store.detailedGrades.find((dg) => dg.studentId === g.studentId && dg.courseId === g.courseId)
     if (d) return store.calcTotalScore(g.courseId, d)
-    return g.totalScore ?? g.score ?? 0
+    const base = g.totalScore ?? g.score ?? 0
+    return Math.min(100, base + store.getStudentQualityScore(g.courseId, g.studentId))
   })
   return Math.round(totals.reduce((s, t) => s + t, 0) / totals.length)
 })
@@ -137,6 +138,24 @@ const radarData = computed(() => {
   return result
 })
 
+// ====== 素质评价雷达图数据（取素质评价分最高的 5 门课程） ======
+const qualityRadarData = computed(() => {
+  if (!student.value) return []
+  const result: { label: string; value: number }[] = []
+  for (const enr of myEnrollments.value) {
+    const course = getCourse(enr.courseId)
+    if (!course) continue
+    const qe = store.getStudentQualityEvaluation(enr.courseId, student.value.id)
+    if (!qe || qe.submissions.length === 0) continue
+    const graded = qe.submissions.filter((s) => s.score !== undefined)
+    if (graded.length === 0) continue
+    const latest = graded[graded.length - 1]
+    result.push({ label: course.title, value: Math.round(latest.score ?? 0) })
+  }
+  // 按分数降序，取前 5 门
+  return result.sort((a, b) => b.value - a.value).slice(0, 5)
+})
+
 // ====== 增值评价数据 ======
 const selectedTrendCourseIndex = ref(0)
 
@@ -220,67 +239,79 @@ const evalTrendStats = computed(() => {
   return stats
 })
 
-function getAngle(i: number): number {
-  const total = radarData.value.length || 6
-  return ((360 / total) * i - 90) * Math.PI / 180
-}
+/** 绘制雷达图（坐标以 viewBox="-120 -120 440 440"、中心 (100,100)、最外层半径 150 为基准） */
+function drawRadarChart(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  data: { label: string; value: number }[]
+) {
+  if (data.length === 0) return
+  const angleOf = (i: number): number => ((360 / data.length) * i - 90) * Math.PI / 180
 
-function gridPoints(level: number): string {
-  const r = level * 30
-  return radarData.value.map((_, i) => {
-    const angle = getAngle(i)
-    return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
-  }).join(' ')
-}
+  // 网格多边形（5 层）
+  for (let level = 1; level <= 5; level++) {
+    const r = level * 30
+    const points = data.map((_, i) => {
+      const angle = angleOf(i)
+      return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
+    }).join(' ')
+    svg.append('polygon')
+      .attr('points', points)
+      .attr('fill', 'none')
+      .attr('stroke', '#5eb6b9')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.3)
+  }
 
-function axisEndX(i: number): number {
-  const angle = getAngle(i)
-  return 100 + 150 * Math.cos(angle)
-}
+  // 轴线
+  data.forEach((_, i) => {
+    const angle = angleOf(i)
+    svg.append('line')
+      .attr('x1', 100).attr('y1', 100)
+      .attr('x2', 100 + 150 * Math.cos(angle)).attr('y2', 100 + 150 * Math.sin(angle))
+      .attr('stroke', '#5eb6b9')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.3)
+  })
 
-function axisEndY(i: number): number {
-  const angle = getAngle(i)
-  return 100 + 150 * Math.sin(angle)
-}
-
-function dataPointX(i: number): number {
-  const angle = getAngle(i)
-  const r = radarData.value[i].value * 1.5
-  return 100 + r * Math.cos(angle)
-}
-
-function dataPointY(i: number): number {
-  const angle = getAngle(i)
-  const r = radarData.value[i].value * 1.5
-  return 100 + r * Math.sin(angle)
-}
-
-function dataLabelX(i: number): number {
-  const angle = getAngle(i)
-  const r = Math.min(radarData.value[i].value * 1.5 + 25, 170)
-  return 100 + r * Math.cos(angle)
-}
-
-function dataLabelY(i: number): number {
-  const angle = getAngle(i)
-  const r = Math.min(radarData.value[i].value * 1.5 + 25, 170)
-  return 100 + r * Math.sin(angle)
-}
-
-function dataLabelAnchor(i: number): string {
-  const angle = getAngle(i)
-  const r = radarData.value[i].value * 1.5
-  const x = 100 + r * Math.cos(angle)
-  return x > 100 ? 'start' : 'end'
-}
-
-const dataPolygonPoints = computed(() => {
-  return radarData.value.map((d, i) => {
-    const angle = getAngle(i)
+  // 数据多边形
+  const polyPoints = data.map((d, i) => {
+    const angle = angleOf(i)
     const r = d.value * 1.5
     return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
   }).join(' ')
-})
+  svg.append('polygon')
+    .attr('points', polyPoints)
+    .attr('fill', 'rgba(65, 90, 119, 0.2)')
+    .attr('stroke', '#429fc4')
+    .attr('stroke-width', 2)
+
+  // 数据点 + 标签
+  data.forEach((d, i) => {
+    const angle = angleOf(i)
+    const r = d.value * 1.5
+    const x = 100 + r * Math.cos(angle)
+    const y = 100 + r * Math.sin(angle)
+    const lx = 100 + Math.min(r + 25, 170) * Math.cos(angle)
+    const ly = 100 + Math.min(r + 25, 170) * Math.sin(angle)
+    const anchor = x > 100 ? 'start' : 'end'
+
+    svg.append('circle')
+      .attr('cx', x).attr('cy', y)
+      .attr('r', 4).attr('fill', '#429fc4')
+
+    svg.append('text')
+      .attr('x', lx).attr('y', ly)
+      .attr('text-anchor', anchor)
+      .attr('font-size', 9).attr('fill', '#5eb6b9')
+      .text(d.label)
+
+    svg.append('text')
+      .attr('x', lx).attr('y', ly + 12)
+      .attr('text-anchor', anchor)
+      .attr('font-size', 9).attr('fill', '#429fc4').attr('font-weight', 'bold')
+      .text(`${d.value}分`)
+  })
+}
 
 const showDetailModal = ref(false)
 
@@ -457,52 +488,7 @@ function renderProfile(root: HTMLElement) {
       })
 
     const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
-
-    // 网格多边形
-    for (let level = 1; level <= 5; level++) {
-      svg.append('polygon')
-        .attr('points', gridPoints(level))
-        .attr('fill', 'none')
-        .attr('stroke', '#5eb6b9')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.3)
-    }
-
-    // 轴线
-    rd.forEach((_, i) => {
-      svg.append('line')
-        .attr('x1', 100).attr('y1', 100)
-        .attr('x2', axisEndX(i)).attr('y2', axisEndY(i))
-        .attr('stroke', '#5eb6b9')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.3)
-    })
-
-    // 数据多边形
-    svg.append('polygon')
-      .attr('points', dataPolygonPoints.value)
-      .attr('fill', 'rgba(65, 90, 119, 0.2)')
-      .attr('stroke', '#429fc4')
-      .attr('stroke-width', 2)
-
-    // 数据点 + 标签
-    rd.forEach((d, i) => {
-      svg.append('circle')
-        .attr('cx', dataPointX(i)).attr('cy', dataPointY(i))
-        .attr('r', 4).attr('fill', '#429fc4')
-
-      svg.append('text')
-        .attr('x', dataLabelX(i)).attr('y', dataLabelY(i))
-        .attr('text-anchor', dataLabelAnchor(i))
-        .attr('font-size', 9).attr('fill', '#5eb6b9')
-        .text(d.label)
-
-      svg.append('text')
-        .attr('x', dataLabelX(i)).attr('y', dataLabelY(i) + 12)
-        .attr('text-anchor', dataLabelAnchor(i))
-        .attr('font-size', 9).attr('fill', '#429fc4').attr('font-weight', 'bold')
-        .text(`${d.value}分`)
-    })
+    drawRadarChart(svg, rd)
 
     // hover提示
     const hoverOverlay = svgWrap.append('div')
@@ -513,25 +499,30 @@ function renderProfile(root: HTMLElement) {
       .html('暂无平时成绩数据<br />完成课程评价后将生成能力雷达图')
   }
 
-  // 学习统计
-  const statCard = twoCol.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
-  const statTitle = statCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(statTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
-  statTitle.append('span').text('学习统计')
+  // 素质评价雷达图（取素质评价分最高的 5 门课程，与课程成绩雷达图并排）
+  const qrd = qualityRadarData.value
+  const qualityRadarCard = twoCol.append('div').attr('class', 'bg-white rounded-xl p-6 border border-emerald-400/20 shadow-sm')
+  const qualityRadarTitle = qualityRadarCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
+  renderIcon(qualityRadarTitle, 'award').attr('class', 'w-5 h-5 text-emerald-600')
+  qualityRadarTitle.append('span').text('素质评价雷达图')
 
-  const statItems = [
-    { label: '学习中课程', value: `${inProgress.value} 门`, color: 'text-gray-900' },
-    { label: '已完成课程', value: `${completed.value} 门`, color: 'text-emerald-600' },
-    { label: '总学分', value: `${totalCredits.value} 学分`, color: 'text-brand-600' },
-    ...(hasMidtermAndFinal.value ? [{ label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' }] : []),
-    { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900' },
-  ]
-  const statBody = statCard.append('div').attr('class', 'space-y-4')
-  statItems.forEach((item) => {
-    const row = statBody.append('div').attr('class', 'flex items-center justify-between p-3 bg-gray-50 rounded-lg')
-    row.append('span').attr('class', 'text-sm text-gray-600').text(item.label)
-    row.append('span').attr('class', `font-semibold ${item.color}`).text(item.value)
-  })
+  if (qrd.length > 0) {
+    const svgWrap = qualityRadarCard.append('div').attr('class', 'relative w-72 h-72 mx-auto')
+    const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
+    drawRadarChart(svg, qrd)
+
+    // 各课程素质评价分一览（按分数从高到低排序）
+    const scoreList = qualityRadarCard.append('div').attr('class', 'mt-4 grid grid-cols-1 gap-1.5')
+    qrd.forEach((d) => {
+      const row = scoreList.append('div').attr('class', 'flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-400/10')
+      row.append('span').attr('class', 'text-xs text-gray-600 truncate').text(d.label)
+      row.append('span').attr('class', 'text-sm font-bold text-emerald-600 flex-shrink-0').text(`${d.value}分`)
+    })
+  } else {
+    qualityRadarCard.append('div').attr('class', 'text-center py-8')
+      .append('p').attr('class', 'text-gray-400').text('暂无素质评价数据')
+    qualityRadarCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成素质评价打分后将生成雷达图')
+  }
 
   // 增值评价板块
   const trendData = evalTrendData.value
@@ -669,6 +660,26 @@ function renderProfile(root: HTMLElement) {
       .append('p').attr('class', 'text-gray-400').text('暂无评价数据')
     trendCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成课程评价后将生成增值评价趋势图')
   }
+
+  // 学习统计
+  const statCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
+  const statTitle = statCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
+  renderIcon(statTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
+  statTitle.append('span').text('学习统计')
+
+  const statItems = [
+    { label: '学习中课程', value: `${inProgress.value} 门`, color: 'text-gray-900' },
+    { label: '已完成课程', value: `${completed.value} 门`, color: 'text-emerald-600' },
+    { label: '总学分', value: `${totalCredits.value} 学分`, color: 'text-brand-600' },
+    ...(hasMidtermAndFinal.value ? [{ label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' }] : []),
+    { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900' },
+  ]
+  const statBody = statCard.append('div').attr('class', 'grid grid-cols-2 md:grid-cols-5 gap-3')
+  statItems.forEach((item) => {
+    const cell = statBody.append('div').attr('class', 'p-4 bg-gray-50 rounded-lg')
+    cell.append('p').attr('class', 'text-sm text-gray-600').text(item.label)
+    cell.append('p').attr('class', `text-2xl font-bold mt-1 ${item.color}`).text(item.value)
+  })
 
   // 今日学习轨迹
   const todaySchs = todaySchedules.value

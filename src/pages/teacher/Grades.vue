@@ -262,6 +262,8 @@
       :cfg="detailTargetCfg"
       :total-score="detailTargetTotalScore"
       :exam-scores="detailTargetExamScores"
+      :course-id="detailTarget.courseId"
+      :student-id="detailTarget.studentId"
     />
   </div>
 </template>
@@ -463,7 +465,8 @@ const detailTargetCfg = computed(() => {
 
 const detailTargetTotalScore = computed(() => {
   if (!detailTarget.value) return 0
-  return store.grades.find((g) => g.studentId === detailTarget.value!.studentId && g.courseId === detailTarget.value!.courseId)?.score ?? 0
+  const base = store.grades.find((g) => g.studentId === detailTarget.value!.studentId && g.courseId === detailTarget.value!.courseId)?.score ?? 0
+  return Math.min(100, base + getQualityBonus(detailTarget.value.courseId, detailTarget.value.studentId))
 })
 
 const detailTargetExamScores = computed(() => {
@@ -478,7 +481,13 @@ function getStudentTotal(enr: Enrollment): number | null {
   // 课程未开课时不展示成绩
   if (!store.isFirstClassStarted(enr.courseId)) return null
   const g = store.grades.find((g) => g.studentId === enr.studentId && g.courseId === enr.courseId)
-  return g?.score ?? null
+  if (g?.score == null) return null
+  return Math.min(100, g.score + getQualityBonus(enr.courseId, enr.studentId))
+}
+
+/** 素质评价加成（封顶为配置的加成上限，直接加在总成绩上） */
+function getQualityBonus(courseId: string, studentId: string): number {
+  return store.getStudentQualityScore(courseId, studentId)
 }
 
 /** 获取评阅时间 */

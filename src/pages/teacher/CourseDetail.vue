@@ -29,7 +29,7 @@
       </button>
     </div>
 
-    <!-- Tab: 评论管理 -->
+    <!-- Tab: 评价管理 -->
     <div v-if="activeTab === 'comments'" class="space-y-6">
       <!-- 评价方案配置（始终展开） -->
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -39,7 +39,7 @@
             <h2 class="font-semibold text-gray-900">评价方案配置</h2>
           </div>
           <div class="flex items-center gap-3">
-            <span v-if="evalConfigLocked || isMentor" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 border border-gray-200">
+            <span v-if="evalConfigLocked || isViewOnly" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 border border-gray-200">
               <Lock class="w-3 h-3 inline mr-0.5" />仅查看
             </span>
             <span class="text-xs text-gray-400">
@@ -76,7 +76,7 @@
         </div>
 
         <!-- 教师可编辑：直接展示配置界面 -->
-        <template v-if="!isReadOnly && !evalConfigLocked && !isMentor">
+        <template v-if="!isReadOnly && !evalConfigLocked && !isViewOnly">
           <div class="border-t border-gray-100 mt-3 pt-4 space-y-4">
             <div>
               <p class="text-sm font-medium text-gray-700 mb-2">评价模板</p>
@@ -200,7 +200,7 @@
             <h2 class="font-semibold text-gray-900">评价管理</h2>
             <span class="text-xs text-gray-400">{{ enrolledStudents.length }}名学生</span>
           </div>
-          <button v-if="!isMentor" @click="handleProcessOverdue" class="text-xs flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100">
+          <button v-if="!isViewOnly" @click="handleProcessOverdue" class="text-xs flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100">
             <RefreshCw class="w-3 h-3" />
             处理逾期自评
           </button>
@@ -325,7 +325,7 @@
                           <input type="checkbox"
                             v-model="selectedStudentIds"
                             :value="s.student.id"
-                            :disabled="s.submitted"
+                            :disabled="s.submitted || !canManageEval"
                             class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
                         </td>
                         <td class="py-2 px-3">
@@ -354,7 +354,7 @@
                           <span v-else class="text-xs text-gray-300">-</span>
                         </td>
                         <td class="py-2 px-3">
-                          <div v-if="!s.submitted" class="flex items-center gap-1">
+                          <div v-if="!s.submitted && canManageEval" class="flex items-center gap-1">
                             <input type="number" min="0" max="100"
                               :value="evalScoreInputs[s.student.id] ?? ''"
                               @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) evalScoreInputs[s.student.id] = Math.min(100, Math.max(0, v)); else delete evalScoreInputs[s.student.id] }"
@@ -362,7 +362,8 @@
                               class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
                             <span class="text-xs text-gray-400">分</span>
                           </div>
-                          <span v-else class="text-xs font-medium text-emerald-600">{{ s.finalScore }}分</span>
+                          <span v-else-if="s.submitted" class="text-xs font-medium text-emerald-600">{{ s.finalScore }}分</span>
+                          <span v-else class="text-xs text-gray-300">-</span>
                         </td>
                       </tr>
                     </tbody>
@@ -374,29 +375,30 @@
             <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-start justify-between gap-4">
               <div class="flex flex-wrap items-center gap-2">
                 <button @click="toggleAllClass"
-                  :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${selectedUnsubmittedCount === 0 && !isAllClassSelected ? 'opacity-50 cursor-not-allowed' : ''} border-gray-300 text-gray-600 hover:bg-gray-100`">
+                  :disabled="!canManageEval"
+                  :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${!canManageEval || (selectedUnsubmittedCount === 0 && !isAllClassSelected) ? 'opacity-50 cursor-not-allowed' : ''} border-gray-300 text-gray-600 hover:bg-gray-100`">
                   {{ isAllClassSelected ? '取消全选' : '全选本班' }}
                 </button>
                 <span class="text-xs text-gray-500 font-medium">一键等级评价（选中 {{ selectedUnsubmittedCount }} 名学生）：</span>
                 <div class="flex flex-wrap gap-1.5">
                   <button v-for="level in LEVEL_OPTIONS" :key="level.label"
                     @click="handleBatchEval(level.label)"
-                    :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${level.color} hover:opacity-80 ${selectedUnsubmittedCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`"
-                    :disabled="selectedUnsubmittedCount === 0">
+                    :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${level.color} hover:opacity-80 ${selectedUnsubmittedCount === 0 || !canManageEval ? 'opacity-50 cursor-not-allowed' : ''}`"
+                    :disabled="selectedUnsubmittedCount === 0 || !canManageEval">
                     {{ level.label }} ({{ level.range[0] }}-{{ level.range[1] }}分)
                   </button>
                 </div>
               </div>
               <div class="flex items-center gap-2">
                 <button @click="handleSaveEvalScores"
-                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasEvalInputs ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-                  :disabled="!hasEvalInputs">
+                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasEvalInputs && canManageEval ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
+                  :disabled="!hasEvalInputs || !canManageEval">
                   <Save class="w-4 h-4" />
                   保存评分
                 </button>
                 <button @click="handleSubmitAll"
-                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasSubmittable ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-                  :disabled="!hasSubmittable">
+                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasSubmittable && canManageEval ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
+                  :disabled="!hasSubmittable || !canManageEval">
                   <CheckCircle class="w-4 h-4" />
                   提交评价（{{ submittableCount }}人）
                 </button>
@@ -418,7 +420,7 @@
             <h2 class="font-semibold text-gray-900">成绩配置</h2>
             <span class="text-xs text-gray-400">{{ enrolledStudents.length }}名学生</span>
           </div>
-          <div v-if="!isMentor" class="flex items-center gap-2">
+          <div v-if="!isViewOnly" class="flex items-center gap-2">
             <button @click="handleSaveGradeConfig" :disabled="isReadOnly || isWeightLocked || mainTotal !== 100 || regularTotal !== 100 || midtermSubTotal !== 100 || finalSubTotal !== 100"
               class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed transition-colors">
               <Save class="w-3.5 h-3.5" />
@@ -436,27 +438,40 @@
         <!-- 完整权重配置区域 -->
         <div class="space-y-6">
           <Section title="总成绩权重" :hint="`合计：${mainTotal}%${mainTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="mainTotal === 100">
-            <Slider label="平时成绩" :val="gradeConfig.regularWeight" @change="(v) => updateGradeConfig('regularWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="期中成绩" :val="gradeConfig.midtermWeight" @change="(v) => updateGradeConfig('midtermWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="期末成绩" :val="gradeConfig.finalWeight" @change="(v) => updateGradeConfig('finalWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
+            <Slider label="平时成绩" :val="gradeConfig.regularWeight" @change="(v) => updateGradeConfig('regularWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="期中成绩" :val="gradeConfig.midtermWeight" @change="(v) => updateGradeConfig('midtermWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="期末成绩" :val="gradeConfig.finalWeight" @change="(v) => updateGradeConfig('finalWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
           </Section>
 
           <Section title="平时成绩构成" :hint="`合计：${regularTotal}%${regularTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="regularTotal === 100">
-            <Slider label="自评" :val="gradeConfig.selfEvalWeight" @change="(v) => updateGradeConfig('selfEvalWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="组内互评" :val="gradeConfig.peerReviewWeight" @change="(v) => updateGradeConfig('peerReviewWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="组间互评" :val="gradeConfig.interGroupEvalWeight" @change="(v) => updateGradeConfig('interGroupEvalWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="教师评价" :val="gradeConfig.teacherScoreWeight" @change="(v) => updateGradeConfig('teacherScoreWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="企业导师评价" :val="gradeConfig.mentorScoreWeight" @change="(v) => updateGradeConfig('mentorScoreWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
+            <Slider label="自评" :val="gradeConfig.selfEvalWeight" @change="(v) => updateGradeConfig('selfEvalWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="组内互评" :val="gradeConfig.peerReviewWeight" @change="(v) => updateGradeConfig('peerReviewWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="组间互评" :val="gradeConfig.interGroupEvalWeight" @change="(v) => updateGradeConfig('interGroupEvalWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="教师评价" :val="gradeConfig.teacherScoreWeight" @change="(v) => updateGradeConfig('teacherScoreWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="企业导师评价" :val="gradeConfig.mentorScoreWeight" @change="(v) => updateGradeConfig('mentorScoreWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
           </Section>
 
           <Section title="期中成绩构成" :hint="`合计：${midtermSubTotal}%${midtermSubTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="midtermSubTotal === 100">
-            <Slider label="期中考试" :val="gradeConfig.midtermExamWeight" @change="(v) => updateGradeConfig('midtermExamWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="项目成绩" :val="gradeConfig.midtermProjectWeight" @change="(v) => updateGradeConfig('midtermProjectWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
+            <Slider label="期中考试" :val="gradeConfig.midtermExamWeight" @change="(v) => updateGradeConfig('midtermExamWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="项目成绩" :val="gradeConfig.midtermProjectWeight" @change="(v) => updateGradeConfig('midtermProjectWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
           </Section>
 
           <Section title="期末成绩构成" :hint="`合计：${finalSubTotal}%${finalSubTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="finalSubTotal === 100">
-            <Slider label="期末测试" :val="gradeConfig.finalExamWeight" @change="(v) => updateGradeConfig('finalExamWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
-            <Slider label="项目成绩" :val="gradeConfig.finalProjectWeight" @change="(v) => updateGradeConfig('finalProjectWeight', v)" :disabled="isReadOnly || isWeightLocked || isMentor" />
+            <Slider label="期末测试" :val="gradeConfig.finalExamWeight" @change="(v) => updateGradeConfig('finalExamWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <Slider label="项目成绩" :val="gradeConfig.finalProjectWeight" @change="(v) => updateGradeConfig('finalProjectWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+          </Section>
+
+          <Section title="素质评价" hint="教师评分的加成分数上限（不计入权重百分比）" :valid="true">
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-gray-700 w-28 flex-shrink-0">加成上限（分）</span>
+              <input type="number" min="0" max="20" step="1"
+                :value="gradeConfig.qualityEvalMaxBonus ?? 10"
+                :disabled="isReadOnly || isWeightLocked || isViewOnly"
+                @change="(e) => updateQualityMaxBonus(Number((e.target as HTMLInputElement).value))"
+                class="w-24 px-2 py-1 rounded border border-gray-200 focus:border-brand-600 outline-none text-sm text-center disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed" />
+              <span class="text-sm text-gray-400">分</span>
+            </div>
+            <p class="text-xs text-gray-400 pl-2">教师对素质评价打分（0-100），最终最多折算该上限分数加成到总成绩（当前上限 {{ gradeConfig.qualityEvalMaxBonus ?? 10 }} 分）</p>
           </Section>
         </div>
       </div>
@@ -475,6 +490,11 @@
 
         <!-- 搜索与过滤 -->
         <div class="flex flex-wrap items-center gap-2 mb-4">
+          <div class="relative w-48">
+            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input v-model="gradeEntrySearch" type="text" placeholder="搜索学生姓名或学号..."
+              class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-xs" />
+          </div>
           <select v-model="gradeFilterClass"
             class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
             <option value="">全部班级</option>
@@ -485,6 +505,9 @@
             <option value="">全部分组</option>
             <option v-for="opt in gradeGroupOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
           </select>
+          <span v-if="gradeEntrySearch.trim()" class="text-xs text-gray-400">
+            搜索 "{{ gradeEntrySearch.trim() }}"：匹配 {{ filteredGradeClassBlocks.length }} 个班级
+          </span>
         </div>
 
         <!-- 期中 / 期末 列表（展开，含导入导出） -->
@@ -505,12 +528,12 @@
                     <span v-if="midtermProjects.length > 1" :class="midtermProjectTotalShare === 100 ? 'text-blue-400' : 'text-amber-500'" class="text-[10px]">占比合计：{{ midtermProjectTotalShare }}%</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button @click="showNewExamModal = true; newExamType = 'midterm_project'" :disabled="isReadOnly"
+                    <button @click="showNewExamModal = true; newExamType = 'midterm_project'" :disabled="isReadOnly || !canManageProjects"
                       class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                       <Plus class="w-3 h-3" /> 添加项目
                     </button>
                     <button v-if="midtermProjects.length > 1" @click="toggleMidtermProjectLock()"
-                      :disabled="!canLockProjectWeight('midterm') || isReadOnly"
+                      :disabled="!canLockProjectWeight('midterm') || isReadOnly || !canManageProjects"
                       class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       :class="midtermProjectLocked ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'">
                       <Lock class="w-3 h-3" /> {{ midtermProjectLocked ? '解锁' : '锁定' }}
@@ -532,13 +555,13 @@
                               disabled
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
                             <Lock class="w-3 h-3 text-amber-500" />
-                            <button @click="unlockProjectWeight(e.name)"
+                            <button v-if="!isReadOnly && canManageProjects" @click="unlockProjectWeight(e.name)"
                               class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
                           </template>
                           <template v-else>
                             <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
                               @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
-                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly" />
+                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
                           </template>
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
@@ -586,7 +609,7 @@
                   <div class="w-1 h-4 rounded-full bg-emerald-400"></div>
                   <span class="text-xs font-semibold text-emerald-700">笔试成绩</span>
                   <span class="text-[10px] text-emerald-300 ml-1">(固定，仅1次)</span>
-                  <span v-if="isMentor" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">导师仅查看</span>
+                  <span v-if="isViewOnly" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">仅查看</span>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermExams" :key="e.name" class="px-4 py-3">
@@ -642,12 +665,12 @@
                     <span v-if="finalProjects.length > 1" :class="finalProjectTotalShare === 100 ? 'text-blue-400' : 'text-amber-500'" class="text-[10px]">占比合计：{{ finalProjectTotalShare }}%</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button @click="showNewExamModal = true; newExamType = 'final_project'" :disabled="isReadOnly"
+                    <button @click="showNewExamModal = true; newExamType = 'final_project'" :disabled="isReadOnly || !canManageProjects"
                       class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                       <Plus class="w-3 h-3" /> 添加项目
                     </button>
                     <button v-if="finalProjects.length > 1" @click="toggleFinalProjectLock()"
-                      :disabled="!canLockProjectWeight('final') || isReadOnly"
+                      :disabled="!canLockProjectWeight('final') || isReadOnly || !canManageProjects"
                       class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       :class="finalProjectLocked ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'">
                       <Lock class="w-3 h-3" /> {{ finalProjectLocked ? '解锁' : '锁定' }}
@@ -669,13 +692,13 @@
                               disabled
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
                             <Lock class="w-3 h-3 text-amber-500" />
-                            <button @click="unlockProjectWeight(e.name)"
+                            <button v-if="!isReadOnly && canManageProjects" @click="unlockProjectWeight(e.name)"
                               class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
                           </template>
                           <template v-else>
                             <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
                               @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
-                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly" />
+                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
                           </template>
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
@@ -723,7 +746,7 @@
                   <div class="w-1 h-4 rounded-full bg-emerald-400"></div>
                   <span class="text-xs font-semibold text-emerald-700">笔试成绩</span>
                   <span class="text-[10px] text-emerald-300 ml-1">(固定，仅1次)</span>
-                  <span v-if="isMentor" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">导师仅查看</span>
+                  <span v-if="isViewOnly" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">仅查看</span>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalExams" :key="e.name" class="px-4 py-3">
@@ -881,7 +904,7 @@
                 <div class="flex items-center gap-1">
                   <label class="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium rounded transition-colors cursor-pointer bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100">
                     <FileSpreadsheet class="w-3 h-3" /> 导入
-                    <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly || (isMentor && currentExamIsWritten)" />
+                    <input type="file" accept=".xlsx,.xls" @change="handleExcelImport" class="hidden" :disabled="isReadOnly || isViewOnly" />
                   </label>
                   <button @click="handleDownloadTemplate()"
                     class="flex items-center gap-0.5 px-2 py-1 text-[10px] font-medium rounded border border-gray-200 text-gray-500 hover:bg-gray-50">
@@ -934,7 +957,7 @@
                         </td>
                         <td class="py-2 px-3 text-xs text-gray-500">{{ currentExamFullScore }}</td>
                         <td class="py-2 px-3">
-                          <div v-if="!isExamSubmitted(student!.id) && !(isMentor && currentExamIsWritten)" class="flex items-center gap-1">
+                          <div v-if="!isExamSubmitted(student!.id) && !isViewOnly" class="flex items-center gap-1">
                             <input type="number" min="0" max="100" step="0.5"
                               :value="examInputs[student!.id] ?? getStudentExamScore(student!.id)"
                               @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) examInputs[student!.id] = Math.min(100, Math.max(0, v)); else delete examInputs[student!.id] }"
@@ -943,7 +966,7 @@
                             <span class="text-xs text-gray-400">/ {{ currentExamFullScore }}</span>
                           </div>
                           <span v-else-if="isExamSubmitted(student!.id)" class="text-xs font-medium text-emerald-600">{{ getStudentExamScore(student!.id) }}分</span>
-                          <span v-else-if="isMentor && currentExamIsWritten" class="text-xs font-medium text-gray-500">
+                          <span v-else-if="isViewOnly" class="text-xs font-medium text-gray-500">
                             {{ getStudentExamScore(student!.id) !== null ? getStudentExamScore(student!.id) + '分' : '未录入' }}
                           </span>
                         </td>
@@ -964,7 +987,7 @@
               </template>
             </div>
             <!-- 底部：导师在笔试成绩下不显示保存（笔试仅查看）；项目成绩可保存 -->
-            <div v-if="!isReadOnly && (!isMentor || !currentExamIsWritten)" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <div v-if="!isReadOnly && !isViewOnly" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-500">已提交 {{ submittedExamCount }} 人</span>
               </div>
@@ -1003,7 +1026,7 @@
       <!-- 顶部全局操作栏：只保留新建班级和导入班级 -->
       <div class="flex items-center justify-between flex-wrap gap-2">
         <h2 class="font-semibold text-gray-900 text-lg">班级管理</h2>
-        <div class="flex gap-2 flex-wrap">
+        <div v-if="!isViewOnly" class="flex gap-2 flex-wrap">
           <button @click="showAddClass = true"
             class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors shadow-sm">
             <Plus class="w-3.5 h-3.5" />
@@ -1030,7 +1053,7 @@
               {{ classData.className || '未分班' }}
               <span class="text-xs text-gray-400 font-normal">（{{ classData.students.length }}人）</span>
             </h3>
-            <div v-if="classData.className" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div v-if="!isViewOnly && classData.className" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button @click.stop="handleImportGroupsForClass(classData.className)" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="导入分组">
                 <Upload class="w-3.5 h-3.5" />
               </button>
@@ -1059,7 +1082,7 @@
                     <p class="text-[11px] text-gray-400">{{ group.memberIds.length }} 名成员</p>
                   </div>
                 </div>
-                <div class="flex gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
+                <div v-if="!isViewOnly" class="flex gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
                   <button @click.stop="openEditGroupModal(group)" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="编辑分组">
                     <Pencil class="w-3.5 h-3.5" />
                   </button>
@@ -1079,14 +1102,14 @@
           <div v-else class="border border-dashed border-gray-200 rounded-lg p-6 text-center">
             <Users class="w-8 h-8 mx-auto mb-2 text-gray-200" />
             <p class="text-xs text-gray-400">该班级暂无分组</p>
-            <button @click="openNewGroupForClass(classData.className)"
+            <button v-if="!isViewOnly" @click="openNewGroupForClass(classData.className)"
               class="mt-3 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
               <Plus class="w-3 h-3" />新建分组
             </button>
           </div>
 
           <!-- 一键分组按钮（每个班级内部） -->
-          <div v-if="classData.className && classData.students.length >= 2" class="mt-4 pt-3 border-t border-gray-100 flex gap-2 justify-end">
+          <div v-if="!isViewOnly && classData.className && classData.students.length >= 2" class="mt-4 pt-3 border-t border-gray-100 flex gap-2 justify-end">
             <button @click.stop="showOneClickGroupForClass(classData.className)"
               class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors">
               <RefreshCw class="w-3.5 h-3.5" />一键分组
@@ -1306,6 +1329,130 @@
         </div>
       </Teleport>
     </div>
+
+    <!-- ===== 素质评价 Tab ===== -->
+    <div v-if="activeTab === 'quality-eval'" class="space-y-6">
+      <div class="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-xl p-5 border border-emerald-100">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <UserCheck class="w-5 h-5 text-emerald-600" />
+            <h2 class="font-semibold text-emerald-800 text-lg">素质评价管理</h2>
+            <span v-if="isViewOnly" class="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-500">仅查看</span>
+          </div>
+          <div class="text-xs text-emerald-700">
+            已提交：{{ courseQualityEvaluations.length }} / {{ enrolledStudents.length }} 人
+            <span class="mx-1">·</span>
+            已批改：{{ courseQualityEvaluations.filter(q => q.submissions.some(s => s.score !== undefined)).length }} 人
+          </div>
+        </div>
+        <p class="text-sm text-emerald-700 mt-2">
+          查看学生提交的素质评价资料，上传后直接按打分加成到总成绩（满分 10 分加成）。
+        </p>
+      </div>
+
+      <div v-if="courseQualityEvaluations.length === 0" class="bg-white rounded-xl p-12 border border-brand-400/20 text-center">
+        <div class="w-16 h-16 rounded-full bg-brand-400/10 flex items-center justify-center mx-auto mb-4">
+          <UserCheck class="w-8 h-8 text-brand-400" />
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">暂无学生提交</h3>
+        <p class="text-sm text-gray-500">学生在课程学习页的「素质评价」Tab 中提交资料后，会在此处显示</p>
+      </div>
+
+      <div v-else class="space-y-4">
+        <div v-for="qe in courseQualityEvaluations" :key="qe.id"
+          class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5">
+          <!-- 头部：学生信息 + 提交次数切换 -->
+          <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold">
+                {{ getQualityStudentName(qe.studentId)?.[0] || '?' }}
+              </div>
+              <div>
+                <p class="font-medium text-gray-900">{{ getQualityStudentName(qe.studentId) || '未知学生' }}</p>
+                <p class="text-xs text-gray-400">学号：{{ qe.studentId }} · 共 {{ qe.submissions.length }} 次提交</p>
+              </div>
+            </div>
+            <!-- 提交次数选择器（可对任意一次提交评分） -->
+            <div class="flex items-center gap-1 flex-wrap" v-if="qe.submissions.length > 1">
+              <span class="text-xs text-gray-400 mr-1">选择提交：</span>
+              <button v-for="(sub, si) in qe.submissions" :key="sub.id"
+                @click="qualitySelectedSubId[qe.id] = sub.id"
+                :class="`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                  (qualitySelectedSubId[qe.id] || qe.submissions[qe.submissions.length - 1].id) === sub.id
+                    ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                }`">
+                第{{ si + 1 }}次
+                <span v-if="sub.score !== undefined" class="text-emerald-500 ml-0.5">✓</span>
+              </button>
+            </div>
+            <div v-else class="px-3 py-1 rounded-full text-xs text-gray-400 bg-gray-50 border border-gray-200">
+              第 1 次提交
+            </div>
+          </div>
+
+          <!-- 当前选中的提交 -->
+          <template v-if="getQualityCurrentSub(qe)">
+            <!-- 成果说明 -->
+            <div v-if="getQualityCurrentSub(qe).description" class="mb-3">
+              <p class="text-xs text-gray-500 mb-1">成果说明</p>
+              <p class="text-sm text-gray-700 whitespace-pre-wrap bg-gray-50 p-3 rounded border">{{ getQualityCurrentSub(qe).description }}</p>
+            </div>
+
+            <!-- 文件列表 -->
+            <div class="mb-4">
+              <p class="text-xs text-gray-500 mb-2">提交的资料（{{ getQualityCurrentSub(qe).files.length }} 个文件）</p>
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <a v-for="(f, fi) in getQualityCurrentSub(qe).files" :key="fi" :href="f.dataUrl"
+                  :download="f.fileName" target="_blank"
+                  class="flex items-center gap-2 px-3 py-2 bg-brand-400/5 border border-brand-400/20 rounded text-sm text-brand-700 hover:bg-brand-400/10 transition-colors truncate">
+                  <FileText class="w-4 h-4 flex-shrink-0" />
+                  <span class="truncate">{{ f.fileName }}</span>
+                  <span class="text-xs text-gray-400 flex-shrink-0">{{ (f.fileSize / 1024).toFixed(0) }}KB</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- 教师评分区域 -->
+            <div class="border-t border-brand-400/20 pt-4">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <span class="text-xs font-medium text-gray-600">该次提交状态：</span>
+                <span v-if="getQualityCurrentSub(qe).score !== undefined"
+                  class="px-3 py-1 rounded-full text-sm font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                  已批改：{{ getQualityCurrentSub(qe).score }} 分
+                </span>
+                <span v-else class="px-3 py-1 rounded-full bg-amber-50 text-amber-600 text-xs border border-amber-200">
+                  待批改
+                </span>
+              </div>
+              <div v-if="!isViewOnly" class="flex items-center gap-3 flex-wrap mt-3">
+                <label class="text-sm font-medium text-gray-700">评分 (0-100)：</label>
+                <input type="number" min="0" max="100"
+                  :value="getQualityCurrentSub(qe).score !== undefined ? getQualityCurrentSub(qe).score : ''"
+                  @change="(e) => onQualityScoreChange(getQualityCurrentSub(qe).id, Number((e.target as HTMLInputElement).value))"
+                  class="w-24 px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+                  placeholder="分数" />
+                <span class="text-xs text-gray-400">（折算为最多 {{ gradeConfig.qualityEvalMaxBonus ?? 10 }} 分加成到总分）</span>
+              </div>
+              <div v-if="!isViewOnly" class="flex items-center gap-2 mt-2">
+                <label class="text-xs text-gray-500">评语：</label>
+                <input type="text"
+                  :value="getQualityCurrentSub(qe).teacherComment || ''"
+                  @change="(e) => onQualityCommentChange(getQualityCurrentSub(qe).id, (e.target as HTMLInputElement).value)"
+                  class="flex-1 min-w-[200px] px-3 py-1.5 border border-gray-200 rounded-lg text-sm"
+                  placeholder="可选的评语" />
+                <button @click="saveQualityEval(qe.id, getQualityCurrentSub(qe).id)"
+                  class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg transition-colors">
+                  保存批改
+                </button>
+              </div>
+              <p v-if="getQualityCurrentSub(qe).teacherComment" class="text-xs text-gray-500 mt-2">评语：{{ getQualityCurrentSub(qe).teacherComment }}</p>
+              <p v-if="getQualityCurrentSub(qe).gradedAt" class="text-xs text-gray-400 mt-2">批改时间：{{ getQualityCurrentSub(qe).gradedAt }}</p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- GradeConfig 权重配置弹窗 -->
@@ -1331,7 +1478,7 @@ import {
   EvalFrequencyDescs, OverdueRuleLabels, getDefaultGradeConfig
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
-import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3 } from 'lucide-vue-next'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import * as echarts from 'echarts'
 
@@ -1344,6 +1491,21 @@ const course = computed(() => store.courses.find((c) => c.id === courseId.value)
 const isReadOnly = computed(() => course.value?.status !== 'active')
 /** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由（我的课程/详情均为导师视图） */
 const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
+/** 领导视图：学院领导身份进入课程详情（只读查看） */
+const isLeaderView = computed(() => store.currentRole === 'leader' || route.path.startsWith('/leader'))
+/**
+ * 是否仅查看：非该课程授课教师（导师 / 领导 / 其他教师）只能查看老师录入的内容，
+ * 不能修改课程配置、成绩、评价方案、学生管理等。导师仍可在评价管理中提交自己的导师评价。
+ */
+const isViewOnly = computed(() => {
+  if (isMentor.value || isLeaderView.value) return true
+  const c = course.value
+  return c ? c.teacher !== store.currentUser : false
+})
+/** 能否操作评价管理：授课教师可评教师评价，企业导师（含领导以导师身份进入）可提交自己的导师评价；领导/其他教师仅查看 */
+const canManageEval = computed(() => !isViewOnly.value || isMentor.value)
+/** 能否添加/管理课程项目：企业导师可以添加项目；领导/其他教师仅查看 */
+const canManageProjects = computed(() => !isViewOnly.value || isMentor.value)
 
 // 从数据库加载课程学员
 onMounted(async () => {
@@ -1381,6 +1543,7 @@ onMounted(async () => {
   }
   ensureWrittenExams()
   normalizeProjectShares()
+  syncProjectWeightLocksFromStore()
 })
 
 /** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
@@ -1431,7 +1594,8 @@ const completedCount = computed(() =>
 
 // ---- Tab 配置 ----
 const tabList = [
-  { key: 'comments',     label: '评论管理', icon: ClipboardCheck },
+  { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
+  { key: 'quality-eval', label: '素质评价', icon: UserCheck },
   { key: 'grade-config', label: '成绩配置', icon: Settings },
   { key: 'grade-entry',  label: '成绩管理', icon: TrendingUp },
   { key: 'students',     label: '学生管理', icon: Users },
@@ -1634,10 +1798,16 @@ const showGradeConfig = ref(false)
 /** 成绩配置——完整权重编辑器（直接展示在标签页内） */
 const gradeConfig = ref<GradeWeightConfig>(getDefaultGradeConfig(courseId.value))
 watch(() => courseId.value, (id) => {
-  gradeConfig.value = store.getGradeConfig(id)
+  const cfg = store.getGradeConfig(id)
+  gradeConfig.value = { ...cfg, qualityEvalMaxBonus: cfg.qualityEvalMaxBonus ?? 10 }
 }, { immediate: true })
 const updateGradeConfig = (key: keyof GradeWeightConfig, val: number) => {
   gradeConfig.value = { ...gradeConfig.value, [key]: Math.max(0, Math.min(100, val || 0)) }
+}
+/** 素质评价加成上限（0-20分） */
+const updateQualityMaxBonus = (val: number) => {
+  const v = Number.isFinite(val) ? Math.round(val) : 0
+  gradeConfig.value = { ...gradeConfig.value, qualityEvalMaxBonus: Math.max(0, Math.min(20, v)) }
 }
 const mainTotal = computed(() => gradeConfig.value.regularWeight + gradeConfig.value.midtermWeight + gradeConfig.value.finalWeight)
 const regularTotal = computed(() => gradeConfig.value.selfEvalWeight + gradeConfig.value.peerReviewWeight + gradeConfig.value.interGroupEvalWeight + gradeConfig.value.teacherScoreWeight + gradeConfig.value.mentorScoreWeight)
@@ -1653,6 +1823,7 @@ const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_project' | 'final_project'>('midterm_project')
 const selectedExam = ref('')
 const gradeSearch = ref('')
+const gradeEntrySearch = ref('')
 const examInputs = ref<Record<string, number>>({})
 const selectedStudentIds = ref<string[]>([])
 const evalScoreInputs = ref<Record<string, number>>({})
@@ -1705,7 +1876,7 @@ function unlockProjectWeight(examName: string) {
   lockedWeightProjects.value.delete(examName)
 }
 
-// 板块级锁定/解锁：锁定后该板块所有项目占比不可修改
+// 板块级锁定/解锁：锁定后该板块所有项目占比不可修改（状态持久化，刷新不丢失）
 function toggleMidtermProjectLock() {
   if (midtermProjectLocked.value) {
     midtermProjectLocked.value = false
@@ -1716,6 +1887,7 @@ function toggleMidtermProjectLock() {
       midtermProjects.value.forEach((e) => lockProjectWeight(e.name))
     }
   }
+  if (courseId.value) store.setProjectWeightLock(courseId.value, 'midterm', midtermProjectLocked.value)
 }
 
 function toggleFinalProjectLock() {
@@ -1728,7 +1900,26 @@ function toggleFinalProjectLock() {
       finalProjects.value.forEach((e) => lockProjectWeight(e.name))
     }
   }
+  if (courseId.value) store.setProjectWeightLock(courseId.value, 'final', finalProjectLocked.value)
 }
+
+/** 页面加载时从持久化状态恢复期中/期末项目占比锁定 */
+function syncProjectWeightLocksFromStore() {
+  if (!courseId.value) return
+  midtermProjectLocked.value = store.getProjectWeightLock(courseId.value, 'midterm')
+  finalProjectLocked.value = store.getProjectWeightLock(courseId.value, 'final')
+  const lockedNames = new Set<string>()
+  if (midtermProjectLocked.value) midtermProjects.value.forEach((e) => lockedNames.add(e.name))
+  if (finalProjectLocked.value) finalProjects.value.forEach((e) => lockedNames.add(e.name))
+  lockedWeightProjects.value = lockedNames
+}
+
+// 切换课程时重新同步锁定状态：路由复用组件不会触发 onMounted，
+// 若不重新同步，会沿用上一门课程的锁定状态，导致已锁定课程的占比被误判为未锁定而重新均分。
+// 首次挂载的同步由 onMounted 中的 syncProjectWeightLocksFromStore() 完成，故此处不加 immediate（避免 setup 阶段访问后置声明的 computed 触发 TDZ）
+watch(() => courseId.value, () => {
+  syncProjectWeightLocksFromStore()
+})
 
 // 成绩查询图表引用
 const midtermChartRef = ref<HTMLDivElement | null>(null)
@@ -1949,15 +2140,6 @@ const currentExamWeight = computed(() => {
   return store.getExamWeight(courseId.value, selectedExam.value)
 })
 
-/** 当前选中的是否为笔试（期中/期末考试），用于导师端「笔试成绩仅查看」 */
-const currentExamIsWritten = computed(() => {
-  if (!selectedExam.value) return false
-  const found = examsWithTypes.value.find((e) => e.name === selectedExam.value)
-  if (found) return found.type === 'midterm_exam' || found.type === 'final_exam'
-  // 项目刚创建尚无成绩记录时按名称兜底（笔试固定名为「期中考试/期末考试」）
-  return selectedExam.value === '期中考试' || selectedExam.value === '期末考试'
-})
-
 const filteredGradeStudents = computed(() => {
   if (!selectedExam.value) return []
   let list = enrolledStudents.value
@@ -2054,6 +2236,13 @@ const filteredGradeClassBlocks = computed(() => {
       ...s,
       groups: s.groups.filter(g => g.groupName === gradeFilterGroup.value)
     })).filter(s => s.groups.length > 0)
+  }
+  // 按学生姓名/学号搜索：仅展示包含匹配学生的班级
+  if (gradeEntrySearch.value.trim()) {
+    const q = gradeEntrySearch.value.trim().toLowerCase()
+    blocks = blocks.filter(b => b.groups.some(g => g.items.some(({ student }) =>
+      student && (student.name.toLowerCase().includes(q) || student.id.toLowerCase().includes(q) || (student.studentId && student.studentId.toLowerCase().includes(q)))
+    )))
   }
   return blocks
 })
@@ -2303,11 +2492,15 @@ function handleAddExam() {
     const sameTypeExams = store.getExamScoresForCourse(courseId.value)
       .filter((s) => s.type === type)
     const uniqueNames = Array.from(new Set(sameTypeExams.map((s) => s.examName)))
+    const isLocked = type === 'midterm_project' ? midtermProjectLocked.value : finalProjectLocked.value
 
-    // 添加新项目后，所有项目占比默认均分 100%
-    const eachShare = Math.floor(100 / uniqueNames.length)
-    uniqueNames.forEach((examName, i) =>
-      store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
+    // 分区未锁定时：新添加项目后所有项目占比重新均分 100%（末项取余数保证合计）
+    // 分区已锁定时：保持原有占比不变，新项目占比默认 0，需解锁后才能调整
+    if (!isLocked) {
+      const eachShare = Math.floor(100 / uniqueNames.length)
+      uniqueNames.forEach((examName, i) =>
+        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
+    }
   }
 
   showNewExamModal.value = false
@@ -3497,4 +3690,50 @@ async function handleImportGroupsExcel(event: Event) {
   input.value = ''
 }
 
+// ====== 素质评价（教师端） ======
+const courseQualityEvaluations = computed(() => store.getQualityEvaluationsForCourse(courseId.value || ''))
+
+// 每个学生当前选中的提交（key: 记录 id，value: submission id；未选择时默认最后一条）
+const qualitySelectedSubId = ref<Record<string, string>>({})
+
+// 本地暂存编辑值（key: submission id，避免 @change 直接写入时丢失未保存状态）
+const qualityScoreDrafts = ref<Record<string, number>>({})
+const qualityCommentDrafts = ref<Record<string, string>>({})
+
+function getQualityStudentName(studentId: string): string {
+  return store.students.find((s) => s.id === studentId)?.name || ''
+}
+
+/** 获取记录当前选中的提交（默认最后一条，即最新提交） */
+function getQualityCurrentSub(qe: any): any {
+  if (!qe || !qe.submissions || qe.submissions.length === 0) return undefined
+  const selectedId = qualitySelectedSubId.value[qe.id]
+  return qe.submissions.find((s: any) => s.id === selectedId) || qe.submissions[qe.submissions.length - 1]
+}
+
+function onQualityScoreChange(submissionId: string, score: number) {
+  qualityScoreDrafts.value[submissionId] = score
+}
+
+function onQualityCommentChange(submissionId: string, comment: string) {
+  qualityCommentDrafts.value[submissionId] = comment
+}
+
+function saveQualityEval(qeId: string, submissionId: string) {
+  const score = qualityScoreDrafts.value[submissionId]
+  if (score === undefined || score === null || Number.isNaN(score)) {
+    alert('请输入有效分数（0-100）')
+    return
+  }
+  if (score < 0 || score > 100) {
+    alert('分数必须在 0-100 之间')
+    return
+  }
+  const comment = qualityCommentDrafts.value[submissionId]
+  store.scoreQualityEvaluation(qeId, submissionId, score, comment)
+  // 清除草稿
+  delete qualityScoreDrafts.value[submissionId]
+  delete qualityCommentDrafts.value[submissionId]
+  alert('批改已保存，该次素质评价分数将自动加成到学生总成绩中')
+}
 </script>

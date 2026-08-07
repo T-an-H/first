@@ -7,7 +7,7 @@ import type {
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
   StudentGroup, EvalAnomaly, EvalReminder, GradeWeightConfig, DetailedGrade,
   Mentor, Leader, AITierQuestion, StudentTierRecord, EvalType,
-  Homework, HomeworkSubmission, Department
+  Homework, HomeworkSubmission, Department, QualityEvaluation, QualityEvalFile, QualityEvalSubmission
 } from '@/types'
 import { getDefaultGradeConfig, TEMPLATE_EVAL_TYPES } from '@/types'
 import {
@@ -57,7 +57,12 @@ const loadFromStorage = <T>(key: string, fallback: T): T => {
 }
 
 const saveToStorage = (key: string, data: unknown) => {
-  localStorage.setItem(key, JSON.stringify(data))
+  try {
+    localStorage.setItem(key, JSON.stringify(data))
+  } catch (e) {
+    // 存储空间不足（如大文件 base64 撑爆配额）时降级为内存态，避免应用崩溃
+    console.warn(`[store] 保存 ${key} 失败（可能超出 localStorage 配额）:`, e)
+  }
 }
 
 // ====== Mock 数据版本检查：版本变化时清除旧 localStorage ======
@@ -73,7 +78,7 @@ try {
       'evaluations', 'evalConfigs', 'studentGroups', 'evalReminders',
       'gradeConfigs', 'detailedGrades', 'homework', 'homeworkSubmissions',
       'examScores', 'examWeights', 'teacherSubmittedEvals', 'lockedSessions',
-      'studentTiers',
+      'studentTiers', 'qualityEvaluations', 'projectWeightLocks',
     ]
     resetKeys.forEach((k) => localStorage.removeItem(k))
     localStorage.setItem(MOCK_VERSION_KEY, MOCK_VERSION)
@@ -97,6 +102,30 @@ export const useAppStore = defineStore('app', () => {
   const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', mockEvalConfigs))
   const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', [...mockStudentGroups, ...supplementaryAll.supplementaryStudentGroups]))
   const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', supplementaryAll.supplementaryEvalReminders))
+
+  // 素质评价提交（学生上传文件，教师打分）
+  const qualityEvaluations = ref<import('@/types').QualityEvaluation[]>(
+    loadFromStorage<import('@/types').QualityEvaluation[]>('qualityEvaluations', [])
+  )
+  // 迁移旧格式（单次提交，顶层直接存放文件/评分）→ 新格式（submissions 数组支持多次提交）
+  qualityEvaluations.value = qualityEvaluations.value.map((q) => {
+    if ((q as any).submissions) return q
+    const old = q as any
+    return {
+      id: old.id,
+      courseId: old.courseId,
+      studentId: old.studentId,
+      submissions: old.files ? [{
+        id: old.id,
+        description: old.description,
+        files: old.files,
+        submittedAt: old.submittedAt,
+        score: old.score,
+        teacherComment: old.teacherComment,
+        gradedAt: old.gradedAt,
+      }] : [],
+    }
+  })
   const gradeConfigs = ref<Record<string, GradeWeightConfig>>(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {}))
   const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', [...mockDetailedGrades, ...supplementaryAll.supplementaryDetailedGrades]))
   const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', [...mockHomework, ...supplementaryAll.supplementaryHomework]))
@@ -135,6 +164,11 @@ export const useAppStore = defineStore('app', () => {
   // 考试/项目权重配置 (courseId → examName → weight)
   const examWeights = ref<Record<string, Record<string, number>>>(
     loadFromStorage<Record<string, Record<string, number>>>('examWeights', {})
+  )
+
+  // 期中/期末项目占比锁定状态 (courseId → { midterm, final })，持久化，刷新/重进不丢失
+  const projectWeightLocks = ref<Record<string, { midterm: boolean; final: boolean }>>(
+    loadFromStorage<Record<string, { midterm: boolean; final: boolean }>>('projectWeightLocks', {})
   )
 
   // 配置完成标记（权重配置 / 评价方案配置）
@@ -782,6 +816,20 @@ export const useAppStore = defineStore('app', () => {
     return examWeights.value[courseId] || {}
   }
 
+  /** 获取某课程期中/期末项目占比的锁定状态 */
+  function getProjectWeightLock(courseId: string, section: 'midterm' | 'final'): boolean {
+    return projectWeightLocks.value[courseId]?.[section] ?? false
+  }
+
+  /** 持久化某课程期中/期末项目占比的锁定状态 */
+  function setProjectWeightLock(courseId: string, section: 'midterm' | 'final', locked: boolean) {
+    projectWeightLocks.value = {
+      ...projectWeightLocks.value,
+      [courseId]: { midterm: false, final: false, ...(projectWeightLocks.value[courseId] || {}), [section]: locked },
+    }
+    saveToStorage('projectWeightLocks', projectWeightLocks.value)
+  }
+
   /** 检查课程是否有已提交的期末考试成绩（期末考试/期末项目） */
   function hasFinalExamSubmitted(courseId: string): boolean {
     return examScores.value.some(
@@ -1393,7 +1441,84 @@ export const useAppStore = defineStore('app', () => {
       (dg.mentorScore ?? 0) * cfg.mentorScoreWeight / 100
     const midterm = ((dg.midtermExamScore ?? 0) * cfg.midtermExamWeight + (dg.midtermProjectScore ?? 0) * cfg.midtermProjectWeight) / 100
     const final = ((dg.finalExamScore ?? 0) * cfg.finalExamWeight + (dg.finalProjectScore ?? 0) * cfg.finalProjectWeight) / 100
-    return Math.round(regular * cfg.regularWeight / 100 + midterm * cfg.midtermWeight / 100 + final * cfg.finalWeight / 100)
+    const base = regular * cfg.regularWeight / 100 + midterm * cfg.midtermWeight / 100 + final * cfg.finalWeight / 100
+    // 素质评价分数直接加在总成绩上（满分100，封顶 +10）
+    const bonus = getStudentQualityScore(courseId, dg.studentId)
+    return Math.round(Math.min(100, base + bonus))
+  }
+
+  // ====== 素质评价操作 ======
+
+  /** 学生提交素质评价（追加一条提交记录，保留历史提交） */
+  function submitQualityEvaluation(data: { courseId: string; studentId: string; files: QualityEvalFile[]; description?: string }) {
+    const submission: QualityEvalSubmission = {
+      id: `qes-${Date.now()}`,
+      files: data.files,
+      description: data.description,
+      submittedAt: getNow().toISOString().split('T')[0],
+    }
+    const existing = qualityEvaluations.value.find(
+      (q) => q.courseId === data.courseId && q.studentId === data.studentId
+    )
+    if (existing) {
+      qualityEvaluations.value = qualityEvaluations.value.map((q) =>
+        q.id === existing.id ? { ...q, submissions: [...q.submissions, submission] } : q
+      )
+    } else {
+      qualityEvaluations.value = [
+        ...qualityEvaluations.value,
+        { id: `qe-${Date.now()}`, courseId: data.courseId, studentId: data.studentId, submissions: [submission] },
+      ]
+    }
+    saveToStorage('qualityEvaluations', qualityEvaluations.value)
+  }
+
+  /** 教师对某次提交评分 */
+  function scoreQualityEvaluation(id: string, submissionId: string, score: number, comment?: string) {
+    qualityEvaluations.value = qualityEvaluations.value.map((q) =>
+      q.id === id
+        ? {
+            ...q,
+            submissions: q.submissions.map((s) =>
+              s.id === submissionId
+                ? { ...s, score, teacherComment: comment || s.teacherComment, gradedAt: getNow().toISOString().split('T')[0] }
+                : s
+            ),
+          }
+        : q
+    )
+    saveToStorage('qualityEvaluations', qualityEvaluations.value)
+  }
+
+  /** 获取某课程所有素质评价 */
+  function getQualityEvaluationsForCourse(courseId: string): QualityEvaluation[] {
+    return qualityEvaluations.value.filter((q) => q.courseId === courseId)
+  }
+
+  /** 获取某学生在某课程的素质评价记录 */
+  function getStudentQualityEvaluation(courseId: string, studentId: string): QualityEvaluation | undefined {
+    return qualityEvaluations.value.find((q) => q.courseId === courseId && q.studentId === studentId)
+  }
+
+  /** 统计某课程中「最新一次提交尚未批改」的学生人数（用于教师端待批改提示） */
+  function countPendingQualitySubmissions(courseId: string): number {
+    return qualityEvaluations.value.filter((q) => {
+      if (q.courseId !== courseId || q.submissions.length === 0) return false
+      const latest = q.submissions[q.submissions.length - 1]
+      return latest.score === undefined
+    }).length
+  }
+
+  /** 获取某学生素质评价加成分数（取最新一次被评分的提交分数，封顶为配置的加成上限） */
+  function getStudentQualityScore(courseId: string, studentId: string): number {
+    const qe = getStudentQualityEvaluation(courseId, studentId)
+    if (!qe) return 0
+    const graded = qe.submissions.filter((s) => s.score !== undefined)
+    if (graded.length === 0) return 0
+    const latest = graded[graded.length - 1]
+    // 加成上限可配置（成绩配置-素质评价），默认10分
+    const maxBonus = gradeConfigs.value[courseId]?.qualityEvalMaxBonus ?? 10
+    return Math.min(latest.score ?? 0, maxBonus)
   }
 
   // ====== 配置提醒 ======
@@ -1775,6 +1900,7 @@ export const useAppStore = defineStore('app', () => {
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
     addExamScore, updateExamScore, submitExamScores, getExamScoresForCourse, getExamNames, deduplicateExamScores, normalizeWrittenExamNames,
     setExamWeight, getExamWeight, getExamWeightsForCourse,
+    getProjectWeightLock, setProjectWeightLock,
     hasFinalExamSubmitted, isEvalConfigEditable, isWeightConfigEditable,
     lockSession, isSessionLocked, getSessionScheduleRangeIndex, getSessionEndDate, isSessionTime, isFinalSessionDeadlinePassed, autoLockPreviousSession, autoLockExpiredSessions,
     generateSessionReminders, checkAndGenerateSessionReminders, getSessionDeadline, checkAndMarkOverdueReminders,
@@ -1786,6 +1912,9 @@ export const useAppStore = defineStore('app', () => {
     saveGradeConfig, getGradeConfig,
     addDetailedGrade, updateDetailedGrade, getDetailedGrades, syncEvalToDetailedGrade,
     calcTotalScore,
+    // 素质评价
+    qualityEvaluations, submitQualityEvaluation, scoreQualityEvaluation,
+    getQualityEvaluationsForCourse, getStudentQualityEvaluation, getStudentQualityScore, countPendingQualitySubmissions,
     getMentorCourseIds, getLeaderCourses, getLeaderStudents,
     getStudentTier, determineTier, submitAITierTest,
     isSecondClassStarted, getPendingAITierTests, autoAssignOverdueBasicTier,

@@ -59,7 +59,8 @@
     <!-- 课程卡片列表 -->
     <div v-else class="space-y-3">
       <div v-for="course in filteredCourses" :key="course.id"
-        class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5 hover:shadow-md transition-all flex items-center justify-between">
+        @click="goDetail(course.id)"
+        class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5 hover:shadow-md transition-all flex items-center justify-between cursor-pointer">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
             <BookOpen class="w-6 h-6 text-white" />
@@ -90,11 +91,13 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { Search, BookOpen, Play, CheckCircle, LoaderCircle } from 'lucide-vue-next'
 import { fetchDepartmentCourses } from '@/api'
 import { useAppStore } from '@/stores/app'
 
 const store = useAppStore()
+const router = useRouter()
 
 const courses = ref<any[]>([])
 const loading = ref(true)
@@ -115,6 +118,11 @@ const filteredCourses = computed(() => {
 function getCategoryName(categoryId: string): string {
   const cat = store.categories.find((c: any) => c.id === categoryId)
   return cat?.name || '未分类'
+}
+
+/** 进入课程只读详情（领导端仅查看） */
+function goDetail(courseId: string) {
+  router.push(`/leader/courses/${courseId}`)
 }
 
 async function loadCourses() {

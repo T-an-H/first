@@ -152,6 +152,11 @@ const router = createRouter({
           component: () => import('@/pages/leader/Courses.vue'),
         },
         {
+          path: 'courses/:id',
+          name: 'LeaderCourseDetail',
+          component: () => import('@/pages/teacher/CourseDetail.vue'),
+        },
+        {
           path: 'students',
           name: 'LeaderStudents',
           component: () => import('@/pages/leader/Students.vue'),
