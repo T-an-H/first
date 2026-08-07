@@ -102,7 +102,6 @@
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
 
@@ -406,57 +405,201 @@
             </div>
             <StudentEvaluation v-else :course-id="courseId" :student-id="myStudent?.id || ''"
               :student-name="myStudent?.name || store.currentUser || ''" />
-          </div>
 
-          <!-- ===== 综合评价 ===== -->
-          <div v-if="activeTab === 'eval_overview'" class="space-y-6">
-            <!-- 综合成绩卡片 -->
-            <div>
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">综合评价</h3>
-              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
-                <div class="flex items-center justify-between mb-4">
-                  <div>
-                    <p class="text-xs text-gray-400 mb-1">课程总评</p>
-                    <p class="text-3xl font-bold text-blue-600">{{ totalScore ?? '-' }}<span class="text-base text-gray-400">分</span></p>
+            <!-- ===== 素质评价（合并入评价填写） ===== -->
+            <div class="space-y-4 mt-8 pt-6 border-t border-brand-400/20">
+              <div class="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-2xl p-5 border border-emerald-100">
+                <div class="flex items-center gap-2 mb-2">
+                  <UserCheck class="w-5 h-5 text-emerald-600" />
+                  <h3 class="text-base font-semibold text-emerald-800">素质评价</h3>
+                </div>
+                <p class="text-sm text-emerald-700">
+                  上传与本课程相关的实践成果、项目文档、证书等资料，教师将根据提交内容进行评分。素质评价分数会直接加成到你的课程总分中。
+                </p>
+              </div>
+
+              <div v-if="isReadOnly" class="bg-brand-400/5 border border-brand-400/30 rounded-xl p-6 text-center text-sm text-gray-400">
+                <Eye class="w-8 h-8 mx-auto mb-2 text-gray-400/60" />
+                <p>课程已结束，无法提交素质评价</p>
+                <p class="text-xs mt-1">如需查看已提交内容，请联系教师</p>
+              </div>
+
+              <div v-else class="space-y-4">
+                <!-- 描述 -->
+                <div class="bg-white rounded-xl p-4 border border-brand-400/20">
+                  <label class="text-sm font-medium text-gray-700 mb-2 block">成果说明</label>
+                  <textarea v-model="qualityDesc" rows="3"
+                    placeholder="简要说明你提交的成果、收获或实践内容..."
+                    class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                </div>
+
+                <!-- 文件上传 -->
+                <div class="bg-white rounded-xl p-4 border border-brand-400/20">
+                  <label class="text-sm font-medium text-gray-700 mb-2 block">上传资料（图片/文档，单个文件 ≤ 2MB）</label>
+                  <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-emerald-400 transition-colors cursor-pointer"
+                    @click="qualityFileInputRef?.click()">
+                    <Upload class="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p class="text-sm text-gray-500">点击选择文件上传</p>
+                    <p class="text-xs text-gray-400 mt-1">支持图片、PDF、Word、Excel 等格式</p>
+                    <input type="file" ref="qualityFileInputRef" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.ppt,.pptx"
+                      class="hidden" @change="handleQualityFileSelect" />
                   </div>
-                  <div class="text-right">
-                    <p class="text-xs text-gray-400">班级平均</p>
-                    <p class="text-xl font-semibold text-brand-600">{{ classAvgScore }}分</p>
+
+                  <!-- 已选文件列表 -->
+                  <div v-if="qualityPendingFiles.length > 0" class="mt-3 space-y-2">
+                    <div v-for="(f, i) in qualityPendingFiles" :key="i"
+                      class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded border">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <FileText class="w-4 h-4 text-gray-500 flex-shrink-0" />
+                        <span class="text-sm text-gray-700 truncate">{{ f.fileName }}</span>
+                        <span class="text-xs text-gray-400 flex-shrink-0">{{ formatSize(f.fileSize) }}</span>
+                      </div>
+                      <button @click="qualityPendingFiles.splice(i, 1)" class="text-gray-400 hover:text-red-500">
+                        <X class="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <!-- 分数条对比 -->
-                <div class="relative h-3 bg-brand-400/10 rounded-full overflow-hidden">
-                  <div class="absolute top-0 h-full w-0.5 bg-red-400 z-10" :style="{ left: classAvgScore + '%' }" />
-                  <div v-if="totalScore" class="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all"
-                    :style="{ width: Math.min(totalScore, 100) + '%' }" />
+
+                <!-- 历史提交列表 -->
+                <div v-if="myQualitySubmissions.length > 0" class="space-y-3">
+                  <div v-for="(sub, si) in myQualitySubmissions" :key="sub.id"
+                    class="bg-white rounded-xl p-4 border border-brand-400/20">
+                    <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+                      <div>
+                        <p class="text-sm font-medium text-gray-800">第 {{ myQualitySubmissions.length - si }} 次提交</p>
+                        <p class="text-xs text-gray-400 mt-0.5">提交时间：{{ sub.submittedAt }}</p>
+                      </div>
+                      <div v-if="sub.score !== undefined"
+                        class="px-3 py-1 rounded-full text-sm font-bold"
+                        :class="sub.score >= 60 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-red-50 text-red-500 border border-red-200'">
+                        教师评分：{{ sub.score }} 分
+                      </div>
+                      <div v-else class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 text-xs">
+                        待教师批改
+                      </div>
+                    </div>
+                    <p v-if="sub.description" class="text-sm text-gray-600 mb-3 whitespace-pre-wrap">{{ sub.description }}</p>
+                    <div v-if="sub.files.length > 0" class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <a v-for="(f, i) in sub.files" :key="i" :href="f.dataUrl"
+                        :download="f.fileName" target="_blank"
+                        class="flex items-center gap-2 px-3 py-2 bg-brand-400/5 border border-brand-400/20 rounded text-sm text-brand-700 hover:bg-brand-400/10 transition-colors truncate">
+                        <FileText class="w-4 h-4 flex-shrink-0" />
+                        <span class="truncate">{{ f.fileName }}</span>
+                      </a>
+                    </div>
+                    <p v-if="sub.teacherComment" class="mt-3 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                      教师评语：{{ sub.teacherComment }}
+                    </p>
+                  </div>
                 </div>
-                <div class="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>0</span>
-                  <span class="text-red-400">平均{{ classAvgScore }}</span>
-                  <span>100</span>
+
+                <!-- 提交按钮 -->
+                <div class="flex items-center gap-3 pt-2">
+                  <div v-if="qualitySubmitError" class="flex-1 text-xs text-red-500 flex items-center gap-1">
+                    <XCircle class="w-3 h-3" />{{ qualitySubmitError }}
+                  </div>
+                  <button @click="submitQuality"
+                    :disabled="qualityPendingFiles.length === 0"
+                    class="ml-auto px-6 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                    提交素质评价（第 {{ myQualitySubmissions.length + 1 }} 次）
+                  </button>
                 </div>
               </div>
             </div>
+            </div>
+            </div>
+          </div>
 
-            <!-- 评价细分 -->
-            <div>
-              <h3 class="text-sm font-semibold text-gray-800 mb-3">评价维度细分</h3>
-              <div class="space-y-3">
+        <div class="lg:col-span-4">
+          <!-- ===== 综合评价 ===== -->
+          <div v-if="activeTab === 'eval_overview'">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- 左列：最终综合评价 -->
+            <div class="space-y-6">
+              <!-- 最终综合评价卡片 -->
+              <div class="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-2xl p-6 text-white shadow-lg shadow-blue-600/10 border border-blue-500/20">
+                <div class="flex items-center justify-between mb-5">
+                  <div>
+                    <p class="text-blue-100/80 text-xs mb-2 tracking-wide">
+                      {{ selectedSession === null ? '最终综合评分' : `第 ${selectedSession} 次综合评分` }}
+                    </p>
+                    <p class="text-4xl font-bold leading-none drop-shadow-sm">
+                      {{ currentComprehensiveScore ?? '-' }}<span class="text-lg text-blue-200/80 ml-1 font-medium">分</span>
+                    </p>
+                    <p class="text-blue-100/60 text-xs mt-2">作为平时分计入总成绩</p>
+                  </div>
+                  <div class="text-right bg-white/10 rounded-xl px-4 py-3 backdrop-blur-sm border border-white/10">
+                    <p class="text-blue-100/70 text-xs mb-1">班级平均</p>
+                    <p class="text-2xl font-semibold">{{ classAvgScore }}<span class="text-xs text-blue-200/80 ml-0.5">分</span></p>
+                  </div>
+                </div>
+                <!-- 分数条对比 -->
+                <div class="relative h-2.5 bg-white/15 rounded-full overflow-hidden">
+                  <div class="absolute top-0 h-full w-0.5 bg-white/80 z-10" :style="{ left: classAvgScore + '%' }" />
+                  <div v-if="currentComprehensiveScore !== null" class="h-full rounded-full bg-gradient-to-r from-emerald-300 to-emerald-400 transition-all"
+                    :style="{ width: Math.min(currentComprehensiveScore, 100) + '%' }" />
+                </div>
+                <div class="flex justify-between text-blue-100/60 text-xs mt-1.5">
+                  <span>0</span>
+                  <span class="text-white/80 font-medium">▼ 平均 {{ classAvgScore }}</span>
+                  <span>100</span>
+                </div>
+              </div>
+
+            <!-- 次数选择器 -->
+            <div v-if="sessionComprehensiveScores.length > 0" class="bg-white rounded-2xl p-5 border border-brand-400/20 shadow-sm">
+              <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5">
+                <Calendar class="w-4 h-4 text-blue-500" /> 查看各次评价
+              </h3>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  @click="selectedSession = null"
+                  class="px-4 py-2 rounded-full text-sm font-medium transition-all border"
+                  :class="selectedSession === null
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
+                    : 'bg-white text-gray-600 border-brand-400/30 hover:border-blue-300 hover:text-blue-600'">
+                  最终
+                  <span v-if="finalComprehensiveScore !== null" class="ml-1 font-bold">({{ finalComprehensiveScore }})</span>
+                </button>
+                <button
+                  v-for="s in sessionComprehensiveScores"
+                  :key="s.session"
+                  @click="selectedSession = s.session"
+                  class="px-4 py-2 rounded-full text-sm font-medium transition-all border"
+                  :class="selectedSession === s.session
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
+                    : 'bg-white text-gray-600 border-brand-400/30 hover:border-blue-300 hover:text-blue-600'">
+                  第{{ s.session }}次
+                  <span v-if="s.score !== null" class="ml-1 font-bold">({{ s.score }})</span>
+                  <span v-else class="ml-1 text-gray-300">(-)</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 评价维度细分 -->
+            <div class="bg-white rounded-2xl p-5 border border-brand-400/20 shadow-sm">
+              <h3 class="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-1.5">
+                <BarChart3 class="w-4 h-4 text-blue-500" /> 评价维度细分
+                <span v-if="selectedSession !== null" class="text-xs font-normal text-gray-400 ml-1">· 第 {{ selectedSession }} 次</span>
+                <span v-else class="text-xs font-normal text-gray-400 ml-1">· 全部平均</span>
+              </h3>
+              <div class="space-y-3.5">
                 <div v-for="dim in evalDimensions" :key="dim.label"
-                  class="flex items-center gap-3 p-3 rounded-lg border border-brand-400/20">
-                  <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                  class="flex items-center gap-3 p-3 rounded-xl border border-brand-400/15 bg-brand-400/[0.02] hover:border-brand-400/30 transition-colors">
+                  <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
                     :class="dim.iconBg">
                     <component :is="dim.icon" class="w-4 h-4" :class="dim.iconColor" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-gray-900">{{ dim.label }}</p>
-                    <div class="flex items-center gap-2 mt-1">
+                    <div class="flex items-center gap-2 mt-1.5">
                       <div class="flex-1 bg-brand-400/10 rounded-full h-2 overflow-hidden">
                         <div class="h-full rounded-full transition-all duration-500" :class="dim.barColor"
                           :style="{ width: (dim.score / (dim.maxScore || 100) * 100) + '%' }" />
                       </div>
-                      <span class="text-xs font-medium text-brand-600 w-12 text-right">
-                        {{ dim.score }}<span class="text-gray-400">/{{ dim.maxScore || 100 }}</span>
+                      <span class="text-xs font-bold text-brand-600 w-12 text-right">
+                        {{ dim.score }}<span class="text-gray-400 font-normal">/{{ dim.maxScore || 100 }}</span>
                       </span>
                     </div>
                   </div>
@@ -466,16 +609,200 @@
             </div>
 
             <!-- 成绩权重说明 -->
-            <div v-if="currentCfg" class="bg-brand-50 rounded-xl p-4 border border-brand-200 text-sm text-brand-800">
-              <p class="font-medium mb-1">成绩构成</p>
+            <div v-if="currentCfg" class="bg-gradient-to-br from-brand-50 to-blue-50 rounded-2xl p-5 border border-brand-200 text-sm text-brand-800 shadow-sm">
+              <p class="font-semibold mb-2 flex items-center gap-1.5">
+                <PieChart class="w-4 h-4 text-brand-600" /> 成绩构成
+              </p>
               <p>总成绩 = 平时成绩({{ currentCfg.regularWeight }}%) + 期中成绩({{ currentCfg.midtermWeight }}%) + 期末成绩({{ currentCfg.finalWeight }}%)</p>
-              <p class="text-xs text-brand-700 mt-1">
+              <p class="text-xs text-brand-700 mt-1.5 leading-relaxed">
                 平时成绩构成：自评({{ currentCfg.selfEvalWeight }}%) + 互评({{ currentCfg.peerReviewWeight }}%) + 组间评({{ currentCfg.interGroupEvalWeight }}%) + 教师({{ currentCfg.teacherScoreWeight }}%) + 导师({{ currentCfg.mentorScoreWeight }}%)
               </p>
             </div>
+            </div>
+
+            <!-- ===== 右列：增值评价 ===== -->
+            <div class="space-y-6">
+          <!-- 说明 -->
+          <div class="bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 rounded-2xl p-5 border border-blue-500/20 text-white shadow-lg shadow-blue-600/10">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0 border border-white/10">
+                <TrendingUp class="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-white">增值评价</h3>
+                <p class="text-blue-100/70 text-xs mt-0.5">学业成长趋势分析</p>
+              </div>
+            </div>
+            <p class="text-blue-100/80 text-sm mt-3 leading-relaxed">
+              基于本课程历次评价数据，分析你的学习进步趋势，直观展示学业成长轨迹。
+            </p>
+          </div>
+
+          <!-- 有数据时显示折线图 -->
+          <div v-if="valueAddedData.length > 0" class="space-y-6">
+            <!-- 统计卡片 -->
+            <div class="grid grid-cols-3 gap-4">
+              <div class="bg-white rounded-2xl p-4 border border-brand-400/20 shadow-sm">
+                <p class="text-xs text-gray-400 mb-1.5">当前得分</p>
+                <p class="text-2xl font-bold text-gray-900">{{ valueAddedData[valueAddedData.length - 1].score }}</p>
+                <p class="text-xs text-gray-400 mt-1">第{{ valueAddedData.length }}次评价</p>
+              </div>
+              <div v-if="valueAddedStats" class="bg-white rounded-2xl p-4 border border-brand-400/20 shadow-sm">
+                <p class="text-xs text-gray-400 mb-1.5">相比上次</p>
+                <p class="text-2xl font-bold" :class="valueAddedStats.change > 0 ? 'text-emerald-600' : valueAddedStats.change < 0 ? 'text-red-500' : 'text-gray-500'">
+                  {{ valueAddedStats.change > 0 ? '+' : '' }}{{ valueAddedStats.change.toFixed(1) }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">{{ valueAddedStats.change > 0 ? '进步' : valueAddedStats.change < 0 ? '退步' : '保持不变' }}</p>
+              </div>
+              <div v-if="valueAddedImprovement" class="bg-white rounded-2xl p-4 border border-brand-400/20 shadow-sm">
+                <p class="text-xs text-gray-400 mb-1.5">累计变化</p>
+                <p class="text-2xl font-bold" :class="valueAddedImprovement.totalChange > 0 ? 'text-emerald-600' : valueAddedImprovement.totalChange < 0 ? 'text-red-500' : 'text-gray-500'">
+                  {{ valueAddedImprovement.totalChange > 0 ? '+' : '' }}{{ valueAddedImprovement.totalChange.toFixed(1) }}
+                </p>
+                <p class="text-xs text-gray-400 mt-1">共{{ valueAddedData.length }}次评价</p>
+              </div>
+            </div>
+
+            <!-- 折线图 -->
+            <div class="bg-white rounded-2xl p-6 border border-brand-400/20 shadow-sm">
+              <h3 class="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-1.5">
+                <TrendingUp class="w-4 h-4 text-blue-500" /> 成绩趋势图
+              </h3>
+              <svg :viewBox="`0 0 ${chartWidth} ${chartHeight}`" class="w-full" style="min-height: 200px">
+                <!-- 背景网格 -->
+                <defs>
+                  <pattern id="valueAddedGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" stroke-width="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#valueAddedGrid)" />
+                
+                <!-- Y轴 -->
+                <line 
+                  :x1="padding.left" :y1="padding.top" 
+                  :x2="padding.left" :y2="padding.top + innerHeight" 
+                  stroke="#e5e7eb" stroke-width="1" />
+                
+                <!-- X轴 -->
+                <line 
+                  :x1="padding.left" :y1="padding.top + innerHeight" 
+                  :x2="padding.left + innerWidth" :y2="padding.top + innerHeight" 
+                  stroke="#e5e7eb" stroke-width="1" />
+                
+                <!-- Y轴刻度 -->
+                <g v-for="i in 5" :key="'y-tick-' + i">
+                  <line 
+                    :x1="padding.left - 5" 
+                    :y1="padding.top + innerHeight * (1 - (i - 1) / 4)"
+                    :x2="padding.left" 
+                    :y2="padding.top + innerHeight * (1 - (i - 1) / 4)"
+                    stroke="#9ca3af" stroke-width="1" />
+                  <text 
+                    :x="padding.left - 8" 
+                    :y="padding.top + innerHeight * (1 - (i - 1) / 4) + 3"
+                    text-anchor="end" 
+                    font-size="10" 
+                    fill="#9ca3af">
+                    {{ 100 - (i - 1) * 25 }}
+                  </text>
+                </g>
+                
+                <!-- 折线 -->
+                <polyline
+                  :points="linePoints"
+                  fill="none"
+                  stroke="#2563eb"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                
+                <!-- 渐变填充 -->
+                <defs>
+                  <linearGradient id="valueAddedGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#2563eb" stop-opacity="0.3" />
+                    <stop offset="100%" stop-color="#2563eb" stop-opacity="0" />
+                  </linearGradient>
+                </defs>
+                <polygon
+                  :points="areaPoints"
+                  fill="url(#valueAddedGradient)"
+                />
+                
+                <!-- 数据点 -->
+                <g v-for="(point, i) in valueAddedData" :key="'point-' + i">
+                  <circle
+                    :cx="padding.left + (valueAddedData.length > 1 ? i * xStep : innerWidth / 2)"
+                    :cy="padding.top + innerHeight * (1 - point.score / 100)"
+                    r="5"
+                    fill="#2563eb"
+                    stroke="white"
+                    stroke-width="2"
+                    class="cursor-pointer"
+                  >
+                    <title>{{ point.label }}: {{ point.score }}分</title>
+                  </circle>
+                  <text
+                    :x="padding.left + (valueAddedData.length > 1 ? i * xStep : innerWidth / 2)"
+                    :y="padding.top + innerHeight * (1 - point.score / 100) - 12"
+                    text-anchor="middle"
+                    font-size="10"
+                    font-weight="bold"
+                    fill="#2563eb">
+                    {{ point.score }}
+                  </text>
+                  <text
+                    :x="padding.left + (valueAddedData.length > 1 ? i * xStep : innerWidth / 2)"
+                    :y="padding.top + innerHeight + 20"
+                    text-anchor="middle"
+                    font-size="10"
+                    fill="#6b7280">
+                    {{ point.label }}
+                  </text>
+                </g>
+              </svg>
+            </div>
+
+            <!-- 进步建议 -->
+            <div v-if="valueAddedImprovement" class="bg-gradient-to-r from-emerald-500 to-blue-600 rounded-2xl p-5 border border-emerald-100 text-white shadow-lg shadow-emerald-500/10">
+              <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 border border-white/20">
+                  <TrendingUp class="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p class="text-base font-semibold text-white">
+                    {{ valueAddedImprovement.totalChange > 0 ? '学习状态良好' : valueAddedImprovement.totalChange < 0 ? '需要加强学习' : '保持稳定' }}
+                  </p>
+                  <p class="text-white/80 text-sm mt-1 leading-relaxed">
+                    {{ valueAddedImprovement.totalChange > 0 
+                      ? `平均每次进步 ${valueAddedImprovement.avgChangePerSession.toFixed(1)} 分，继续保持！` 
+                      : valueAddedImprovement.totalChange < 0 
+                        ? `平均每次退步 ${Math.abs(valueAddedImprovement.avgChangePerSession).toFixed(1)} 分，建议加强复习。` 
+                        : '成绩保持稳定，继续努力提升！' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 无数据时显示空状态 -->
+          <div v-else class="bg-white rounded-2xl p-12 border border-brand-400/20 text-center shadow-sm">
+            <div class="w-16 h-16 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <TrendingUp class="w-8 h-8 text-blue-500" />
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">暂无增值评价数据</h3>
+            <p class="text-sm text-gray-500">完成至少一次课程评价后，系统将自动生成你的增值评价趋势图</p>
+            <button 
+              v-if="(activeTab as string) !== 'evaluations'"
+              @click="activeTab = 'evaluations'"
+              class="mt-6 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-sm font-medium rounded-full shadow-md shadow-blue-600/20 transition-colors">
+              去评价填写
+            </button>
+          </div>
+          </div>
           </div>
         </div>
-      </div>
+        </div>
 
       <!-- ===== 右侧栏（D3 渲染） ===== -->
       <div class="lg:col-span-1" id="course-learn-sidebar"></div>
@@ -483,16 +810,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
   CheckCircle, Circle, Layers, GitBranch, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
-  Download, Upload
+  Download, Upload, TrendingUp, X, Calendar, BarChart3, PieChart
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
-import type { AITierQuestion, LearningTier, CloudFile } from '@/types'
+import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile } from '@/types'
 import Modal from '@/components/Modal.vue'
 import { getNow } from '@/lib/date'
 
@@ -501,13 +828,25 @@ const router = useRouter()
 const store = useAppStore()
 const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
-const activeTab = ref('tasks')
+
+// 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
+const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const activeTab = ref<string>(
+  VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
+)
 const selectedFiles = ref<Record<string, File>>({})
 
 onMounted(() => {
   store.pushNearDeadlineEvalReminders()
   if (myStudent.value) {
     store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
+  }
+})
+
+// 路由 query 变化时切换 tab（红点溯源：同一页面内二次跳转）
+watch(() => route.query.tab, (val) => {
+  if (val && VALID_TABS.includes(val as string)) {
+    activeTab.value = val as string
   }
 })
 
@@ -590,6 +929,90 @@ const tierBadgeClass = computed(() => {
     excellent: 'bg-emerald-600/10 text-emerald-600 border border-emerald-400',
   }
   return map[myTier.value]
+})
+
+// ===== 增值评价 =====
+const valueAddedData = computed(() => {
+  if (!myStudent.value) return []
+  const studentId = myStudent.value.id
+  
+  const evals = store.evaluations
+    .filter(ev => ev.courseId === courseId && ev.studentId === studentId && ev.score > 0)
+    .sort((a, b) => a.sessionNumber - b.sessionNumber)
+  
+  if (evals.length === 0) return []
+  
+  return evals.map(ev => ({
+    session: ev.sessionNumber,
+    score: ev.score,
+    label: `第${ev.sessionNumber}次`
+  }))
+})
+
+const valueAddedStats = computed(() => {
+  const data = valueAddedData.value
+  if (data.length < 2) return null
+  
+  const currentScore = data[data.length - 1].score
+  const previousScore = data[data.length - 2].score
+  const change = currentScore - previousScore
+  
+  return {
+    currentScore,
+    previousScore,
+    change,
+    hasTrend: true
+  }
+})
+
+const valueAddedImprovement = computed(() => {
+  const data = valueAddedData.value
+  if (data.length < 2) return null
+  
+  // 计算整体提升/退步趋势
+  let totalChange = 0
+  for (let i = 1; i < data.length; i++) {
+    totalChange += data[i].score - data[i-1].score
+  }
+  
+  return {
+    totalChange,
+    avgChangePerSession: totalChange / (data.length - 1)
+  }
+})
+
+// ===== 增值评价图表计算 =====
+const chartWidth = 500
+const chartHeight = 200
+const padding = { top: 20, right: 20, bottom: 35, left: 45 }
+const innerWidth = chartWidth - padding.left - padding.right
+const innerHeight = chartHeight - padding.top - padding.bottom
+
+const xStep = computed(() => {
+  if (valueAddedData.value.length <= 1) return 0
+  return innerWidth / (valueAddedData.value.length - 1)
+})
+
+const linePoints = computed(() => {
+  return valueAddedData.value.map((point, i) => {
+    const x = padding.left + (valueAddedData.value.length > 1 ? i * xStep.value : innerWidth / 2)
+    const y = padding.top + innerHeight * (1 - point.score / 100)
+    return `${x},${y}`
+  }).join(' ')
+})
+
+const areaPoints = computed(() => {
+  if (valueAddedData.value.length === 0) return ''
+  const points = valueAddedData.value.map((point, i) => {
+    const x = padding.left + (valueAddedData.value.length > 1 ? i * xStep.value : innerWidth / 2)
+    const y = padding.top + innerHeight * (1 - point.score / 100)
+    return `${x},${y}`
+  })
+  // 添加底部两个点形成封闭区域
+  const firstX = padding.left + (valueAddedData.value.length > 1 ? 0 * xStep.value : innerWidth / 2)
+  const lastX = padding.left + (valueAddedData.value.length > 1 ? (valueAddedData.value.length - 1) * xStep.value : innerWidth / 2)
+  const bottomY = padding.top + innerHeight
+  return `${firstX},${bottomY} ${points.join(' ')} ${lastX},${bottomY}`
 })
 
 // ===== AI 分层测试弹窗 =====
@@ -1092,7 +1515,11 @@ function relationChipClass(relation: string): string {
 }
 
 // ===== 综合评价 =====
-const totalScore = computed(() => myGrade.value?.score ?? null)
+const totalScore = computed(() => {
+  const base = myGrade.value?.score ?? null
+  if (base === null || !myStudent.value) return null
+  return Math.min(100, base + store.getStudentQualityScore(courseId, myStudent.value.id))
+})
 
 const classAvgScore = computed(() => {
   const courseGrades = store.grades.filter((g) => g.courseId === courseId)
@@ -1102,25 +1529,113 @@ const classAvgScore = computed(() => {
 
 const currentCfg = computed(() => store.getGradeConfig(courseId))
 
+const gradeIconMap: Record<string, any> = {
+  self: UserCheck,
+  intra_group: Users,
+  inter_group: MessageSquare,
+  teacher: Award,
+  mentor: Sparkles,
+}
+
+const gradeLabelMap: Record<string, string> = {
+  self: '自评',
+  intra_group: '组内互评',
+  inter_group: '组间互评',
+  teacher: '教师评价',
+  mentor: '企业导师',
+}
+
+const gradeWeightKeyMap: Record<string, keyof import('@/types').GradeWeightConfig> = {
+  self: 'selfEvalWeight',
+  intra_group: 'peerReviewWeight',
+  inter_group: 'interGroupEvalWeight',
+  teacher: 'teacherScoreWeight',
+  mentor: 'mentorScoreWeight',
+}
+
+const allEvalTypes = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor'] as const
+type EvalTypeKey = typeof allEvalTypes[number]
+
+const selectedSession = ref<number | null>(null)
+
+const evalSessions = computed(() => {
+  const evals = store.evaluations.filter(
+    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
+  )
+  const sessions = new Set<number>()
+  evals.forEach(e => sessions.add(e.sessionNumber))
+  return Array.from(sessions).sort((a, b) => a - b)
+})
+
+function calcSessionComprehensiveScore(sessionNumber: number) {
+  const cfg = currentCfg.value
+  const evals = store.evaluations.filter(
+    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id && e.sessionNumber === sessionNumber
+  )
+  let totalWeight = 0
+  let weightedSum = 0
+  for (const type of allEvalTypes) {
+    const filtered = evals.filter(e => e.type === type)
+    if (filtered.length === 0) continue
+    const avg = Math.round(filtered.reduce((s, e) => s + e.score, 0) / filtered.length)
+    const weight = (cfg[gradeWeightKeyMap[type]] as number) || 0
+    weightedSum += avg * weight
+    totalWeight += weight
+  }
+  if (totalWeight === 0) return null
+  return Math.round(weightedSum / totalWeight)
+}
+
+const sessionComprehensiveScores = computed(() => {
+  return evalSessions.value.map(sn => ({
+    session: sn,
+    score: calcSessionComprehensiveScore(sn),
+  }))
+})
+
+const finalComprehensiveScore = computed(() => {
+  const validScores = sessionComprehensiveScores.value.filter(s => s.score !== null)
+  if (validScores.length === 0) return null
+  return Math.round(validScores.reduce((s, v) => s + (v.score as number), 0) / validScores.length)
+})
+
+const currentComprehensiveScore = computed(() => {
+  if (selectedSession.value === null) return finalComprehensiveScore.value
+  const found = sessionComprehensiveScores.value.find(s => s.session === selectedSession.value)
+  return found ? found.score : null
+})
+
 const evalDimensions = computed(() => {
   const evals = store.evaluations.filter(
     (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
   )
+
+  const evalsForCalc = selectedSession.value !== null
+    ? evals.filter(e => e.sessionNumber === selectedSession.value)
+    : evals
+
   const calcAvg = (type: string) => {
-    const filtered = evals.filter((e) => e.type === type)
+    const filtered = evalsForCalc.filter((e) => e.type === type)
     if (filtered.length === 0) return null
     return Math.round(filtered.reduce((s, e) => s + e.score, 0) / filtered.length)
   }
 
   const dims: { label: string; icon: string; iconBg: string; iconColor: string; barColor: string; score: number; maxScore: number }[] = []
-  const selfScore = calcAvg('self')
-  if (selfScore !== null) dims.push({ label: '自评', icon: 'userCheck', iconBg: 'bg-brand-600/15', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: selfScore, maxScore: 100 })
-  const peerScore = calcAvg('intra_group')
-  if (peerScore !== null) dims.push({ label: '组内互评', icon: 'users', iconBg: 'bg-brand-600/10', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: peerScore, maxScore: 100 })
-  const interScore = calcAvg('inter_group')
-  if (interScore !== null) dims.push({ label: '组间互评', icon: 'messageSquare', iconBg: 'bg-brand-600/10', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: interScore, maxScore: 100 })
-  const teacherScore = calcAvg('teacher')
-  if (teacherScore !== null) dims.push({ label: '教师评价', icon: 'award', iconBg: 'bg-brand-400/10', iconColor: 'text-brand-600', barColor: 'bg-brand-600', score: teacherScore, maxScore: 100 })
+  for (const type of allEvalTypes) {
+    const score = calcAvg(type)
+    if (score !== null) {
+      const weight = (currentCfg.value[gradeWeightKeyMap[type]] as number) || 0
+      dims.push({
+        label: gradeLabelMap[type],
+        icon: gradeIconMap[type],
+        iconBg: 'bg-brand-600/15',
+        iconColor: 'text-brand-600',
+        barColor: 'bg-brand-600',
+        score,
+        maxScore: 100,
+      })
+    }
+  }
 
   return dims
 })
@@ -1196,5 +1711,88 @@ function submitHomework(hw: typeof courseHomework.value[0]) {
   
   delete selectedFiles.value[hw.id]
   alert('作业提交成功！')
+}
+
+// ====== 素质评价 ======
+const qualityDesc = ref('')
+const qualityPendingFiles = ref<QualityEvalFile[]>([])
+const qualitySubmitError = ref('')
+const qualityFileInputRef = ref<HTMLInputElement | null>(null)
+
+const myQualityRecord = computed(() => {
+  if (!myStudent.value) return undefined
+  return store.getStudentQualityEvaluation(courseId, myStudent.value.id)
+})
+
+// 历史提交列表（最新在前）
+const myQualitySubmissions = computed(() => {
+  const rec = myQualityRecord.value
+  if (!rec) return []
+  return [...rec.submissions].reverse()
+})
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB'
+}
+
+async function handleQualityFileSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = input.files
+  if (!files || files.length === 0) return
+  qualitySubmitError.value = ''
+  // 总大小限制（base64 存储于 localStorage，避免撑爆配额）
+  const totalSize = qualityPendingFiles.value.reduce((s, f) => s + f.fileSize, 0)
+  for (const file of Array.from(files)) {
+    if (file.size > 2 * 1024 * 1024) {
+      qualitySubmitError.value = `文件 ${file.name} 超过 2MB，已跳过`
+      continue
+    }
+    if (totalSize + file.size > 4 * 1024 * 1024) {
+      qualitySubmitError.value = `文件总大小超过 4MB，已停止添加（当前已选 ${(totalSize / 1024 / 1024).toFixed(1)}MB）`
+      break
+    }
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      qualityPendingFiles.value.push({
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size,
+        dataUrl,
+      })
+    } catch {
+      qualitySubmitError.value = `文件 ${file.name} 读取失败`
+    }
+  }
+  input.value = ''
+}
+
+function submitQuality() {
+  if (!myStudent.value) return
+  qualitySubmitError.value = ''
+
+  // 多次提交：每次提交必须有新的文件
+  if (qualityPendingFiles.value.length === 0) {
+    qualitySubmitError.value = '请至少上传一份文件'
+    return
+  }
+
+  store.submitQualityEvaluation({
+    courseId,
+    studentId: myStudent.value.id,
+    files: qualityPendingFiles.value,
+    description: qualityDesc.value,
+  })
+
+  // 清空本地状态
+  qualityPendingFiles.value = []
+  qualityDesc.value = ''
+  alert('素质评价提交成功！请等待教师批改。')
 }
 </script>

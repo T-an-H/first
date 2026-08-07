@@ -16,8 +16,8 @@
       />
     </div>
 
-    <!-- 课程卡片网格：2 列 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <!-- 课程卡片网格：放大版，任何版面仅左右 2 张 -->
+    <div class="grid grid-cols-2 gap-6">
       <div
         v-for="course in sortedAndFilteredCourses" :key="course.id"
         @click="goDetail(course.id)"
@@ -29,11 +29,31 @@
         ]"
       >
         <!-- 渐变顶栏（无封面图，只做颜色区分） -->
-        <div class="relative h-[100px]" :style="{ background: getCourseGradient(course.id) }">
+        <div class="relative h-[160px]" :style="{ background: getCourseGradient(course.id) }">
           <!-- 已结束水印 -->
           <div v-if="course.status !== 'active'" class="absolute inset-0 flex items-center justify-center">
             <span class="text-white/50 text-lg font-bold tracking-widest -rotate-12 select-none">已结束</span>
           </div>
+
+          <!-- 待评价红点标记（点击可溯源到评论管理） -->
+          <button
+            v-if="hasPendingEval(course.id)"
+            @click.stop="goEval(course.id)"
+            title="有未完成的评价，点击前往评论管理"
+            class="absolute top-3 left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-red-500 text-white font-medium shadow cursor-pointer hover:bg-red-600 transition-colors">
+            <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+            待评价
+          </button>
+
+          <!-- 素质评价待批改红点标记（点击可溯源到素质评价管理） -->
+          <button
+            v-if="pendingQualityCount(course.id) > 0"
+            @click.stop="goQualityEval(course.id)"
+            :title="`有 ${pendingQualityCount(course.id)} 名学生提交的素质评价待批改，点击前往素质评价管理`"
+            class="absolute top-12 left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-orange-500 text-white font-medium shadow cursor-pointer hover:bg-orange-600 transition-colors">
+            <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+            素质评价待批改 {{ pendingQualityCount(course.id) }}
+          </button>
 
           <!-- 状态标签 - 右上角 -->
           <span :class="`absolute top-3 right-3 z-10 text-xs px-2.5 py-1 rounded-full font-medium ${
@@ -47,12 +67,12 @@
 
           <!-- 课程标题 -->
           <div class="absolute bottom-3 left-4 right-4">
-            <h3 class="text-white font-bold text-lg leading-tight truncate">{{ course.title }}</h3>
+            <h3 class="text-white font-bold text-2xl leading-tight truncate">{{ course.title }}</h3>
           </div>
         </div>
 
         <!-- 卡片内容区域 -->
-        <div class="p-5 space-y-4">
+        <div class="p-7 space-y-5">
           <!-- 老师名字 -->
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <User class="w-4 h-4 text-gray-400" />
@@ -82,6 +102,34 @@
                 :style="{ width: getCourseProgress(course.id) + '%' }">
               </div>
             </div>
+          </div>
+
+          <!-- AI 分层分布（与学生端 AI 分层测试结果关联） -->
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">AI 分层分布</span>
+              <span class="text-[10px] text-gray-400">{{ studentCount(course.id) }} 名学生</span>
+            </div>
+            <div v-if="studentCount(course.id) > 0" class="flex items-center gap-6">
+              <div class="relative w-[140px] h-[140px] flex-shrink-0">
+                <svg viewBox="0 0 100 100" class="w-full h-full -rotate-90">
+                  <circle v-for="seg in tierPieSegments(course.id)" :key="seg.key" cx="50" cy="50" r="40" fill="none"
+                    stroke-width="18" :stroke="seg.color" :stroke-dasharray="seg.dash" :stroke-dashoffset="seg.offset" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                  <span class="text-3xl font-bold text-gray-800 leading-none">{{ studentCount(course.id) }}</span>
+                  <span class="text-xs text-gray-400 mt-1 leading-none">学生数</span>
+                </div>
+              </div>
+              <div class="flex-1 grid grid-cols-1 gap-y-2.5">
+                <div v-for="item in tierLegend(course.id)" :key="item.label" class="flex items-center gap-2 text-sm text-gray-600">
+                  <span class="w-3.5 h-3.5 rounded-sm flex-shrink-0" :style="{ background: item.color }"></span>
+                  <span>{{ item.label }}</span>
+                  <span class="ml-auto font-semibold text-gray-800">{{ item.count }}人</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="flex items-center justify-center py-6 rounded-lg bg-gray-50 text-sm text-gray-400">暂无学生</div>
           </div>
 
           <!-- 底部操作 -->
@@ -437,7 +485,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 
 import {
@@ -456,9 +504,11 @@ import { fetchTeacherCourses } from '@/api'
 
 
 const router = useRouter()
+const route = useRoute()
 const store = useAppStore()
 
-const isMentor = computed(() => store.currentRole === 'mentor')
+/** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由 */
+const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
 const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
 
 const searchQuery = ref('')
@@ -525,6 +575,10 @@ const sortedAndFilteredCourses = computed(() => {
 const myCourses = computed(() => {
   if (isLeaderWithTeaching.value) {
     return store.getLeaderCourses(store.currentUser || '')
+  }
+  if (isMentor.value) {
+    const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')
+    return store.courses.filter((c) => mentorCourseIds.includes(c.id))
   }
   return store.courses.filter((c) => c.teacher === store.currentUser)
 })
@@ -811,8 +865,84 @@ function getCourseProgress(courseId: string): number {
   return Math.round(avg)
 }
 
+// ===== AI 分层分布（饼图） =====
+const TIER_COLORS: Record<string, string> = {
+  excellent: '#10b981', // 卓越层（翠绿）
+  advanced: '#3b82f6',  // 进阶层（蓝）
+  basic: '#f59e0b',     // 基础层（琥珀）
+  untested: '#d1d5db',  // 未分层（灰）
+}
+const TIER_ORDER = ['excellent', 'advanced', 'basic', 'untested'] as const
+const TIER_LABELS: Record<string, string> = { excellent: '卓越层', advanced: '进阶层', basic: '基础层', untested: '未分层' }
+
+/** 统计某课程内各 AI 分层人数（关联学生端分层记录） */
+function getTierDistribution(courseId: string): Record<string, number> {
+  const dist: Record<string, number> = { excellent: 0, advanced: 0, basic: 0, untested: 0 }
+  for (const e of store.enrollments) {
+    if (e.courseId !== courseId || e.status === 'dropped') continue
+    const rec = store.getStudentTier(courseId, e.studentId)
+    if (rec && rec.tier in dist) dist[rec.tier]++
+    else dist.untested++
+  }
+  return dist
+}
+
+/** 生成饼图扇区（SVG circle stroke-dasharray 方案，r=40，周长 C≈251.3） */
+function tierPieSegments(courseId: string) {
+  const dist = getTierDistribution(courseId)
+  const total = studentCount(courseId)
+  if (total === 0) return []
+  const C = 2 * Math.PI * 40
+  let acc = 0
+  return TIER_ORDER.filter((k) => dist[k] > 0).map((k) => {
+    const len = (dist[k] / total) * C
+    const seg = { key: k, color: TIER_COLORS[k], dash: `${len} ${C - len}`, offset: -acc }
+    acc += len
+    return seg
+  })
+}
+
+/** 饼图图例（含未分层，仅显示人数 > 0 的项） */
+function tierLegend(courseId: string) {
+  const dist = getTierDistribution(courseId)
+  return TIER_ORDER.filter((k) => dist[k] > 0).map((k) => ({
+    label: TIER_LABELS[k],
+    color: TIER_COLORS[k],
+    count: dist[k],
+  }))
+}
+
 function goDetail(courseId: string) {
   router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}`)
+}
+
+/** 当前教师/导师是否有该课程的待完成评价（用于红点溯源） */
+function hasPendingEval(courseId: string) {
+  if (!store.currentUser) return false
+  return store.evalReminders.some(
+    (r) =>
+      r.courseId === courseId &&
+      r.studentId === store.currentUser &&
+      (r.status === 'pending' || r.status === 'overdue')
+  )
+}
+
+/** 待评价红点溯源：直达评论管理（评价填写）tab */
+function goEval(courseId: string) {
+  router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=comments`)
+}
+
+/** 该课程中「最新提交尚未批改」的素质评价学生人数（仅授课教师显示红点） */
+function pendingQualityCount(courseId: string) {
+  if (!store.currentUser) return 0
+  const course = store.courses.find((c) => c.id === courseId)
+  if (!course || course.teacher !== store.currentUser) return 0
+  return store.countPendingQualitySubmissions(courseId)
+}
+
+/** 素质评价待批改红点溯源：直达素质评价管理 tab */
+function goQualityEval(courseId: string) {
+  router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=quality-eval`)
 }
 
 // ===== 评价配置 & 批量操作（模板引用，统一放在此处） =====

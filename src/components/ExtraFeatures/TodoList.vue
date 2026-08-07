@@ -17,6 +17,15 @@
         </button>
         <span class="flex-1 text-sm text-gray-900">{{ t.title }}</span>
         <span v-if="t.dueDate" class="text-xs text-gray-400">{{ t.dueDate }}</span>
+        <!-- 溯源：跳转到该提醒的来源处 -->
+        <button
+          v-if="traceMap[t.id]"
+          @click="router.push(traceMap[t.id]!.path)"
+          :title="`前往：${traceMap[t.id]!.label}`"
+          class="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-brand-600/10 text-brand-700 hover:bg-brand-600/20 transition-colors flex-shrink-0">
+          <ArrowRight class="w-3 h-3" />
+          {{ traceMap[t.id]!.label }}
+        </button>
         <button @click="store.deleteTodo(t.id)" class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-brand-600/10 text-red-400 transition-all">
           <X class="w-4 h-4" />
         </button>
@@ -44,12 +53,14 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Plus, Circle, CheckCircle, X } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Plus, Circle, CheckCircle, X, ArrowRight } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import { getNow } from '@/lib/date'
 import { EvalTypeLabels } from '@/types'
 
 const store = useAppStore()
+const router = useRouter()
 const title = ref('')
 const dueDate = ref('')
 
@@ -127,4 +138,67 @@ const handleAdd = () => {
   title.value = ''
   dueDate.value = ''
 }
+
+// ===== 待办溯源：自动生成的待办可跳转到提醒来源 =====
+
+interface TodoTrace {
+  path: string
+  label: string
+}
+
+/** 根据待办 id/标题解析其提醒来源的跳转目标 */
+function getTodoTrace(t: { id: string; title: string }): TodoTrace | null {
+  const roleBase = store.currentRole === 'mentor' ? '/mentor' : '/teacher'
+  // 当前登录学生 id（用于从自动待办 id 中剥离后缀，课程 id 与学生 id 均可能含连字符）
+  const currentStudentId = store.currentRole === 'student' && store.currentUser
+    ? (store.students.find((s) => s.name === store.currentUser)?.id ?? null)
+    : null
+  // [评价] auto-eval-{courseId}-{session}
+  if (t.id.startsWith('auto-eval-')) {
+    const parts = t.id.split('-')
+    if (parts.length < 4) return null
+    const courseId = parts.slice(2, -1).join('-')
+    if (!courseId) return null
+    const base = store.currentRole === 'student' ? '/student' : roleBase
+    const tab = store.currentRole === 'student' ? 'evaluations' : 'comments'
+    return { path: `${base}/courses/${courseId}?tab=${tab}`, label: '去评价' }
+  }
+  // [配置] auto-config-{courseId}
+  if (t.id.startsWith('auto-config-')) {
+    const courseId = t.id.replace('auto-config-', '')
+    if (!courseId) return null
+    return { path: `/teacher/courses/${courseId}?tab=grade-config`, label: '去配置' }
+  }
+  // [AI分层] auto-ai-tier-{courseId}-{studentId}
+  if (t.id.startsWith('auto-ai-tier-') && currentStudentId) {
+    const courseId = t.id.replace('auto-ai-tier-', '').slice(0, -currentStudentId.length - 1)
+    if (!courseId) return null
+    return { path: `/student/courses/${courseId}?tab=ai_tier`, label: '去测试' }
+  }
+  // [作业] auto-homework-{homeworkId}-{studentId}
+  if (t.id.startsWith('auto-homework-') && currentStudentId) {
+    const hwId = t.id.replace('auto-homework-', '').slice(0, -currentStudentId.length - 1)
+    const hw = store.homework.find((h) => h.id === hwId)
+    if (!hw) return null
+    return { path: `/student/courses/${hw.courseId}?tab=homework`, label: '去完成' }
+  }
+  // 旧的「📋 评价提醒」待办：从标题匹配课程名
+  if (t.title.includes('评价提醒')) {
+    const course = store.courses.find((c) => t.title.includes(c.title))
+    if (!course) return null
+    const base = store.currentRole === 'student' ? '/student' : roleBase
+    const tab = store.currentRole === 'student' ? 'evaluations' : 'comments'
+    return { path: `${base}/courses/${course.id}?tab=${tab}`, label: '去评价' }
+  }
+  return null
+}
+
+/** 每个待办的溯源跳转（Map<id, trace>） */
+const traceMap = computed<Record<string, TodoTrace | null>>(() => {
+  const map: Record<string, TodoTrace | null> = {}
+  for (const t of myTodos.value) {
+    map[t.id] = getTodoTrace(t)
+  }
+  return map
+})
 </script>

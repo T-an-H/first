@@ -7,6 +7,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
+import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const student = computed(() => store.students.find((s) => s.name === store.currentUser))
@@ -18,7 +19,25 @@ const inProgress = computed(() => myEnrollments.value.filter((e) => e.status ===
 
 const avgScore = computed(() => {
   if (myGrades.value.length === 0) return 0
-  return Math.round(myGrades.value.reduce((s, g) => s + g.score, 0) / myGrades.value.length)
+  // 与成绩查询页面一致：优先用 calcTotalScore 计算加权总分，无详细成绩时回退
+  const totals = myGrades.value.map((g) => {
+    const d = store.detailedGrades.find((dg) => dg.studentId === g.studentId && dg.courseId === g.courseId)
+    if (d) return store.calcTotalScore(g.courseId, d)
+    const base = g.totalScore ?? g.score ?? 0
+    return Math.min(100, base + store.getStudentQualityScore(g.courseId, g.studentId))
+  })
+  return Math.round(totals.reduce((s, t) => s + t, 0) / totals.length)
+})
+
+// 判断是否已录入期中及期末成绩（用于控制"平均成绩"的显示）
+const hasMidtermAndFinal = computed(() => {
+  if (!student.value) return false
+  return store.detailedGrades.some((dg) => {
+    if (dg.studentId !== student.value!.id) return false
+    const hasMidterm = (dg.midtermExamScore != null && dg.midtermExamScore > 0) || (dg.midtermProjectScore != null && dg.midtermProjectScore > 0)
+    const hasFinal = (dg.finalExamScore != null && dg.finalExamScore > 0) || (dg.finalProjectScore != null && dg.finalProjectScore > 0)
+    return hasMidterm && hasFinal
+  })
 })
 
 const totalCredits = computed(() => {
@@ -30,10 +49,62 @@ const totalCredits = computed(() => {
 
 const avgProgress = computed(() => {
   if (myEnrollments.value.length === 0) return 0
-  return Math.round(myEnrollments.value.reduce((s, e) => s + e.progress, 0) / myEnrollments.value.length)
+  // 实时计算：基于已上课节数 / 总课节数
+  const now = getNow()
+  const progresses = myEnrollments.value.map((e) => {
+    const courseSchedules = store.schedules.filter((s) => s.courseId === e.courseId)
+    if (courseSchedules.length === 0) return 0
+    const startedCount = courseSchedules.filter((s) => new Date(s.startDate) < now).length
+    return Math.round((startedCount / courseSchedules.length) * 100)
+  })
+  return Math.round(progresses.reduce((s, p) => s + p, 0) / progresses.length)
 })
 
 const getCourse = (id: string) => store.courses.find((c) => c.id === id)
+
+// ====== 今日学习轨迹（根据课表，按班级从数据库加载，与课表页面一致） ======
+const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const dbSchedules = ref<any[]>([])
+
+function getTodayLabel(): string {
+  return dayLabels[(new Date().getDay() + 6) % 7]
+}
+
+function getScheduleDay(sch: any): string {
+  if (sch.day) return sch.day
+  if (sch.startDate) {
+    const d = new Date(sch.startDate)
+    if (!isNaN(d.getTime())) return dayLabels[(d.getDay() + 6) % 7]
+  }
+  return '-'
+}
+
+async function loadMySchedules() {
+  try {
+    const studentName = store.currentUser
+    if (!studentName) return
+    // 1. 查询学生信息获取班级
+    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
+    const stuData = await stuRes.json()
+    const myInfo = stuData.students?.[0]
+    if (!myInfo?.className) return
+    // 2. 按班级加载排课（与课表页面 Schedule.vue 数据源一致）
+    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
+    const schData = await schRes.json()
+    if (schData.success) {
+      dbSchedules.value = schData.schedules
+    }
+  } catch (e) {
+    console.error('加载课表失败:', e)
+  }
+}
+
+const todaySchedules = computed(() => {
+  const today = getTodayLabel()
+  return dbSchedules.value
+    .filter((s: any) => getScheduleDay(s) === today)
+    .sort((a: any, b: any) => (a.timeSlot || '').localeCompare(b.timeSlot || ''))
+})
 
 const radarData = computed(() => {
   const result: { label: string; value: number }[] = []
@@ -67,67 +138,180 @@ const radarData = computed(() => {
   return result
 })
 
-function getAngle(i: number): number {
-  const total = radarData.value.length || 6
-  return ((360 / total) * i - 90) * Math.PI / 180
-}
+// ====== 素质评价雷达图数据（取素质评价分最高的 5 门课程） ======
+const qualityRadarData = computed(() => {
+  if (!student.value) return []
+  const result: { label: string; value: number }[] = []
+  for (const enr of myEnrollments.value) {
+    const course = getCourse(enr.courseId)
+    if (!course) continue
+    const qe = store.getStudentQualityEvaluation(enr.courseId, student.value.id)
+    if (!qe || qe.submissions.length === 0) continue
+    const graded = qe.submissions.filter((s) => s.score !== undefined)
+    if (graded.length === 0) continue
+    const latest = graded[graded.length - 1]
+    result.push({ label: course.title, value: Math.round(latest.score ?? 0) })
+  }
+  // 按分数降序，取前 5 门
+  return result.sort((a, b) => b.value - a.value).slice(0, 5)
+})
 
-function gridPoints(level: number): string {
-  const r = level * 30
-  return radarData.value.map((_, i) => {
-    const angle = getAngle(i)
-    return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
-  }).join(' ')
-}
+// ====== 增值评价数据 ======
+const selectedTrendCourseIndex = ref(0)
 
-function axisEndX(i: number): number {
-  const angle = getAngle(i)
-  return 100 + 150 * Math.cos(angle)
-}
+const evalTrendData = computed(() => {
+  if (!student.value) return []
+  const studentId = student.value.id
+  
+  // 获取该学生的所有评价记录
+  const studentEvals = store.evaluations
+    .filter(ev => ev.studentId === studentId && ev.score > 0)
+    .sort((a, b) => {
+      // 先按课程分组，再按 sessionNumber 排序
+      if (a.courseId !== b.courseId) return a.courseId.localeCompare(b.courseId)
+      return a.sessionNumber - b.sessionNumber
+    })
+  
+  if (studentEvals.length === 0) return []
+  
+  // 按课程分组
+  const courseMap = new Map<string, { courseTitle: string; sessions: { session: number; score: number; date: string }[] }>()
+  
+  for (const ev of studentEvals) {
+    const course = getCourse(ev.courseId)
+    if (!course) continue
+    
+    if (!courseMap.has(ev.courseId)) {
+      courseMap.set(ev.courseId, {
+        courseTitle: course.title,
+        sessions: []
+      })
+    }
+    
+    const courseData = courseMap.get(ev.courseId)!
+    courseData.sessions.push({
+      session: ev.sessionNumber,
+      score: ev.score,
+      date: ev.createdAt
+    })
+  }
+  
+  // 转换为图表数据格式
+  const result: { courseId: string; courseTitle: string; points: { x: number; y: number; label: string }[] }[] = []
+  
+  courseMap.forEach((value, key) => {
+    if (value.sessions.length < 1) return // 至少需要1次评价才能显示趋势
+    const points = value.sessions.map(s => ({
+      x: s.session,
+      y: s.score,
+      label: `第${s.session}次`
+    }))
+    result.push({
+      courseId: key,
+      courseTitle: value.courseTitle,
+      points
+    })
+  })
+  
+  return result
+})
 
-function axisEndY(i: number): number {
-  const angle = getAngle(i)
-  return 100 + 150 * Math.sin(angle)
-}
+// 获取增值评价统计信息
+const evalTrendStats = computed(() => {
+  if (evalTrendData.value.length === 0) return null
+  
+  const stats = evalTrendData.value.map(course => {
+    const points = course.points
+    const currentScore = points[points.length - 1].y
+    const previousScore = points.length > 1 ? points[points.length - 2].y : null
+    const change = previousScore !== null ? currentScore - previousScore : null
+    
+    return {
+      courseId: course.courseId,
+      courseTitle: course.courseTitle,
+      currentScore,
+      previousScore,
+      change,
+      hasTrend: points.length > 1
+    }
+  })
+  
+  return stats
+})
 
-function dataPointX(i: number): number {
-  const angle = getAngle(i)
-  const r = radarData.value[i].value * 1.5
-  return 100 + r * Math.cos(angle)
-}
+/** 绘制雷达图（坐标以 viewBox="-120 -120 440 440"、中心 (100,100)、最外层半径 150 为基准） */
+function drawRadarChart(
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
+  data: { label: string; value: number }[]
+) {
+  if (data.length === 0) return
+  const angleOf = (i: number): number => ((360 / data.length) * i - 90) * Math.PI / 180
 
-function dataPointY(i: number): number {
-  const angle = getAngle(i)
-  const r = radarData.value[i].value * 1.5
-  return 100 + r * Math.sin(angle)
-}
+  // 网格多边形（5 层）
+  for (let level = 1; level <= 5; level++) {
+    const r = level * 30
+    const points = data.map((_, i) => {
+      const angle = angleOf(i)
+      return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
+    }).join(' ')
+    svg.append('polygon')
+      .attr('points', points)
+      .attr('fill', 'none')
+      .attr('stroke', '#5eb6b9')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.3)
+  }
 
-function dataLabelX(i: number): number {
-  const angle = getAngle(i)
-  const r = Math.min(radarData.value[i].value * 1.5 + 25, 170)
-  return 100 + r * Math.cos(angle)
-}
+  // 轴线
+  data.forEach((_, i) => {
+    const angle = angleOf(i)
+    svg.append('line')
+      .attr('x1', 100).attr('y1', 100)
+      .attr('x2', 100 + 150 * Math.cos(angle)).attr('y2', 100 + 150 * Math.sin(angle))
+      .attr('stroke', '#5eb6b9')
+      .attr('stroke-width', 1)
+      .attr('stroke-opacity', 0.3)
+  })
 
-function dataLabelY(i: number): number {
-  const angle = getAngle(i)
-  const r = Math.min(radarData.value[i].value * 1.5 + 25, 170)
-  return 100 + r * Math.sin(angle)
-}
-
-function dataLabelAnchor(i: number): string {
-  const angle = getAngle(i)
-  const r = radarData.value[i].value * 1.5
-  const x = 100 + r * Math.cos(angle)
-  return x > 100 ? 'start' : 'end'
-}
-
-const dataPolygonPoints = computed(() => {
-  return radarData.value.map((d, i) => {
-    const angle = getAngle(i)
+  // 数据多边形
+  const polyPoints = data.map((d, i) => {
+    const angle = angleOf(i)
     const r = d.value * 1.5
     return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
   }).join(' ')
-})
+  svg.append('polygon')
+    .attr('points', polyPoints)
+    .attr('fill', 'rgba(65, 90, 119, 0.2)')
+    .attr('stroke', '#429fc4')
+    .attr('stroke-width', 2)
+
+  // 数据点 + 标签
+  data.forEach((d, i) => {
+    const angle = angleOf(i)
+    const r = d.value * 1.5
+    const x = 100 + r * Math.cos(angle)
+    const y = 100 + r * Math.sin(angle)
+    const lx = 100 + Math.min(r + 25, 170) * Math.cos(angle)
+    const ly = 100 + Math.min(r + 25, 170) * Math.sin(angle)
+    const anchor = x > 100 ? 'start' : 'end'
+
+    svg.append('circle')
+      .attr('cx', x).attr('cy', y)
+      .attr('r', 4).attr('fill', '#429fc4')
+
+    svg.append('text')
+      .attr('x', lx).attr('y', ly)
+      .attr('text-anchor', anchor)
+      .attr('font-size', 9).attr('fill', '#5eb6b9')
+      .text(d.label)
+
+    svg.append('text')
+      .attr('x', lx).attr('y', ly + 12)
+      .attr('text-anchor', anchor)
+      .attr('font-size', 9).attr('fill', '#429fc4').attr('font-weight', 'bold')
+      .text(`${d.value}分`)
+  })
+}
 
 const showDetailModal = ref(false)
 
@@ -284,19 +468,6 @@ function renderProfile(root: HTMLElement) {
     span.append('span').text(item.text)
   })
 
-  // 统计数字
-  const statsRow = infoRow.append('div').attr('class', 'flex gap-6')
-  const stats = [
-    { value: enrs.length, label: '已报名', bg: 'bg-blue-50', text: 'text-brand-600' },
-    { value: completed.value, label: '已完成', bg: 'bg-emerald-50', text: 'text-emerald-600' },
-    { value: avgScore.value, label: '平均分', bg: 'bg-brand-400/10', text: 'text-brand-700' },
-  ]
-  stats.forEach((st) => {
-    const box = statsRow.append('div').attr('class', `text-center px-4 py-3 ${st.bg} rounded-lg`)
-    box.append('p').attr('class', `text-2xl font-bold ${st.text}`).text(String(st.value))
-    box.append('p').attr('class', 'text-xs text-gray-400 mt-1').text(st.label)
-  })
-
   // 能力雷达图 + 学习统计 两列布局
   const twoCol = container.append('div').attr('class', 'grid grid-cols-1 lg:grid-cols-2 gap-6')
 
@@ -309,55 +480,15 @@ function renderProfile(root: HTMLElement) {
   if (rd.length > 0) {
     const svgWrap = radarCard.append('div')
       .attr('class', 'relative w-80 h-80 mx-auto cursor-pointer')
-      .on('click', () => { showDetailModal.value = true; reRender() })
+      .on('click', () => {
+        const scrollY = window.scrollY
+        showDetailModal.value = true
+        reRender()
+        window.scrollTo(0, scrollY)
+      })
 
     const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
-
-    // 网格多边形
-    for (let level = 1; level <= 5; level++) {
-      svg.append('polygon')
-        .attr('points', gridPoints(level))
-        .attr('fill', 'none')
-        .attr('stroke', '#5eb6b9')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.3)
-    }
-
-    // 轴线
-    rd.forEach((_, i) => {
-      svg.append('line')
-        .attr('x1', 100).attr('y1', 100)
-        .attr('x2', axisEndX(i)).attr('y2', axisEndY(i))
-        .attr('stroke', '#5eb6b9')
-        .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.3)
-    })
-
-    // 数据多边形
-    svg.append('polygon')
-      .attr('points', dataPolygonPoints.value)
-      .attr('fill', 'rgba(65, 90, 119, 0.2)')
-      .attr('stroke', '#429fc4')
-      .attr('stroke-width', 2)
-
-    // 数据点 + 标签
-    rd.forEach((d, i) => {
-      svg.append('circle')
-        .attr('cx', dataPointX(i)).attr('cy', dataPointY(i))
-        .attr('r', 4).attr('fill', '#429fc4')
-
-      svg.append('text')
-        .attr('x', dataLabelX(i)).attr('y', dataLabelY(i))
-        .attr('text-anchor', dataLabelAnchor(i))
-        .attr('font-size', 9).attr('fill', '#5eb6b9')
-        .text(d.label)
-
-      svg.append('text')
-        .attr('x', dataLabelX(i)).attr('y', dataLabelY(i) + 12)
-        .attr('text-anchor', dataLabelAnchor(i))
-        .attr('font-size', 9).attr('fill', '#429fc4').attr('font-weight', 'bold')
-        .text(`${d.value}分`)
-    })
+    drawRadarChart(svg, rd)
 
     // hover提示
     const hoverOverlay = svgWrap.append('div')
@@ -368,8 +499,170 @@ function renderProfile(root: HTMLElement) {
       .html('暂无平时成绩数据<br />完成课程评价后将生成能力雷达图')
   }
 
+  // 素质评价雷达图（取素质评价分最高的 5 门课程，与课程成绩雷达图并排）
+  const qrd = qualityRadarData.value
+  const qualityRadarCard = twoCol.append('div').attr('class', 'bg-white rounded-xl p-6 border border-emerald-400/20 shadow-sm')
+  const qualityRadarTitle = qualityRadarCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
+  renderIcon(qualityRadarTitle, 'award').attr('class', 'w-5 h-5 text-emerald-600')
+  qualityRadarTitle.append('span').text('素质评价雷达图')
+
+  if (qrd.length > 0) {
+    const svgWrap = qualityRadarCard.append('div').attr('class', 'relative w-72 h-72 mx-auto')
+    const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
+    drawRadarChart(svg, qrd)
+
+    // 各课程素质评价分一览（按分数从高到低排序）
+    const scoreList = qualityRadarCard.append('div').attr('class', 'mt-4 grid grid-cols-1 gap-1.5')
+    qrd.forEach((d) => {
+      const row = scoreList.append('div').attr('class', 'flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-400/10')
+      row.append('span').attr('class', 'text-xs text-gray-600 truncate').text(d.label)
+      row.append('span').attr('class', 'text-sm font-bold text-emerald-600 flex-shrink-0').text(`${d.value}分`)
+    })
+  } else {
+    qualityRadarCard.append('div').attr('class', 'text-center py-8')
+      .append('p').attr('class', 'text-gray-400').text('暂无素质评价数据')
+    qualityRadarCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成素质评价打分后将生成雷达图')
+  }
+
+  // 增值评价板块
+  const trendData = evalTrendData.value
+  const trendStats = evalTrendStats.value
+  const trendCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
+  const trendTitle = trendCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
+  renderIcon(trendTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
+  trendTitle.append('span').text('增值评价')
+
+  if (trendData.length > 0) {
+    // 课程切换标签（放在折线图上方）
+    const courseTabs = trendCard.append('div').attr('class', 'flex flex-wrap gap-2 mb-4')
+    
+    trendData.forEach((course, index) => {
+      const isActive = selectedTrendCourseIndex.value === index
+      const tab = courseTabs.append('button')
+        .attr('class', `px-3 py-1.5 text-sm rounded-full transition-colors cursor-pointer ${isActive ? 'bg-brand-700 text-white' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`)
+        .text(course.courseTitle)
+      
+      tab.on('click', () => {
+        selectedTrendCourseIndex.value = index
+        const scrollY = window.scrollY
+        reRender()
+        window.scrollTo(0, scrollY)
+      })
+    })
+    
+    // 当前选中的课程
+    const currentCourse = trendData[selectedTrendCourseIndex.value]
+    const currentStat = trendStats?.[selectedTrendCourseIndex.value]
+    
+    // 绘制当前课程折线图
+    const chartWidth = 400
+    const chartHeight = 120
+    const padding = { top: 20, right: 20, bottom: 30, left: 40 }
+    const innerWidth = chartWidth - padding.left - padding.right
+    const innerHeight = chartHeight - padding.top - padding.bottom
+    
+    const courseSection = trendCard.append('div').attr('class', 'border border-brand-400/10 rounded-lg p-4')
+    const courseHeader = courseSection.append('div').attr('class', 'flex items-center justify-between mb-3')
+    courseHeader.append('h4').attr('class', 'font-semibold text-gray-900').text(currentCourse.courseTitle)
+    
+    // 统计信息
+    if (currentStat && currentStat.hasTrend) {
+      const change = currentStat.change!
+      const changeColor = change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-500' : 'text-gray-500'
+      const changeText = change > 0 ? `进步 ${change.toFixed(1)} 分` : change < 0 ? `退步 ${Math.abs(change).toFixed(1)} 分` : '保持不变'
+      courseHeader.append('span').attr('class', `text-sm font-medium ${changeColor}`).text(changeText)
+    } else {
+      courseHeader.append('span').attr('class', 'text-xs text-gray-400').text('首次评价，暂无对比')
+    }
+    
+    const svgContainer = courseSection.append('div').attr('class', 'flex justify-center')
+    const svg = svgContainer.append('svg')
+      .attr('width', chartWidth)
+      .attr('height', chartHeight)
+      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`)
+    
+    const points = currentCourse.points
+    const maxY = 100
+    const xStep = points.length > 1 ? innerWidth / (points.length - 1) : 0
+    
+    // Y轴
+    svg.append('line')
+      .attr('x1', padding.left).attr('y1', padding.top)
+      .attr('x2', padding.left).attr('y2', padding.top + innerHeight)
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1)
+    
+    // X轴
+    svg.append('line')
+      .attr('x1', padding.left).attr('y1', padding.top + innerHeight)
+      .attr('x2', padding.left + innerWidth).attr('y2', padding.top + innerHeight)
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1)
+    
+    // Y轴刻度
+    for (let i = 0; i <= 4; i++) {
+      const y = padding.top + innerHeight * (1 - i / 4)
+      const val = maxY * (i / 4)
+      svg.append('line')
+        .attr('x1', padding.left - 5).attr('y1', y)
+        .attr('x2', padding.left).attr('y2', y)
+        .attr('stroke', '#9ca3af').attr('stroke-width', 1)
+      svg.append('text')
+        .attr('x', padding.left - 8).attr('y', y + 3)
+        .attr('text-anchor', 'end').attr('font-size', '9').attr('fill', '#9ca3af')
+        .text(val.toString())
+    }
+    
+    // 折线路径
+    const linePoints: string[] = []
+    points.forEach((point, i) => {
+      const x = padding.left + (points.length > 1 ? i * xStep : innerWidth / 2)
+      const y = padding.top + innerHeight * (1 - point.y / 100)
+      linePoints.push(`${x},${y}`)
+    })
+    
+    // 折线
+    if (linePoints.length > 1) {
+      svg.append('polyline')
+        .attr('points', linePoints.join(' '))
+        .attr('fill', 'none')
+        .attr('stroke', '#429fc4')
+        .attr('stroke-width', 2)
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+    }
+    
+    // 数据点
+    points.forEach((point, i) => {
+      const x = padding.left + (points.length > 1 ? i * xStep : innerWidth / 2)
+      const y = padding.top + innerHeight * (1 - point.y / 100)
+      
+      svg.append('circle')
+        .attr('cx', x).attr('cy', y)
+        .attr('r', 4)
+        .attr('fill', '#429fc4')
+        .attr('stroke', 'white')
+        .attr('stroke-width', 2)
+      
+      svg.append('text')
+        .attr('x', x).attr('y', y - 10)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '10').attr('fill', '#429fc4').attr('font-weight', 'bold')
+        .text(`${point.y}分`)
+      
+      svg.append('text')
+        .attr('x', x).attr('y', padding.top + innerHeight + 15)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '9').attr('fill', '#6b7280')
+        .text(point.label)
+    })
+  } else {
+    // 无评价数据
+    trendCard.append('div').attr('class', 'text-center py-8')
+      .append('p').attr('class', 'text-gray-400').text('暂无评价数据')
+    trendCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成课程评价后将生成增值评价趋势图')
+  }
+
   // 学习统计
-  const statCard = twoCol.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
+  const statCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
   const statTitle = statCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
   renderIcon(statTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
   statTitle.append('span').text('学习统计')
@@ -378,50 +671,51 @@ function renderProfile(root: HTMLElement) {
     { label: '学习中课程', value: `${inProgress.value} 门`, color: 'text-gray-900' },
     { label: '已完成课程', value: `${completed.value} 门`, color: 'text-emerald-600' },
     { label: '总学分', value: `${totalCredits.value} 学分`, color: 'text-brand-600' },
-    { label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' },
+    ...(hasMidtermAndFinal.value ? [{ label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' }] : []),
     { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900' },
   ]
-  const statBody = statCard.append('div').attr('class', 'space-y-4')
+  const statBody = statCard.append('div').attr('class', 'grid grid-cols-2 md:grid-cols-5 gap-3')
   statItems.forEach((item) => {
-    const row = statBody.append('div').attr('class', 'flex items-center justify-between p-3 bg-gray-50 rounded-lg')
-    row.append('span').attr('class', 'text-sm text-gray-600').text(item.label)
-    row.append('span').attr('class', `font-semibold ${item.color}`).text(item.value)
+    const cell = statBody.append('div').attr('class', 'p-4 bg-gray-50 rounded-lg')
+    cell.append('p').attr('class', 'text-sm text-gray-600').text(item.label)
+    cell.append('p').attr('class', `text-2xl font-bold mt-1 ${item.color}`).text(item.value)
   })
 
-  // 学习轨迹
+  // 今日学习轨迹
+  const todaySchs = todaySchedules.value
   const trackCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
   const trackTitle = trackCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
   renderIcon(trackTitle, 'bookOpen').attr('class', 'w-5 h-5 text-brand-600')
-  trackTitle.append('span').text('学习轨迹')
+  trackTitle.append('span').text('今日学习轨迹')
 
-  if (enrs.length > 0) {
+  if (todaySchs.length > 0) {
     const trackList = trackCard.append('div').attr('class', 'relative')
-    enrs.forEach((enr, index) => {
+    todaySchs.forEach((sch, index) => {
       const item = trackList.append('div').attr('class', 'flex gap-4 pb-6 relative')
 
-      if (index < enrs.length - 1) {
+      if (index < todaySchs.length - 1) {
         item.append('div').attr('class', 'absolute left-[7px] top-4 bottom-0 w-0.5 bg-blue-200')
       }
 
-      const dotClass = enr.status === 'completed' ? 'bg-brand-600' :
-        enr.status === 'in_progress' ? 'bg-brand-600' : 'bg-blue-500'
-      item.append('div').attr('class', `w-4 h-4 rounded-full mt-1 flex-shrink-0 ${dotClass}`)
+      item.append('div').attr('class', 'w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-brand-600')
 
       const content = item.append('div').attr('class', 'flex-1')
-      content.append('p').attr('class', 'font-medium text-gray-900').text(getCourse(enr.courseId)?.title || '未知课程')
-
-      const statusText = enr.status === 'completed' ? '已完成' : enr.status === 'in_progress' ? '学习中' : '已报名'
-      content.append('p').attr('class', 'text-sm text-gray-400')
-        .text(`${enr.enrollDate} · 进度 ${enr.progress}% · ${statusText}`)
+      content.append('p').attr('class', 'font-medium text-gray-900').text(sch.title || getCourse(sch.courseId)?.title || '未知课程')
+      content.append('p').attr('class', 'text-sm text-gray-400').text(sch.timeSlot || '')
     })
   } else {
-    trackCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('暂无学习记录')
+    trackCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('今日暂无课程安排')
   }
 
   // 详情弹窗 (showDetailModal)
   if (showDetailModal.value) {
     const modalOverlay = container.append('div').attr('class', 'fixed inset-0 z-50 flex items-center justify-center p-4')
-    modalOverlay.append('div').attr('class', 'absolute inset-0 bg-black/50').on('click', () => { showDetailModal.value = false; reRender() })
+    modalOverlay.append('div').attr('class', 'absolute inset-0 bg-black/50').on('click', () => {
+      const scrollY = window.scrollY
+      showDetailModal.value = false
+      reRender()
+      window.scrollTo(0, scrollY)
+    })
 
     const modalBox = modalOverlay.append('div').attr('class', 'relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden')
 
@@ -433,7 +727,12 @@ function renderProfile(root: HTMLElement) {
 
     const closeBtn = modalHeader.append('button')
       .attr('class', 'p-2 hover:bg-brand-400/10 rounded-lg transition-colors')
-      .on('click', () => { showDetailModal.value = false; reRender() })
+      .on('click', () => {
+        const scrollY = window.scrollY
+        showDetailModal.value = false
+        reRender()
+        window.scrollTo(0, scrollY)
+      })
     const closeSvg = closeBtn.append('svg').attr('class', 'w-6 h-6 text-gray-400')
       .attr('fill', 'none').attr('stroke', 'currentColor').attr('viewBox', '0 0 24 24')
     closeSvg.append('path').attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
@@ -509,12 +808,13 @@ function reRender() {
   if (el) renderProfile(el)
 }
 
-onMounted(() => {
+onMounted(async () => {
+  await loadMySchedules()
   const el = document.getElementById('student-profile-root')
   if (el) renderProfile(el)
 })
 
-watch([myEnrollments, myGrades], () => {
+watch([myEnrollments, myGrades, todaySchedules, hasMidtermAndFinal, avgProgress], () => {
   const el = document.getElementById('student-profile-root')
   if (el) renderProfile(el)
 }, { deep: true })

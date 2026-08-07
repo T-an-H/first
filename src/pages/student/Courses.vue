@@ -138,11 +138,17 @@ function renderCourses(root: HTMLElement) {
     ].join(' ')
 
     const card = grid.append('div').attr('class', cardClasses)
-      .on('click', () => router.push(`/student/courses/${enrollment.courseId}`))
+      .attr('title', pendingEval ? '有未完成的评价，点击进入评价填写' : '')
+      .on('click', () => router.push(`/student/courses/${enrollment.courseId}${pendingEval ? '?tab=evaluations' : ''}`))
 
-    // 待评价红点标记
+    // 待评价红点标记（可点击 → 直达评价填写处，实现红点溯源）
     if (pendingEval) {
-      const evalBadge = card.append('div').attr('class', 'absolute top-3 right-3 z-10')
+      const evalBadge = card.append('div').attr('class', 'absolute top-3 right-3 z-20 cursor-pointer')
+        .attr('title', '有未完成的评价，点击前往评价填写')
+        .on('click', (event) => {
+          event.stopPropagation()
+          router.push(`/student/courses/${enrollment.courseId}?tab=evaluations`)
+        })
       const span = evalBadge.append('span').attr('class', 'relative inline-flex')
       renderIcon(span, 'alertCircle', 'w-5 h-5 text-gray-600')
       span.append('span').attr('class', 'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white animate-pulse')

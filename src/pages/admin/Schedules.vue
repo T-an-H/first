@@ -1,68 +1,121 @@
 <template>
   <div class="space-y-6">
-    <!-- ============ Level 1: 课程分类卡片 ============ -->
-    <template v-if="!selectedCategory">
+    <!-- ============ Level 0: 学院选择 ============ -->
+    <template v-if="!currentDept">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">课程管理</h1>
+          <p class="text-gray-500 mt-1">请选择一个学院进入课程管理</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button @click="triggerDeptExcelImport" class="flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium">
+            <Upload class="w-4 h-4" /> 导入Excel
+          </button>
+          <button @click="openAddDeptModal" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
+            <Plus class="w-4 h-4" /> 添加学院
+          </button>
+        </div>
+      </div>
+
+      <!-- 学院导入结果提示 -->
+      <div v-if="deptImportMsg" :class="`text-sm p-3 rounded-lg ${deptImportMsg.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`">
+        {{ deptImportMsg.text }}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div
+          v-for="dept in store.departments"
+          :key="dept.id"
+          @click="selectDepartment(dept)"
+          class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+        >
+          <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-lg font-bold" :style="{ backgroundColor: dept.color }">
+              {{ dept.name[0] }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-semibold text-gray-900 group-hover:text-brand-600 transition-colors truncate">{{ dept.name }}</h3>
+              <p class="text-xs text-gray-400 mt-0.5">{{ getDeptCourseCount(dept.id) }} 门课程</p>
+            </div>
+            <ArrowRight class="w-5 h-5 text-gray-300 group-hover:text-brand-500 transition-colors flex-shrink-0" />
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- ============ Level 1: 学院课程卡片 ============ -->
+    <template v-else-if="!selectedCourse">
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-gray-900">课程管理</h1>
           <p class="text-gray-500 mt-1">
             当前学院：<span class="font-medium text-gray-700">{{ currentDeptName }}</span>
-            — 管理课程分类，点击分类查看排课信息
+            — 查看学院课程，点击课程查看排课信息
           </p>
         </div>
         <div class="flex items-center gap-2">
-          <button @click="openCategoryModal(null)" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
-            <Plus class="w-4 h-4" /> 新建课程分类
+          <button @click="triggerCourseImport" class="flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium">
+            <Upload class="w-4 h-4" /> 导入Excel
+          </button>
+          <button @click="openCourseModal()" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
+            <Plus class="w-4 h-4" /> 新增课程
+          </button>
+          <button @click="switchDepartment" class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+            <RefreshCw class="w-4 h-4" /> 切换学院
           </button>
         </div>
       </div>
 
-      <!-- 分类卡片网格 -->
+      <!-- 课程导入结果提示 -->
+      <div v-if="courseImportMsg" :class="`text-sm p-3 rounded-lg ${courseImportMsg.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`">
+        {{ courseImportMsg.text }}
+      </div>
+
+      <!-- 课程卡片网格 -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
-          v-for="cat in departmentCategories"
-          :key="cat.id"
-          @click="selectCategory(cat)"
+          v-for="course in departmentCourses"
+          :key="course.id"
+          @click="selectCourse(course)"
           class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-all cursor-pointer group"
         >
           <div class="flex items-start justify-between mb-3">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="{ backgroundColor: cat.color }">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="{ backgroundColor: getCourseColor(course) }">
               <BookOpen class="w-5 h-5 text-white" />
             </div>
-            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button @click.stop="openCategoryModal(cat)" class="text-xs px-2 py-1 text-blue-500 hover:bg-blue-50 rounded transition-colors">编辑</button>
-              <button @click.stop="confirmDeleteCategory(cat)" class="text-xs px-2 py-1 text-red-400 hover:bg-red-50 rounded transition-colors">删除</button>
-            </div>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="statusClass(course.status)">
+              {{ statusLabel(course.status) }}
+            </span>
           </div>
-          <h3 class="font-semibold text-gray-900">{{ cat.name }}</h3>
-          <p class="text-xs text-gray-400 mt-1">{{ getCategoryScheduleCount(cat.name) }} 条排课</p>
+          <h3 class="font-semibold text-gray-900">{{ course.title }}</h3>
+          <p class="text-xs text-gray-400 mt-1">{{ getCourseScheduleCount(course) }} 条排课</p>
         </div>
 
-        <div v-if="departmentCategories.length === 0" class="col-span-full text-center py-20 text-gray-400">
+        <div v-if="departmentCourses.length === 0" class="col-span-full text-center py-20 text-gray-400">
           <BookOpen class="w-12 h-12 mx-auto mb-3 opacity-30" />
-          <p class="mb-3">暂无课程分类，点击上方按钮新建</p>
-          <p class="text-xs text-gray-300">创建分类后，可在分类下管理排课信息</p>
+          <p class="mb-3">该学院暂无课程</p>
+          <p class="text-xs text-gray-300">请先在教务系统中录入课程，或联系系统管理员</p>
         </div>
       </div>
     </template>
 
-    <!-- ============ Level 2: 排课表格 ============ -->
+    <!-- ============ Level 2: 课程排课 ============ -->
     <template v-else>
       <!-- 返回 + 标题 -->
       <div class="flex items-center gap-3 mb-2">
-        <button @click="selectedCategory = null" class="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors">
-          <ArrowLeft class="w-4 h-4" /> 返回分类列表
+        <button @click="selectedCourse = null" class="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 transition-colors">
+          <ArrowLeft class="w-4 h-4" /> 返回课程列表
         </button>
       </div>
 
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="{ backgroundColor: selectedCategory.color }">
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center" :style="{ backgroundColor: getCourseColor(selectedCourse) }">
             <BookOpen class="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 class="text-2xl font-bold text-gray-900">{{ selectedCategory.name }}</h1>
-            <p class="text-gray-500 mt-1">{{ filteredSchedules.length }} 条排课记录</p>
+            <h1 class="text-2xl font-bold text-gray-900">{{ selectedCourse.title }}</h1>
+            <p class="text-gray-500 mt-1">{{ courseSchedules.length }} 条排课记录</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
@@ -78,7 +131,7 @@
       <!-- 搜索 -->
       <div class="relative max-w-md">
         <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input v-model="searchText" type="text" placeholder="搜索课程名称或教师..." class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+        <input v-model="searchText" type="text" placeholder="搜索教师或教室..." class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
       </div>
 
       <!-- 排课列表 -->
@@ -88,36 +141,34 @@
             <tr class="bg-gray-50 border-b border-gray-100">
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">课程</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">教师</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">班级</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">教室</th>
-              <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">日期</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">周几</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">时间段</th>
               <th class="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-50">
-            <tr v-for="sch in filteredSchedules" :key="sch.id" class="hover:bg-gray-50/50 transition-colors"
+            <tr v-for="sch in courseSchedules" :key="sch.id" class="hover:bg-gray-50/50 transition-colors"
               :class="isConflicting(sch) ? 'bg-red-50/50' : ''">
               <td class="px-4 py-3">
                 <div class="flex items-center gap-2">
-                  <span class="font-medium text-gray-900 text-sm">{{ sch.title || getCourseTitle(sch.courseId) }}</span>
+                  <span class="font-medium text-gray-900 text-sm">{{ sch.title || selectedCourse.title }}</span>
                   <span v-if="isConflicting(sch)" class="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded font-medium">冲突</span>
                 </div>
               </td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ sch.teacher }}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">{{ sch.className || '-' }}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ sch.room }}</td>
-              <td class="px-4 py-3 text-sm text-gray-600">{{ sch.startDate }}</td>
+              <td class="px-4 py-3 text-sm text-gray-600">{{ getDayLabel(sch) }}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ sch.timeSlot }}</td>
               <td class="px-4 py-3 text-right">
                 <button @click="openEdit(sch)" class="text-xs px-2.5 py-1.5 text-blue-500 hover:bg-blue-50 rounded transition-colors">编辑</button>
                 <button @click="confirmDelete(sch)" class="text-xs px-2.5 py-1.5 text-red-400 hover:bg-red-50 rounded transition-colors ml-1">删除</button>
               </td>
             </tr>
-            <tr v-if="filteredSchedules.length === 0">
-              <td colspan="7" class="text-center py-12 text-gray-400 text-sm">
+            <tr v-if="courseSchedules.length === 0">
+              <td colspan="6" class="text-center py-12 text-gray-400 text-sm">
                 <CalendarX class="w-8 h-8 mx-auto mb-2 text-gray-200" />
-                {{ searchText ? '没有匹配的排课记录' : '暂无排课记录' }}
+                {{ searchText ? '没有匹配的排课记录' : '该课程暂无排课记录' }}
               </td>
             </tr>
           </tbody>
@@ -126,8 +177,8 @@
 
       <!-- 统计 -->
       <div class="text-xs text-gray-400">
-        共 {{ dbSchedules.length }} 条排课记录
-        <span v-if="conflictCount > 0" class="text-red-500 ml-2">{{ conflictCount }} 条存在冲突</span>
+        共 {{ allCourseSchedules.length }} 条排课记录
+        <span v-if="courseConflictPairs.length > 0" class="text-red-500 ml-2 cursor-pointer hover:underline" @click="showConflictModal = true">{{ courseConflictPairs.length }} 组冲突，点击查看</span>
       </div>
 
       <!-- 隐藏的文件选择器 -->
@@ -145,11 +196,11 @@
           <h3 class="text-lg font-bold text-gray-900 mb-5">{{ editingSchedule ? '编辑排课' : '新增排课' }}</h3>
 
           <div class="space-y-4">
-            <!-- 课程名称（自动填为分类名） -->
+            <!-- 课程名称（自动填为所选课程） -->
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1.5">课程名称</label>
-              <input :value="selectedCategory?.name" type="text" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 outline-none text-sm text-gray-500" readonly />
-              <p class="text-[10px] text-gray-400 mt-0.5">自动使用分类名称</p>
+              <input :value="selectedCourse?.title" type="text" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-gray-50 outline-none text-sm text-gray-500" readonly />
+              <p class="text-[10px] text-gray-400 mt-0.5">自动使用所选课程名称</p>
             </div>
 
             <!-- 授课教师（手动输入） -->
@@ -158,25 +209,10 @@
               <input v-model="form.teacher" type="text" placeholder="输入教师姓名" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
             </div>
 
-            <!-- 班级 -->
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">上课班级</label>
-              <select v-model="form.className" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm bg-white">
-                <option value="">不指定班级</option>
-                <option v-for="c in classList" :key="c.name" :value="c.name">{{ c.name }}（{{ c.count }}人）</option>
-              </select>
-            </div>
-
-            <!-- 教室 -->
-            <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">教室</label>
-              <input v-model="form.room" type="text" placeholder="如 A101" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
-            </div>
-
             <!-- 周课表选时间 -->
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-2">
-                选择上课时间（单击空格多选）
+                选择上课时间（单击空格多选，首个格子填写上课地点）
                 <span v-if="selectedSlots.length" class="text-brand-600 ml-1">— 已选 {{ selectedSlots.length }} 个时段</span>
               </label>
               <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -192,11 +228,22 @@
                       <td class="p-2 text-gray-400 border-r border-gray-100 text-[11px] text-center">{{ slot.label }}</td>
                       <td v-for="d in dayLabels" :key="d" class="p-1 border-r border-gray-100 last:border-r-0">
                         <div
-                          @click="handleSlotClick(d, slot)"
-                          class="relative rounded-md min-h-[36px] flex items-center justify-center text-center text-[11px] leading-tight cursor-pointer select-none transition-all duration-150"
-                          :class="getCellClass(d, slot)"
+                          v-if="getSelectedSlot(dayLabels.indexOf(d), slot.start, slot.end)"
+                          class="relative rounded-md min-h-[36px] bg-brand-100 border-2 border-brand-400"
                         >
-                          {{ getCellContent(d, slot) }}
+                          <input
+                            v-model="getSelectedSlot(dayLabels.indexOf(d), slot.start, slot.end).room"
+                            @click.stop
+                            placeholder="地点"
+                            class="w-full h-full min-h-[32px] bg-transparent text-center text-[11px] text-brand-700 outline-none placeholder:text-brand-300"
+                          />
+                        </div>
+                        <div
+                          v-else
+                          @click="handleSlotClick(d, slot)"
+                          class="relative rounded-md min-h-[36px] flex items-center justify-center text-center text-[11px] leading-tight cursor-pointer select-none transition-all duration-150 bg-gray-50 text-gray-300 hover:bg-brand-50 hover:text-brand-500 hover:border-brand-300 border border-dashed border-gray-200"
+                        >
+                          +
                         </div>
                       </td>
                     </tr>
@@ -213,6 +260,7 @@
                     class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-brand-50 text-brand-700 border border-brand-200"
                   >
                     {{ sel.dayLabel }} {{ sel.start }}-{{ sel.end }}
+                    <span v-if="sel.room" class="font-medium">{{ sel.room }}</span>
                     <button @click="selectedSlots.splice(i, 1)" class="text-brand-400 hover:text-brand-600">
                       <X class="w-3 h-3" />
                     </button>
@@ -245,52 +293,135 @@
         <div class="absolute inset-0 bg-black/30" @click="deleteTarget = null" />
         <div class="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
           <h3 class="text-lg font-bold text-gray-900 mb-2">确认删除</h3>
-          <p class="text-sm text-gray-500 mb-5">确定要删除「{{ deleteTarget.title || getCourseTitle(deleteTarget.courseId) }}」在 {{ deleteTarget.startDate }} {{ deleteTarget.timeSlot }} 的排课吗？</p>
+          <p class="text-sm text-gray-500 mb-5">确定要删除「{{ deleteTarget.title || selectedCourse.title }}」在 {{ getDayLabel(deleteTarget) }} {{ deleteTarget.timeSlot }} 的排课吗？</p>
           <div class="flex justify-end gap-2">
             <button @click="deleteTarget = null" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg transition-colors">取消</button>
             <button @click="handleDelete" class="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors">确认删除</button>
           </div>
         </div>
       </div>
+
+      <!-- 冲突弹窗 -->
+      <div v-if="showConflictModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/30" @click="showConflictModal = false" />
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
+          <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-bold text-gray-900">排课冲突（{{ courseConflictPairs.length }} 组）</h3>
+            <button @click="showConflictModal = false" class="text-gray-400 hover:text-gray-600">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+          <div class="px-6 py-4 overflow-y-auto space-y-3">
+            <div v-if="courseConflictPairs.length === 0" class="text-center py-10 text-sm text-gray-400">所有冲突已解决</div>
+            <div v-for="(pair, i) in courseConflictPairs" :key="i" class="border border-red-200 bg-red-50/50 rounded-lg p-3">
+              <p class="text-xs font-medium text-red-600 mb-2">{{ pair.reasons.join('、') }}</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div v-for="rec in [pair.a, pair.b]" :key="rec.id" class="bg-white rounded-lg border border-gray-100 p-3">
+                  <p class="text-sm font-medium text-gray-900">{{ rec.title || selectedCourse.title }}</p>
+                  <p class="text-xs text-gray-500 mt-1">{{ rec.teacher }} · {{ getDayLabel(rec) }} {{ rec.timeSlot }}</p>
+                  <p class="text-xs text-gray-500">{{ rec.room }}</p>
+                  <div class="mt-2 flex items-center gap-2">
+                    <template v-if="isCourseSchedule(rec)">
+                      <button @click="editFromConflict(rec)" class="text-xs px-2.5 py-1 text-blue-500 hover:bg-blue-50 rounded transition-colors">修改</button>
+                      <button @click="resolveDelete(rec)" class="text-xs px-2.5 py-1 text-red-500 hover:bg-red-50 rounded transition-colors">删除解决</button>
+                    </template>
+                    <span v-else class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-400 rounded">其他课程</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end px-6 py-3 border-t border-gray-100">
+            <button @click="showConflictModal = false" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg transition-colors">关闭</button>
+          </div>
+        </div>
+      </div>
     </template>
 
-    <!-- ====== 分类新增/编辑弹窗 ====== -->
+    <!-- 隐藏的课程导入文件选择器 -->
+    <input ref="courseFileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleCourseFileChange" />
+
+    <!-- 隐藏的学院导入文件选择器 -->
+    <input ref="deptFileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleDeptFileSelect" />
+
+    <!-- 添加学院弹窗 -->
     <Teleport to="body">
-      <div v-if="showCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/50" @click="showCategoryModal = false" />
+      <div v-if="showDeptModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showDeptModal = false" />
         <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ editingCategory ? '编辑课程分类' : '新建课程分类' }}</h3>
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">添加学院</h3>
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">分类名称</label>
-              <input v-model="categoryForm.name" type="text" placeholder="如：高数、物理" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm" />
+              <label class="block text-sm font-medium text-gray-700 mb-1">学院名称</label>
+              <input v-model="deptForm.name" type="text" placeholder="如：计算机学院" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm" />
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">颜色</label>
-              <div class="flex items-center gap-2">
-                <input v-model="categoryForm.color" type="color" class="w-10 h-10 rounded cursor-pointer" />
-                <span class="text-sm text-gray-500">{{ categoryForm.color }}</span>
+              <div class="flex items-center gap-3">
+                <input v-model="deptForm.color" type="color" class="w-10 h-10 rounded cursor-pointer border" />
+                <span class="text-sm text-gray-500">{{ deptForm.color }}</span>
               </div>
             </div>
             <div class="flex gap-3 pt-2">
-              <button @click="handleSaveCategory" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors">保存</button>
-              <button @click="showCategoryModal = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
+              <button @click="handleSaveDept" :disabled="!deptForm.name.trim()" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">保存</button>
+              <button @click="showDeptModal = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
             </div>
           </div>
         </div>
       </div>
     </Teleport>
 
-    <!-- 分类删除确认 -->
+    <!-- 学院 Excel 导入弹窗 -->
     <Teleport to="body">
-      <div v-if="showDeleteCategoryConfirm" class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/50" @click="showDeleteCategoryConfirm = false" />
-        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">确认删除</h3>
-          <p class="text-sm text-gray-500 mb-5">确定要删除分类「{{ deleteCategoryTarget?.name }}」吗？该分类下的课程和排课不会被删除。</p>
-          <div class="flex gap-3">
-            <button @click="handleDeleteCategory" class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">确认删除</button>
-            <button @click="showDeleteCategoryConfirm = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
+      <div v-if="showDeptImportModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showDeptImportModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">从 Excel 导入学院</h3>
+          <p class="text-sm text-gray-500 mb-4">Excel 文件需要包含"学院名称"列，可选"颜色"列。</p>
+
+          <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p class="text-xs text-blue-600 mb-2">📋 没有模板？下载一个标准模板开始：</p>
+            <button @click="downloadDeptTemplate" class="text-xs px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors">下载模板</button>
+          </div>
+
+          <div
+            @click="deptFileInput?.click()"
+            @dragover.prevent
+            @drop.prevent="handleDeptDrop"
+            class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-brand-400 hover:bg-brand-50/30 transition-colors"
+          >
+            <Upload class="w-10 h-10 text-gray-300 mx-auto mb-2" />
+            <p class="text-sm text-gray-600 mb-1">{{ deptImportFile?.name || '点击选择或拖拽 Excel 文件到此处' }}</p>
+            <p class="text-xs text-gray-400">支持 .xlsx 和 .xls 格式</p>
+          </div>
+
+          <div class="flex gap-3 pt-4 mt-4 border-t">
+            <button @click="showDeptImportModal = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
+            <button @click="confirmDeptImport" :disabled="!deptImportFile" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">确认导入</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 新增课程弹窗 -->
+    <Teleport to="body">
+      <div v-if="showCourseModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="closeCourseModal" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <h3 class="text-lg font-semibold text-gray-900 mb-4">新增课程</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">课程名称</label>
+              <input v-model="courseForm.title" type="text" placeholder="如：数据结构" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">课程描述</label>
+              <textarea v-model="courseForm.description" rows="2" placeholder="课程简介（可选）" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm"></textarea>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button @click="handleSaveCourse" :disabled="!courseForm.title.trim()" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">保存</button>
+              <button @click="closeCourseModal" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
+            </div>
           </div>
         </div>
       </div>
@@ -301,9 +432,9 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
-import { Plus, Search, CalendarX, AlertTriangle, Upload, BookOpen, ArrowLeft, X } from 'lucide-vue-next'
-import type { Schedule, Category } from '@/types'
-import { bulkImportSchedules, fetchClasses, fetchSchedules, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
+import { Plus, Search, CalendarX, AlertTriangle, Upload, RefreshCw, BookOpen, ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
+import type { Schedule, Course, Department } from '@/types'
+import { bulkImportSchedules, fetchSchedules, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
@@ -312,92 +443,174 @@ const store = useAppStore()
 const currentDept = computed(() => store.getSelectedDepartment())
 const currentDeptName = computed(() => currentDept.value?.name || '')
 
-// ====== 课程分类（仅当前学院）======
-const departmentCategories = computed(() => {
+// ====== 学院选择 ======
+function selectDepartment(dept: Department) {
+  store.setSelectedDepartment(dept.id)
+}
+
+function getDeptCourseCount(deptId: string): number {
+  const deptCategoryIds = new Set(store.getDepartmentCategories(deptId).map((c) => c.id))
+  return store.courses.filter((c) => c.departmentId === deptId || deptCategoryIds.has(c.categoryId)).length
+}
+
+// ====== 学院课程（属于该学院或分类属于该学院的课程）======
+const departmentCourses = computed(() => {
   if (!store.selectedDepartmentId) return []
-  return store.getDepartmentCategories(store.selectedDepartmentId)
+  const deptCategoryIds = new Set(
+    store.getDepartmentCategories(store.selectedDepartmentId).map((c) => c.id)
+  )
+  return store.courses.filter(
+    (c) => c.departmentId === store.selectedDepartmentId || deptCategoryIds.has(c.categoryId)
+  )
 })
 
-function getCategoryScheduleCount(catName: string) {
-  return dbSchedules.value.filter((s: any) => (s.title || '') === catName).length
+function getCourseColor(course: Course): string {
+  return store.categories.find((c) => c.id === course.categoryId)?.color || '#3b82f6'
+}
+
+function getCourseScheduleCount(course: Course): number {
+  return allSchedules.value.filter(
+    (s: any) => s.courseId === course.id || (s.title || '') === course.title
+  ).length
+}
+
+// ====== 新增课程 ======
+const showCourseModal = ref(false)
+const courseForm = ref({ title: '', description: '' })
+
+function openCourseModal() {
+  courseForm.value = { title: '', description: '' }
+  showCourseModal.value = true
+}
+
+function closeCourseModal() {
+  showCourseModal.value = false
+}
+
+function handleSaveCourse() {
+  if (!courseForm.value.title.trim()) return
+  if (store.courses.some((c) => c.title === courseForm.value.title.trim())) {
+    courseImportMsg.value = { success: false, text: '课程名称已存在，请更换名称' }
+    return
+  }
+  store.addCourse({
+    id: `course-${Date.now()}`,
+    title: courseForm.value.title.trim(),
+    description: courseForm.value.description,
+    categoryId: '',
+    departmentId: store.selectedDepartmentId,
+    teacher: '',
+    cover: '',
+    credits: 0,
+    duration: 0,
+    status: 'active',
+    createdAt: new Date().toISOString().split('T')[0],
+  })
+  closeCourseModal()
+}
+
+// ====== Excel 导入课程 ======
+const courseFileInput = ref<HTMLInputElement>()
+const courseImportMsg = ref<{ success: boolean; text: string } | null>(null)
+
+function triggerCourseImport() {
+  courseFileInput.value?.click()
+}
+
+async function handleCourseFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+
+  courseImportMsg.value = null
+
+  try {
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0) {
+      courseImportMsg.value = { success: false, text: 'Excel 文件为空，请检查文件内容' }
+      return
+    }
+
+    const existingTitles = new Set(store.courses.map((c) => c.title))
+    const now = new Date().toISOString().split('T')[0]
+    let added = 0
+    let skipped = 0
+
+    for (const row of rows) {
+      const title = String(row['课程名称'] || row['title'] || row['课程'] || '').trim()
+      if (!title || existingTitles.has(title)) {
+        skipped++
+        continue
+      }
+      const teacher = ''
+      const credits = Number(row['学分'] || row['credits'] || 0) || 0
+      const duration = Number(row['课时'] || row['duration'] || 0) || 0
+      const status = String(row['状态'] || 'active').includes('结束') ? 'inactive' : 'active'
+      store.addCourse({
+        id: `course-${Date.now()}-${added}`,
+        title,
+        description: String(row['描述'] || row['description'] || row['课程描述'] || ''),
+        categoryId: '',
+        departmentId: store.selectedDepartmentId,
+        teacher,
+        cover: '',
+        credits,
+        duration,
+        status: status as any,
+        createdAt: now,
+      })
+      existingTitles.add(title)
+      added++
+    }
+
+    if (added === 0) {
+      courseImportMsg.value = {
+        success: false,
+        text: `未能导入课程（跳过 ${skipped} 行）：请确保包含"课程名称"列`,
+      }
+      return
+    }
+    courseImportMsg.value = { success: true, text: `成功导入 ${added} 门课程${skipped ? `，跳过 ${skipped} 行` : ''}` }
+    setTimeout(() => { courseImportMsg.value = null }, 5000)
+  } catch (err: any) {
+    courseImportMsg.value = { success: false, text: '导入失败：' + (err.message || '未知错误') }
+  }
+
+  if (courseFileInput.value) courseFileInput.value.value = ''
+}
+
+const statusLabel = (status: string) => {
+  if (status === 'active') return '进行中'
+  if (status === 'inactive') return '已结束'
+  return '草稿'
+}
+
+const statusClass = (status: string) => {
+  if (status === 'active') return 'bg-green-50 text-green-600'
+  if (status === 'inactive') return 'bg-gray-100 text-gray-500'
+  return 'bg-yellow-50 text-yellow-600'
 }
 
 // ====== Level 切换 ======
-const selectedCategory = ref<Category | null>(null)
+const selectedCourse = ref<Course | null>(null)
 
-function selectCategory(cat: Category) {
-  selectedCategory.value = cat
+function selectCourse(course: Course) {
+  selectedCourse.value = course
   searchText.value = ''
 }
 
-
-// ====== 分类管理 ======
-const showCategoryModal = ref(false)
-const editingCategory = ref<Category | null>(null)
-const categoryForm = ref({ name: '', color: '#3b82f6' })
-const showDeleteCategoryConfirm = ref(false)
-const deleteCategoryTarget = ref<Category | null>(null)
-
-function openCategoryModal(cat: Category | null) {
-  editingCategory.value = cat
-  if (cat) {
-    categoryForm.value = { name: cat.name, color: cat.color }
-  } else {
-    categoryForm.value = { name: '', color: '#3b82f6' }
-  }
-  showCategoryModal.value = true
+function switchDepartment() {
+  selectedCourse.value = null
+  store.setSelectedDepartment(null)
 }
-
-function handleSaveCategory() {
-  if (!categoryForm.value.name.trim()) return
-  if (editingCategory.value) {
-    store.updateCategory(editingCategory.value.id, {
-      name: categoryForm.value.name.trim(),
-      color: categoryForm.value.color,
-    })
-    if (selectedCategory.value?.id === editingCategory.value.id) {
-      const updated = store.categories.find((c) => c.id === editingCategory.value!.id)
-      if (updated) selectedCategory.value = updated
-    }
-  } else {
-    store.addCategory({
-      id: Date.now().toString(),
-      name: categoryForm.value.name.trim(),
-      color: categoryForm.value.color,
-      courseCount: 0,
-      departmentId: store.selectedDepartmentId || '',
-    })
-  }
-  showCategoryModal.value = false
-}
-
-function confirmDeleteCategory(cat: Category) {
-  deleteCategoryTarget.value = cat
-  showDeleteCategoryConfirm.value = true
-}
-
-function handleDeleteCategory() {
-  if (deleteCategoryTarget.value) {
-    store.deleteCategory(deleteCategoryTarget.value.id)
-    if (selectedCategory.value?.id === deleteCategoryTarget.value.id) {
-      selectedCategory.value = null
-    }
-    showDeleteCategoryConfirm.value = false
-    deleteCategoryTarget.value = null
-  }
-}
-
-// ====== 班级列表 ======
-const classList = ref<any[]>([])
 
 // ====== 数据库加载 ======
 const dbSchedules = ref<any[]>([])
 
 onMounted(async () => {
-  try {
-    const res = await fetchClasses()
-    if (res.success) classList.value = res.classes
-  } catch (e) { /* ignore */ }
   loadSchedules()
 })
 
@@ -431,31 +644,28 @@ const allSchedules = computed(() => {
   return combined
 })
 
-const filteredSchedules = computed(() => {
-  if (!selectedCategory.value) return []
-
-  // 按排课标题匹配分类名
-  const catName = selectedCategory.value.name
-  let result = allSchedules.value.filter((s: any) =>
-    (s.title || '') === catName
+// 当前课程的全部排课（courseId 或 title 匹配）
+const allCourseSchedules = computed(() => {
+  if (!selectedCourse.value) return []
+  const course = selectedCourse.value
+  return allSchedules.value.filter(
+    (s: any) => s.courseId === course.id || (s.title || '') === course.title
   )
+})
 
-  // 搜索过滤
+// 搜索过滤后的排课
+const courseSchedules = computed(() => {
+  let result = allCourseSchedules.value
   const q = searchText.value.trim().toLowerCase()
   if (q) {
     result = result.filter((s: any) =>
       (s.teacher || '').toLowerCase().includes(q) ||
       (s.room || '').toLowerCase().includes(q) ||
-      (s.className || '').toLowerCase().includes(q)
+      getDayLabel(s).includes(q)
     )
   }
   return result
 })
-
-// ====== 获取课程名称 ======
-function getCourseTitle(courseId: string): string {
-  return store.courses.find((c) => c.id === courseId)?.title || courseId
-}
 
 // ====== 冲突检测 ======
 function timesOverlap(a: string, b: string): boolean {
@@ -469,19 +679,71 @@ function timesOverlap(a: string, b: string): boolean {
 function isConflicting(sch: any): boolean {
   return dbSchedules.value.some((other: any) => {
     if (other.id === sch.id) return false
-    if (other.startDate !== sch.startDate) return false
+    if (getDayLabel(other) !== getDayLabel(sch)) return false
     const sameTeacher = other.teacher === sch.teacher && timesOverlap(other.timeSlot, sch.timeSlot)
     const sameRoom = other.room === sch.room && timesOverlap(other.timeSlot, sch.timeSlot)
     return sameTeacher || sameRoom
   })
 }
 
-const conflictCount = computed(() => dbSchedules.value.filter(isConflicting).length)
+// ====== 冲突弹窗 ======
+const showConflictModal = ref(false)
+
+/** 判断排课是否属于当前课程 */
+function isCourseSchedule(sch: any): boolean {
+  return allCourseSchedules.value.some((s: any) => s.id === sch.id)
+}
+
+/** 与当前课程相关的冲突组：两两配对，冲突双方中至少一方属于当前课程 */
+const courseConflictPairs = computed(() => {
+  const pairs: { a: any; b: any; reasons: string[] }[] = []
+  const list = dbSchedules.value
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i]
+    for (let j = i + 1; j < list.length; j++) {
+      const b = list[j]
+      if (getDayLabel(a) !== getDayLabel(b)) continue
+      const reasons: string[] = []
+      if (a.teacher === b.teacher && timesOverlap(a.timeSlot, b.timeSlot)) reasons.push('教师时间冲突')
+      if (a.room === b.room && timesOverlap(a.timeSlot, b.timeSlot)) reasons.push('教室冲突')
+      if (reasons.length && (isCourseSchedule(a) || isCourseSchedule(b))) {
+        pairs.push({ a, b, reasons })
+      }
+    }
+  }
+  return pairs
+})
+
+/** 删除某条排课（解决冲突） */
+function resolveDelete(sch: any) {
+  apiDeleteSchedule(sch.id)
+    .then(() => loadSchedules())
+    .catch(() => {
+      store.deleteSchedule(sch.id)
+      loadSchedules()
+    })
+}
+
+/** 在冲突弹窗中修改某条排课 */
+function editFromConflict(sch: any) {
+  showConflictModal.value = false
+  openEdit(sch)
+}
 
 // ====== 周课表（多选） ======
 
 /** 周一到周日（getDay(): 0=周日, 1=周一...6=周六） */
 const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+/** 取排课的周几：优先记录里的 day 字段，旧数据从日期推导 */
+function getDayLabel(sch: any): string {
+  if (sch.day) return sch.day
+  if (sch.startDate) {
+    const d = new Date(sch.startDate)
+    if (!isNaN(d.getTime())) return dayLabels[(d.getDay() + 6) % 7]
+  }
+  return '-'
+}
 
 /** 常用课时段 */
 const timeSlots = [
@@ -499,6 +761,7 @@ interface SlotSelection {
   dateStr: string
   start: string
   end: string
+  room: string
 }
 const selectedSlots = ref<SlotSelection[]>([])
 
@@ -515,43 +778,14 @@ function getNextWeekday(dayIndex: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** 当前分类的排课 → 按 周几+时间段 建立索引 */
-const occupiedSlots = computed(() => {
-  if (!selectedCategory.value) return new Set<string>()
-  const catName = selectedCategory.value.name
-  const set = new Set<string>()
-  for (const s of allSchedules.value) {
-    if ((s.title || '') !== catName) continue
-    const d = new Date(s.startDate)
-    const dayIdx = d.getDay() === 0 ? 6 : d.getDay() - 1
-    const key = `${dayIdx}|${s.timeSlot}`
-    set.add(key)
-  }
-  return set
-})
-
-/** 判断格子是否被用户选中 */
-function isSlotSelected(dayIdx: number, start: string, end: string): boolean {
-  return selectedSlots.value.some(
+/** 获取选中格子对应的时段对象（未选中返回 undefined） */
+function getSelectedSlot(dayIdx: number, start: string, end: string): SlotSelection | undefined {
+  return selectedSlots.value.find(
     (sel) => sel.dayIdx === dayIdx && sel.start === start && sel.end === end
   )
 }
 
-/** 判断格子样式 */
-function getCellClass(day: string, slot: { start: string; end: string; label: string }): string {
-  const dayIdx = dayLabels.indexOf(day)
-  if (isSlotSelected(dayIdx, slot.start, slot.end)) {
-    return 'bg-brand-100 border-2 border-brand-400 text-brand-700 font-medium'
-  }
-  return 'bg-gray-50 text-gray-400 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 border border-dashed border-gray-200'
-}
-
-/** 获取格子内容文本 */
-function getCellContent(_day: string, _slot: { start: string; end: string; label: string }): string {
-  return ''
-}
-
-/** 单击格子 → 切换多选 */
+/** 单击格子 → 切换多选（后选的格子默认沿用首个已选格子的地点） */
 function handleSlotClick(day: string, slot: { start: string; end: string; label: string }) {
   const dayIdx = dayLabels.indexOf(day)
   // 切换选中状态
@@ -561,19 +795,16 @@ function handleSlotClick(day: string, slot: { start: string; end: string; label:
   if (idx >= 0) {
     selectedSlots.value.splice(idx, 1)
   } else {
+    const defaultRoom = selectedSlots.value[0]?.room || ''
     selectedSlots.value.push({
       dayIdx,
       dayLabel: day,
       dateStr: getNextWeekday(dayIdx),
       start: slot.start,
       end: slot.end,
+      room: defaultRoom,
     })
   }
-}
-
-/** 清除所有已选 */
-function clearAllSlots() {
-  selectedSlots.value = []
 }
 
 // ====== 新增/编辑弹窗 ======
@@ -581,39 +812,38 @@ const showModal = ref(false)
 const editingSchedule = ref<Schedule | null>(null)
 const form = ref({
   teacher: '',
-  className: '',
-  room: '',
   startDate: '',
   startTime: '09:00',
   endTime: '11:00',
 })
 
 const conflictWarning = computed(() => {
-  if (!selectedCategory.value || !form.value.teacher || selectedSlots.value.length === 0) return ''
+  if (!selectedCourse.value || !form.value.teacher || selectedSlots.value.length === 0) return ''
 
   // 检查每个已选时段是否有教师时间冲突
   for (const sel of selectedSlots.value) {
     const timeSlot = `${sel.start}-${sel.end}`
     const conflict = dbSchedules.value.some((s: any) => {
       if (editingSchedule.value && s.id === editingSchedule.value.id) return false
-      if (s.startDate !== sel.dateStr) return false
+      if (getDayLabel(s) !== sel.dayLabel) return false
       if (s.teacher !== form.value.teacher) return false
       return timesOverlap(s.timeSlot, timeSlot)
     })
     if (conflict) {
-      return `「${form.value.teacher}」在 ${sel.dateStr} ${sel.dayLabel} ${timeSlot} 已有排课`
+      return `「${form.value.teacher}」在 ${sel.dayLabel} ${timeSlot} 已有排课`
     }
   }
   return ''
 })
 
 const canSave = computed(() =>
-  selectedCategory.value && form.value.teacher && form.value.room && selectedSlots.value.length > 0
+  selectedCourse.value && form.value.teacher && selectedSlots.value.length > 0 &&
+  selectedSlots.value.every((s) => !!s.room && s.room.trim())
 )
 
 function openAdd() {
   editingSchedule.value = null
-  form.value = { teacher: '', className: '', room: '', startDate: '', startTime: '', endTime: '' }
+  form.value = { teacher: '', startDate: '', startTime: '', endTime: '' }
   selectedSlots.value = []
   showModal.value = true
 }
@@ -622,13 +852,25 @@ function openEdit(sch: Schedule) {
   editingSchedule.value = sch
   form.value = {
     teacher: sch.teacher,
-    className: (sch as any).className || '',
-    room: sch.room,
     startDate: sch.startDate,
     startTime: sch.timeSlot.split('-')[0],
     endTime: sch.timeSlot.split('-')[1] || '11:00',
   }
+  // 预填该排课的时段与地点，编辑时可直接调整
+  const dayLabel = getDayLabel(sch as any)
+  const dayIdx = dayLabels.indexOf(dayLabel)
+  const [start, end] = sch.timeSlot.split('-')
   selectedSlots.value = []
+  if (dayIdx >= 0 && start && end) {
+    selectedSlots.value.push({
+      dayIdx,
+      dayLabel,
+      dateStr: sch.startDate || getNextWeekday(dayIdx),
+      start,
+      end,
+      room: sch.room,
+    })
+  }
   showModal.value = true
 }
 
@@ -639,19 +881,42 @@ function closeModal() {
 }
 
 function handleSave() {
-  if (!selectedCategory.value || selectedSlots.value.length === 0) return
-  const catName = selectedCategory.value.name
-  const catCourseId = `cat-${selectedCategory.value.id}`
+  if (!selectedCourse.value || selectedSlots.value.length === 0) return
+  const course = selectedCourse.value
 
-  // 为每个选中的时间段创建一条排课
+  // 编辑：更新单条排课
+  if (editingSchedule.value) {
+    const slot = selectedSlots.value[0]
+    const updated = {
+      courseId: course.id,
+      title: course.title,
+      day: slot.dayLabel,
+      startDate: slot.dateStr,
+      endDate: slot.dateStr,
+      timeSlot: `${slot.start}-${slot.end}`,
+      room: slot.room,
+      teacher: form.value.teacher,
+    }
+    const id = editingSchedule.value.id
+    apiUpdateSchedule(id, updated)
+      .then(() => loadSchedules())
+      .catch(() => {
+        store.updateSchedule(id, updated)
+        loadSchedules()
+      })
+    closeModal()
+    return
+  }
+
+  // 新增：为每个选中的时间段创建一条排课
   const newSchedules: any[] = selectedSlots.value.map((slot, i) => ({
-    courseId: catCourseId,
-    title: catName,
-    className: form.value.className,
+    courseId: course.id,
+    title: course.title,
+    day: slot.dayLabel,
     startDate: slot.dateStr,
     endDate: slot.dateStr,
     timeSlot: `${slot.start}-${slot.end}`,
-    room: form.value.room,
+    room: slot.room,
     teacher: form.value.teacher,
   }))
 
@@ -665,12 +930,12 @@ function handleSave() {
     })
     .catch(() => {
       // 后端不可用时，保存到本地 store
-      const now = new Date().toISOString().split('T')[0]
       newSchedules.forEach((s, i) => {
         store.addSchedule({
           id: `local-${Date.now()}-${i}`,
           courseId: s.courseId,
           title: s.title,
+          day: s.day,
           startDate: s.startDate,
           endDate: s.endDate,
           timeSlot: s.timeSlot,
@@ -739,15 +1004,16 @@ async function handleFileChange(e: Event) {
       const startDate = fmtExcelDate(row['日期'] || row['date'] || row['上课日期'] || row['startDate'] || '')
       const endDate = fmtExcelDate(row['结束日期'] || row['endDate'] || row['end_date'] || '') || startDate
       const timeSlot = row['时间段'] || row['timeSlot'] || row['time_slot'] || row['时间'] || ''
+      const day = String(row['周几'] || row['星期'] || row['星期几'] || row['day'] || '').trim()
 
-      if (!title || !startDate || !timeSlot) continue
+      if (!title || !timeSlot) continue
 
       schedules.push({
-        courseId: courseId || title,
+        courseId: courseId || selectedCourse.value?.id || title,
         title,
         teacher: teacher || '未指定',
-        className: row['班级'] || row['className'] || row['class_name'] || row['上课班级'] || '',
         room: room || '未指定',
+        day,
         startDate,
         endDate,
         timeSlot,
@@ -793,5 +1059,108 @@ function fmtExcelDate(val: string | number): string {
     return `${year}-${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')}`
   }
   return s
+}
+
+// ====== 添加学院 ======
+const showDeptModal = ref(false)
+const deptForm = ref({ name: '', color: '#3b82f6' })
+
+function openAddDeptModal() {
+  deptForm.value = { name: '', color: '#3b82f6' }
+  showDeptModal.value = true
+}
+
+function handleSaveDept() {
+  if (!deptForm.value.name.trim()) return
+  store.addDepartment({
+    id: `dept-${Date.now()}`,
+    name: deptForm.value.name.trim(),
+    color: deptForm.value.color,
+  })
+  showDeptModal.value = false
+}
+
+// ====== Excel 导入学院 ======
+const showDeptImportModal = ref(false)
+const deptImportFile = ref<File | null>(null)
+const deptImportMsg = ref<{ success: boolean; text: string } | null>(null)
+const deptFileInput = ref<HTMLInputElement>()
+
+const presetColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#ef4444', '#14b8a6', '#6366f1', '#84cc16']
+
+function triggerDeptExcelImport() {
+  deptImportFile.value = null
+  deptImportMsg.value = null
+  showDeptImportModal.value = true
+}
+
+function handleDeptFileSelect(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) deptImportFile.value = file
+}
+
+function handleDeptDrop(e: DragEvent) {
+  const file = e.dataTransfer?.files[0]
+  if (file) deptImportFile.value = file
+}
+
+async function confirmDeptImport() {
+  if (!deptImportFile.value) return
+  deptImportMsg.value = null
+
+  try {
+    const data = await deptImportFile.value.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+    if (rows.length === 0) {
+      deptImportMsg.value = { success: false, text: 'Excel 文件为空，请检查文件内容' }
+      return
+    }
+
+    const existingNames = new Set(store.departments.map((d) => d.name))
+    let added = 0
+    let skipped = 0
+
+    for (const row of rows) {
+      const name = String(row['学院名称'] || row['院系'] || row['系'] || row['name'] || '').trim()
+      if (!name || existingNames.has(name)) {
+        skipped++
+        continue
+      }
+      const color = String(row['颜色'] || row['color'] || '').trim() || presetColors[store.departments.length % presetColors.length]
+      store.addDepartment({
+        id: `dept-${Date.now()}-${added}`,
+        name,
+        color: color.startsWith('#') ? color : `#${color}`,
+      })
+      existingNames.add(name)
+      added++
+    }
+
+    if (added === 0) {
+      deptImportMsg.value = { success: false, text: `未能导入学院（跳过 ${skipped} 行）：请确保包含"学院名称"列` }
+      return
+    }
+
+    deptImportMsg.value = { success: true, text: `成功导入 ${added} 个学院${skipped ? `，跳过 ${skipped} 行（已存在或无名称）` : ''}` }
+    setTimeout(() => { deptImportMsg.value = null; showDeptImportModal.value = false }, 2000)
+  } catch (err: any) {
+    deptImportMsg.value = { success: false, text: '导入失败：' + (err.message || '未知错误') }
+  }
+}
+
+function downloadDeptTemplate() {
+  const data = [
+    { '学院名称': '计算机学院', '颜色': '#3b82f6' },
+    { '学院名称': '信息工程学院', '颜色': '#10b981' },
+    { '学院名称': '外国语学院', '颜色': '#f59e0b' },
+  ]
+  const ws = XLSX.utils.json_to_sheet(data)
+  ws['!cols'] = [{ wch: 20 }, { wch: 15 }]
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, '学院')
+  XLSX.writeFile(wb, '学院导入模板.xlsx')
 }
 </script>

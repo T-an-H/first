@@ -54,6 +54,7 @@
             {{ cfg.finalWeight > 0 ? `+ ${finalScore.toFixed(1)}×${cfg.finalWeight}%` : '' }}
             =
             {{ regularContrib.toFixed(1) }}{{ cfg.midtermWeight > 0 ? ` + ${midtermContrib.toFixed(1)}` : '' }}{{ cfg.finalWeight > 0 ? ` + ${finalContrib.toFixed(1)}` : '' }}
+            <span v-if="qualityBonus > 0" class="text-emerald-600">+ 素质加成 {{ qualityBonus.toFixed(1) }}</span>
             =
             <span class="font-semibold">{{ (totalScore ?? 0).toFixed(1) }}</span>
           </p>
@@ -83,6 +84,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { X } from 'lucide-vue-next'
+import { useAppStore } from '@/stores/app'
 import type { DetailedGrade, GradeWeightConfig, ExamScore } from '@/types'
 import SectionCalc from './ScoreDetail/SectionCalc.vue'
 
@@ -95,7 +97,16 @@ const props = defineProps<{
   cfg: GradeWeightConfig
   totalScore: number
   examScores?: ExamScore[]
+  courseId?: string
+  studentId?: string
 }>()
+
+const store = useAppStore()
+
+const qualityBonus = computed(() => {
+  if (!props.courseId || !props.studentId) return 0
+  return store.getStudentQualityScore(props.courseId, props.studentId)
+})
 
 const wAvg = (subScores: { score: number | undefined; weight: number }[]): number => {
   const totalWeight = subScores.reduce((s, item) => s + item.weight, 0)

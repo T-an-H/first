@@ -2,12 +2,34 @@
   <div class="space-y-6">
     <div id="student-grades-root"></div>
 
-    <!-- 统计卡片 (保留子组件) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard :icon="Award" label="平均成绩" :value="avgScore" :color="avgScore >= 60 ? 'bg-brand-400/10' : 'bg-brand-600'" />
-      <StatCard :icon="TrendingUp" label="最高分" :value="maxScore" color="bg-brand-600" />
-      <StatCard :icon="TrendingDown" label="最低分" :value="minScore" color="bg-brand-600" />
-      <StatCard :icon="BookOpen" label="已评课程" :value="gradedCourses" color="bg-brand-600" />
+    <!-- 成绩分布图 (ECharts 垂直柱状图) -->
+    <div class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-800">成绩分布</h3>
+        <div class="flex items-center gap-4 text-xs text-gray-500">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm" style="background:#10b981"></span>
+            <span>≥90 优秀</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm" style="background:#3b82f6"></span>
+            <span>≥80 良好</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm" style="background:#60a5fa"></span>
+            <span>≥60 及格</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3 h-3 rounded-sm" style="background:#ef4444"></span>
+            <span><60 不及格</span>
+          </div>
+          <div class="flex items-center gap-1.5 ml-2">
+            <span class="w-0.5 h-3 bg-red-500"></span>
+            <span>平均分 {{ avgScore }}</span>
+          </div>
+        </div>
+      </div>
+      <div ref="chartRef" style="width:100%;height:320px"></div>
     </div>
 
     <!-- 成绩明细弹窗 (保留子组件) -->
@@ -94,12 +116,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, h } from 'vue'
+import { ref, computed, onMounted, watch, h, nextTick } from 'vue'
 import { useAppStore } from '@/stores/app'
 import type { DetailedGrade, Grade } from '@/types'
 import { getDefaultGradeConfig } from '@/types'
 import { Icons, renderIcon } from '@/utils/d3-renderer'
 import * as d3 from 'd3'
+import * as echarts from 'echarts'
 import StatCard from '@/components/StatCard.vue'
 import Modal from '@/components/Modal.vue'
 import { fetchStudentScores } from '@/api'
@@ -129,8 +152,95 @@ const Briefcase = iconView('briefcase')
 
 const store = useAppStore()
 const semester = ref('')
+const chartRef = ref<HTMLElement | null>(null)
+let chartInstance: echarts.ECharts | null = null
 
-// 从数据库加载成绩
+function getBarColor(score: number): string {
+  if (score >= 90) return '#10b981'
+  if (score >= 80) return '#3b82f6'
+  if (score >= 60) return '#60a5fa'
+  return '#ef4444'
+}
+
+function initChart() {
+  if (!chartRef.value || sortedGradeEntries.value.length === 0) return
+  if (chartInstance) {
+    chartInstance.dispose()
+  }
+  chartInstance = echarts.init(chartRef.value)
+  updateChart()
+}
+
+function updateChart() {
+  if (!chartInstance || sortedGradeEntries.value.length === 0) return
+  const data = sortedGradeEntries.value.map(item => ({
+    value: item.totalScore,
+    itemStyle: { color: getBarColor(item.totalScore) }
+  }))
+  const option: echarts.EChartsOption = {
+    grid: { left: 50, right: 20, top: 30, bottom: 70 },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const p = params[0]
+        const score = p.value
+        const level = score >= 90 ? '优秀' : score >= 80 ? '良好' : score >= 60 ? '及格' : '不及格'
+        return `${p.name}<br/>分数：<b>${score}</b> 分<br/>等级：<b>${level}</b>`
+      }
+    },
+    xAxis: {
+      type: 'category',
+      data: sortedGradeEntries.value.map(i => i.courseName),
+      axisLabel: {
+        fontSize: 11,
+        color: '#64748b',
+        interval: 0,
+        rotate: sortedGradeEntries.value.length > 3 ? 20 : 0
+      },
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisTick: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      interval: 20,
+      axisLabel: { fontSize: 11, color: '#64748b' },
+      splitLine: { lineStyle: { color: '#f1f5f9' } }
+    },
+    series: [{
+      type: 'bar',
+      data,
+      barWidth: '45%',
+      itemStyle: {
+        borderRadius: [4, 4, 0, 0]
+      },
+      label: {
+        show: true,
+        position: 'top',
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: '#374151',
+        formatter: '{c}'
+      },
+      markLine: avgScore.value > 0 ? {
+        silent: true,
+        symbol: 'none',
+        lineStyle: { color: '#ef4444', type: 'dashed', width: 2 },
+        data: [{ yAxis: avgScore.value, label: { show: false } }]
+      } : undefined,
+      markPoint: avgScore.value > 0 ? {
+        silent: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        itemStyle: { color: '#ef4444' },
+        data: [{ name: '平均分', coord: [sortedGradeEntries.value.length - 1, avgScore.value] }]
+      } : undefined
+    }]
+  }
+  chartInstance.setOption(option)
+}
+
 onMounted(async () => {
   // 先确保课程数据已加载（让课程名称可以正确显示）
   try {
@@ -169,6 +279,14 @@ onMounted(async () => {
       }
     } catch { /* ignore */ }
   }
+
+  // 数据加载完成后，等待 DOM 更新再初始化图表
+  await nextTick()
+  initChart()
+
+  // 初始化成绩列表
+  const el = document.getElementById('student-grades-root')
+  if (el) renderGrades(el)
 })
 
 // 弹窗状态
@@ -233,6 +351,9 @@ const gradeEntries = computed<GradeEntry[]>(() => {
     let total = g.totalScore ?? g.score ?? 0
     if (d) {
       total = store.calcTotalScore(g.courseId, d)
+    } else {
+      // 无分项成绩时，素质评价加成直接叠加在已存总分上
+      total = Math.min(100, total + store.getStudentQualityScore(g.courseId, g.studentId))
     }
     const sem = g.semester ?? (course?.createdAt ? `${course.createdAt.slice(0, 4)}年` : '2026年')
     return {
@@ -338,6 +459,10 @@ const minScore = computed(() => {
   return Math.min(...gradeEntries.value.map((g) => g.totalScore))
 })
 
+const sortedGradeEntries = computed(() => {
+  return [...gradeEntries.value].sort((a, b) => b.totalScore - a.totalScore)
+})
+
 const gradedCourses = computed(() => gradeEntries.value.length)
 
 function renderGrades(root: HTMLElement) {
@@ -403,17 +528,16 @@ function renderGrades(root: HTMLElement) {
   })
 }
 
-onMounted(() => {
-  const el = document.getElementById('student-grades-root')
-  if (el) renderGrades(el)
-})
-
-watch(gradeEntries, () => {
+watch(gradeEntries, async () => {
+  await nextTick()
+  updateChart()
   const el = document.getElementById('student-grades-root')
   if (el) renderGrades(el)
 }, { deep: true })
 
-watch(semester, () => {
+watch(semester, async () => {
+  await nextTick()
+  updateChart()
   const el = document.getElementById('student-grades-root')
   if (el) renderGrades(el)
 })

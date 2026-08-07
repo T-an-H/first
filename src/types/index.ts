@@ -18,6 +18,8 @@ export interface Course {
   title: string;
   description: string;
   categoryId: string;
+  /** 所属学院（学院即课程分类时使用） */
+  departmentId?: string;
   cover: string;
   credits: number;
   duration: number;
@@ -114,6 +116,10 @@ export interface Schedule {
   id: string;
   courseId: string;
   title: string;
+  /** 周几（如 周一），未设置时由 startDate 推导 */
+  day?: string;
+  /** 上课班级 */
+  className?: string;
   startDate: string;
   endDate: string;
   timeSlot: string;
@@ -152,6 +158,8 @@ export interface GradeWeightConfig {
   midtermProjectWeight: number;
   finalExamWeight: number;
   finalProjectWeight: number;
+  /** 素质评价加成上限（教师评分0-100，最终折算最多该分数加成到总成绩，默认10） */
+  qualityEvalMaxBonus: number;
 }
 
 export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
@@ -169,6 +177,7 @@ export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
     midtermProjectWeight: 50,
     finalExamWeight: 50,
     finalProjectWeight: 50,
+    qualityEvalMaxBonus: 10,
   };
 }
 
@@ -406,6 +415,37 @@ export interface EvalAnomaly {
   avgScore: number;
   diff: number;
   warning: string;
+}
+
+/** 素质评价提交（学生上传图片/文档，教师打分直接加进总成绩） */
+export interface QualityEvalFile {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  dataUrl: string;
+}
+
+/** 单次素质评价提交记录（学生可多次提交，教师可对任意一次评分） */
+export interface QualityEvalSubmission {
+  id: string;
+  description?: string;
+  files: QualityEvalFile[];
+  /** 学生提交时间 */
+  submittedAt: string;
+  /** 教师打分（0-100），为空表示未批改 */
+  score?: number;
+  /** 教师评语 */
+  teacherComment?: string;
+  /** 批改时间 */
+  gradedAt?: string;
+}
+
+export interface QualityEvaluation {
+  id: string;
+  courseId: string;
+  studentId: string;
+  /** 多次提交记录，按提交时间先后排列 */
+  submissions: QualityEvalSubmission[];
 }
 
 // ========== AI 分层 ==========

@@ -18,8 +18,8 @@ const adminNavItems = [
 ]
 
 const teacherNavItems = [
-  { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
   { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
+  { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
@@ -119,41 +119,6 @@ function renderSidebar() {
   const headerText = headerFlex.append('div')
   headerText.append('h1').attr('class', 'font-bold text-lg').text('课程管理')
   headerText.append('p').attr('class', 'text-xs text-white/50').text(cfg.label)
-
-  // 管理员显示当前学院
-  if (store.currentRole === 'admin') {
-    const deptName = store.getSelectedDepartment()?.name
-    if (deptName) {
-      const deptBar = header.append('div')
-        .attr('class', 'mt-3 pt-3 border-t border-white/10')
-
-      const deptRow = deptBar.append('div')
-        .attr('class', 'flex items-center justify-between')
-
-      deptRow.append('span')
-        .attr('class', 'text-xs text-white/60')
-        .text('当前学院')
-
-      const deptInfo = deptRow.append('div')
-        .attr('class', 'flex items-center gap-1')
-
-      deptInfo.append('span')
-        .attr('class', 'text-sm font-medium text-white')
-        .text(deptName)
-
-      // 切换学院按钮
-      deptBar.append('button')
-        .attr('class', 'mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/60 hover:text-white hover:bg-white/10 transition-all duration-200')
-        .on('click', () => {
-          store.setSelectedDepartment(null)
-          router.push('/admin')
-        })
-        .call((sel) => {
-          renderIcon(sel, 'refreshCw', 'w-3.5 h-3.5')
-          sel.append('span').text('切换学院')
-        })
-    }
-  }
 
   // ---- nav ----
   const nav = aside.append('nav')

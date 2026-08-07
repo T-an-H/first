@@ -1,19 +1,27 @@
 import type { Category, Course, Student, Schedule, Enrollment, Teacher, Grade, Evaluation, EvaluationConfig, StudentGroup, Mentor, Leader, Department } from '@/types';
 
 /** Mock 数据版本号 — 修改后自动覆盖 localStorage 旧数据 */
-export const MOCK_VERSION = '2.0';
+export const MOCK_VERSION = '3.1';
 
 export const departments: Department[] = [
   { id: 'dept-1', name: '计算机学院', color: '#3b82f6' },
   { id: 'dept-2', name: '数理学院', color: '#10b981' },
   { id: 'dept-3', name: '外国语学院', color: '#f59e0b' },
+  { id: 'dept-4', name: '软件学院', color: '#8b5cf6' },
+  { id: 'dept-5', name: '数据科学学院', color: '#06b6d4' },
+  { id: 'dept-6', name: '人工智能学院', color: '#ec4899' },
+  { id: 'dept-7', name: '网络空间安全学院', color: '#ef4444' },
 ];
 
 /** 班级 → 学院映射 */
 export const departmentClasses: Record<string, string[]> = {
-  'dept-1': ['1班', '2班', '3班'],
+  'dept-1': ['计算机2101班', '计算机2102班', '物联网工程2101班'],
   'dept-2': ['3班', '4班'],
   'dept-3': ['5班'],
+  'dept-4': ['软件工程2101班', '软件工程2102班'],
+  'dept-5': ['数据科学2101班'],
+  'dept-6': ['人工智能2101班'],
+  'dept-7': ['网络安全2101班'],
 };
 
 export const categories: Category[] = [
@@ -56,30 +64,110 @@ export const courses: Course[] = [
 ];
 
 export const students: Student[] = [
-  { id: 'stu-1', name: '张明', studentId: '2024001', className: '1班', phone: '138****1234', email: 'zhangming@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhangming', joinDate: '2026-06-01', status: 'active', enrollmentScore: 645 },
-  { id: 'stu-2', name: '李华', studentId: '2024002', className: '1班', phone: '139****5678', email: 'lihua@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=lihua', joinDate: '2026-06-03', status: 'active', enrollmentScore: 580 },
-  { id: 'stu-3', name: '王芳', studentId: '2024003', className: '1班', phone: '137****9012', email: 'wangfang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wangfang', joinDate: '2026-06-05', status: 'active', enrollmentScore: 620 },
-  { id: 'stu-4', name: '赵磊', studentId: '2024004', className: '1班', phone: '136****3456', email: 'zhaolei@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhaolei', joinDate: '2026-06-08', status: 'active', enrollmentScore: 550 },
-  { id: 'stu-5', name: '陈静', studentId: '2024005', className: '1班', phone: '135****7890', email: 'chenjing@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chenjing', joinDate: '2026-06-10', status: 'active', enrollmentScore: 670 },
-  { id: 'stu-6', name: '刘洋', studentId: '2024006', className: '1班', phone: '134****2345', email: 'liuyang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liuyang', joinDate: '2026-06-12', status: 'active', enrollmentScore: 530 },
-  { id: 'stu-7', name: '孙丽', studentId: '2024007', className: '1班', phone: '133****6789', email: 'sunli@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sunli', joinDate: '2026-06-15', status: 'active', enrollmentScore: 600 },
-  { id: 'stu-8', name: '周杰', studentId: '2024008', className: '1班', phone: '132****0123', email: 'zhoujie@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhoujie', joinDate: '2026-06-18', status: 'inactive', enrollmentScore: 480 },
-  { id: 'stu-9', name: '吴婷', studentId: '2024009', className: '2班', phone: '131****4567', email: 'wuting@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wuting', joinDate: '2026-06-20', status: 'active', enrollmentScore: 610 },
-  { id: 'stu-10', name: '郑凯', studentId: '2024010', className: '2班', phone: '130****8901', email: 'zhengkai@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhengkai', joinDate: '2026-06-22', status: 'active', enrollmentScore: 520 },
-  { id: 'stu-11', name: '黄丽', studentId: '2024011', className: '2班', phone: '159****2345', email: 'huangli@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=huangli', joinDate: '2026-06-25', status: 'active', enrollmentScore: 640 },
-  { id: 'stu-12', name: '林伟', studentId: '2024012', className: '2班', phone: '158****6789', email: 'linwei@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=linwei', joinDate: '2026-06-28', status: 'active', enrollmentScore: 500 },
-  { id: 'stu-13', name: '何雪', studentId: '2024013', className: '2班', phone: '157****0123', email: 'hexue@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hexue', joinDate: '2026-07-01', status: 'active', enrollmentScore: 665 },
-  { id: 'stu-14', name: '马强', studentId: '2024014', className: '2班', phone: '156****4567', email: 'maqiang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=maqiang', joinDate: '2026-07-03', status: 'inactive', enrollmentScore: 460 },
-  { id: 'stu-15', name: '胡敏', studentId: '2024015', className: '2班', phone: '155****8901', email: 'humin@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=humin', joinDate: '2026-07-05', status: 'active', enrollmentScore: 590 },
-  { id: 'stu-16', name: '高飞', studentId: '2024016', className: '2班', phone: '154****2345', email: 'gaofei@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=gaofei', joinDate: '2026-07-08', status: 'active', enrollmentScore: 565 },
-  { id: 'stu-17', name: '欧阳雪', studentId: '2024017', className: '3班', phone: '153****1234', email: 'ouyangxue@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ouyangxue', joinDate: '2026-07-10', status: 'active', enrollmentScore: 685 },
-  { id: 'stu-18', name: '慕容枫', studentId: '2024018', className: '3班', phone: '152****5678', email: 'murongfeng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=murongfeng', joinDate: '2026-07-12', status: 'active', enrollmentScore: 630 },
-  { id: 'stu-19', name: '令狐冲', studentId: '2024019', className: '3班', phone: '151****9012', email: 'linghuchong@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=linghuchong', joinDate: '2026-07-14', status: 'active', enrollmentScore: 590 },
-  { id: 'stu-20', name: '杨过', studentId: '2024020', className: '3班', phone: '150****3456', email: 'yangguo@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=yangguo', joinDate: '2026-07-16', status: 'active', enrollmentScore: 540 },
-  { id: 'stu-21', name: '小龙女', studentId: '2024021', className: '3班', phone: '149****7890', email: 'xiaolongnv@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xiaolongnv', joinDate: '2026-07-18', status: 'active', enrollmentScore: 610 },
-  { id: 'stu-22', name: '独孤求败', studentId: '2024022', className: '3班', phone: '148****0001', email: 'dugu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dugu', joinDate: '2026-07-20', status: 'active', enrollmentScore: 720 },
-  { id: 'stu-23', name: '韦小宝', studentId: '2024023', className: '3班', phone: '147****0002', email: 'weixb@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=weixiaobao', joinDate: '2026-07-20', status: 'active', enrollmentScore: 420 },
-  { id: 'stu-24', name: '乔峰', studentId: '2024024', className: '3班', phone: '146****0003', email: 'qiaofeng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qiaofeng', joinDate: '2026-07-20', status: 'active', enrollmentScore: 680 },
+  // ====== 计算机2101班 (12人) ======
+  { id: 'stu-1', name: '张明', studentId: 'S2024001', className: '计算机2101班', phone: '13800001234', email: 'zhangming@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhangming', joinDate: '2026-06-01', status: 'active', enrollmentScore: 645 },
+  { id: 'stu-2', name: '李华', studentId: 'S2024002', className: '计算机2101班', phone: '13900005678', email: 'lihua@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=lihua', joinDate: '2026-06-03', status: 'active', enrollmentScore: 580 },
+  { id: 'stu-3', name: '王芳', studentId: 'S2024003', className: '计算机2101班', phone: '13700009012', email: 'wangfang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wangfang', joinDate: '2026-06-05', status: 'active', enrollmentScore: 620 },
+  { id: 'stu-4', name: '赵磊', studentId: 'S2024004', className: '计算机2101班', phone: '13600003456', email: 'zhaolei@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhaolei', joinDate: '2026-06-08', status: 'active', enrollmentScore: 550 },
+  { id: 'stu-5', name: '陈静', studentId: 'S2024005', className: '计算机2101班', phone: '13500007890', email: 'chenjing@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chenjing', joinDate: '2026-06-10', status: 'active', enrollmentScore: 670 },
+  { id: 'stu-6', name: '刘洋', studentId: 'S2024006', className: '计算机2101班', phone: '13400002345', email: 'liuyang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liuyang', joinDate: '2026-06-12', status: 'active', enrollmentScore: 530 },
+  { id: 'stu-7', name: '孙丽', studentId: 'S2024007', className: '计算机2101班', phone: '13300006789', email: 'sunli@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sunli', joinDate: '2026-06-15', status: 'active', enrollmentScore: 600 },
+  { id: 'stu-8', name: '周杰', studentId: 'S2024008', className: '计算机2101班', phone: '13200000123', email: 'zhoujie@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhoujie', joinDate: '2026-06-18', status: 'inactive', enrollmentScore: 480 },
+  { id: 'stu-101', name: '杨浩然', studentId: 'S2024025', className: '计算机2101班', phone: '13100001111', email: 'yanghaoran@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=yanghaoran', joinDate: '2026-06-20', status: 'active', enrollmentScore: 610 },
+  { id: 'stu-102', name: '朱子轩', studentId: 'S2024026', className: '计算机2101班', phone: '13000002222', email: 'zhuzixuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhuzixuan', joinDate: '2026-06-22', status: 'active', enrollmentScore: 595 },
+  { id: 'stu-103', name: '徐梓涵', studentId: 'S2024027', className: '计算机2101班', phone: '15900003333', email: 'xuzihan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xuzihan', joinDate: '2026-06-25', status: 'active', enrollmentScore: 630 },
+  { id: 'stu-104', name: '马欣怡', studentId: 'S2024028', className: '计算机2101班', phone: '15800004444', email: 'maxinyi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=maxinyi', joinDate: '2026-06-28', status: 'active', enrollmentScore: 585 },
+
+  // ====== 计算机2102班 (10人) ======
+  { id: 'stu-105', name: '高雨桐', studentId: 'S2024029', className: '计算机2102班', phone: '15700005555', email: 'gaoyutong@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=gaoyutong', joinDate: '2026-06-01', status: 'active', enrollmentScore: 610 },
+  { id: 'stu-106', name: '林思远', studentId: 'S2024030', className: '计算机2102班', phone: '15600006666', email: 'linsiyuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=linsiyuan', joinDate: '2026-06-03', status: 'active', enrollmentScore: 640 },
+  { id: 'stu-107', name: '黄天佑', studentId: 'S2024031', className: '计算机2102班', phone: '15500007777', email: 'huangtianyou@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=huangtianyou', joinDate: '2026-06-05', status: 'active', enrollmentScore: 560 },
+  { id: 'stu-108', name: '何可昕', studentId: 'S2024032', className: '计算机2102班', phone: '15400008888', email: 'hekexin@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hekexin', joinDate: '2026-06-08', status: 'active', enrollmentScore: 625 },
+  { id: 'stu-109', name: '郭佳琪', studentId: 'S2024033', className: '计算机2102班', phone: '15300009999', email: 'guojiaqi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guojiaqi', joinDate: '2026-06-10', status: 'active', enrollmentScore: 590 },
+  { id: 'stu-110', name: '罗梦瑶', studentId: 'S2024034', className: '计算机2102班', phone: '15200000000', email: 'luomengyao@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=luomengyao', joinDate: '2026-06-12', status: 'active', enrollmentScore: 670 },
+  { id: 'stu-111', name: '梁婉婷', studentId: 'S2024035', className: '计算机2102班', phone: '15100001212', email: 'liangwanting@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liangwanting', joinDate: '2026-06-15', status: 'active', enrollmentScore: 545 },
+  { id: 'stu-112', name: '宋俊熙', studentId: 'S2024036', className: '计算机2102班', phone: '15000003434', email: 'songjunxi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=songjunxi', joinDate: '2026-06-18', status: 'inactive', enrollmentScore: 490 },
+  { id: 'stu-113', name: '郑皓轩', studentId: 'S2024037', className: '计算机2102班', phone: '14900005656', email: 'zhenghaoxuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhenghaoxuan', joinDate: '2026-06-20', status: 'active', enrollmentScore: 600 },
+  { id: 'stu-114', name: '冯博文', studentId: 'S2024038', className: '计算机2102班', phone: '14800007878', email: 'fengbowen@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fengbowen', joinDate: '2026-06-22', status: 'active', enrollmentScore: 635 },
+
+  // ====== 软件工程2101班 (11人) ======
+  { id: 'stu-9', name: '吴婷', studentId: 'S2024009', className: '软件工程2101班', phone: '13100004567', email: 'wuting@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wuting', joinDate: '2026-06-20', status: 'active', enrollmentScore: 610 },
+  { id: 'stu-10', name: '郑凯', studentId: 'S2024010', className: '软件工程2101班', phone: '13000008901', email: 'zhengkai@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhengkai', joinDate: '2026-06-22', status: 'active', enrollmentScore: 520 },
+  { id: 'stu-11', name: '黄丽', studentId: 'S2024011', className: '软件工程2101班', phone: '15900002345', email: 'huangli@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=huangli', joinDate: '2026-06-25', status: 'active', enrollmentScore: 640 },
+  { id: 'stu-12', name: '林伟', studentId: 'S2024012', className: '软件工程2101班', phone: '15800006789', email: 'linwei@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=linwei', joinDate: '2026-06-28', status: 'active', enrollmentScore: 500 },
+  { id: 'stu-13', name: '何雪', studentId: 'S2024013', className: '软件工程2101班', phone: '15700000123', email: 'hexue@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hexue', joinDate: '2026-07-01', status: 'active', enrollmentScore: 665 },
+  { id: 'stu-115', name: '邓雅婷', studentId: 'S2024039', className: '软件工程2101班', phone: '15600001122', email: 'dengyating@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dengyating', joinDate: '2026-06-01', status: 'active', enrollmentScore: 580 },
+  { id: 'stu-116', name: '彭若曦', studentId: 'S2024040', className: '软件工程2101班', phone: '15500003344', email: 'pengruoxi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=pengruoxi', joinDate: '2026-06-03', status: 'active', enrollmentScore: 620 },
+  { id: 'stu-117', name: '许子墨', studentId: 'S2024041', className: '软件工程2101班', phone: '15400005566', email: 'xuzimo@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xuzimo', joinDate: '2026-06-05', status: 'active', enrollmentScore: 555 },
+  { id: 'stu-118', name: '韩梓萱', studentId: 'S2024042', className: '软件工程2101班', phone: '15300007788', email: 'hanzixuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hanzixuan', joinDate: '2026-06-08', status: 'active', enrollmentScore: 645 },
+  { id: 'stu-119', name: '冯宇航', studentId: 'S2024043', className: '软件工程2101班', phone: '15200009900', email: 'fengyuhang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fengyuhang', joinDate: '2026-06-10', status: 'active', enrollmentScore: 575 },
+  { id: 'stu-120', name: '朱思琪', studentId: 'S2024044', className: '软件工程2101班', phone: '15100001234', email: 'zhusiqi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhusiqi', joinDate: '2026-06-12', status: 'active', enrollmentScore: 610 },
+
+  // ====== 软件工程2102班 (9人) ======
+  { id: 'stu-14', name: '马强', studentId: 'S2024014', className: '软件工程2102班', phone: '15600004567', email: 'maqiang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=maqiang', joinDate: '2026-07-03', status: 'inactive', enrollmentScore: 460 },
+  { id: 'stu-15', name: '胡敏', studentId: 'S2024015', className: '软件工程2102班', phone: '15500008901', email: 'humin@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=humin', joinDate: '2026-07-05', status: 'active', enrollmentScore: 590 },
+  { id: 'stu-16', name: '高飞', studentId: 'S2024016', className: '软件工程2102班', phone: '15400002345', email: 'gaofei@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=gaofei', joinDate: '2026-07-08', status: 'active', enrollmentScore: 565 },
+  { id: 'stu-121', name: '秦雨泽', studentId: 'S2024045', className: '软件工程2102班', phone: '15300005678', email: 'qinyuze@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qinyuze', joinDate: '2026-06-15', status: 'active', enrollmentScore: 620 },
+  { id: 'stu-122', name: '尹致远', studentId: 'S2024046', className: '软件工程2102班', phone: '15200009012', email: 'yinzhiyuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=yinzhiyuan', joinDate: '2026-06-18', status: 'active', enrollmentScore: 540 },
+  { id: 'stu-123', name: '姜晨曦', studentId: 'S2024047', className: '软件工程2102班', phone: '15100003456', email: 'jiangchenxi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jiangchenxi', joinDate: '2026-06-20', status: 'active', enrollmentScore: 680 },
+  { id: 'stu-124', name: '董皓宇', studentId: 'S2024048', className: '软件工程2102班', phone: '15000007890', email: 'donghaoyu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=donghaoyu', joinDate: '2026-06-22', status: 'active', enrollmentScore: 510 },
+  { id: 'stu-125', name: '肖紫涵', studentId: 'S2024049', className: '软件工程2102班', phone: '14900001234', email: 'xiaoZihan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xiaoZihan', joinDate: '2026-06-25', status: 'active', enrollmentScore: 630 },
+  { id: 'stu-126', name: '曹诗涵', studentId: 'S2024050', className: '软件工程2102班', phone: '14800005678', email: 'caoshihan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=caoshihan', joinDate: '2026-06-28', status: 'active', enrollmentScore: 595 },
+
+  // ====== 数据科学2101班 (10人) ======
+  { id: 'stu-17', name: '欧阳雪', studentId: 'S2024017', className: '数据科学2101班', phone: '15300001234', email: 'ouyangxue@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ouyangxue', joinDate: '2026-07-10', status: 'active', enrollmentScore: 685 },
+  { id: 'stu-18', name: '慕容枫', studentId: 'S2024018', className: '数据科学2101班', phone: '15200005678', email: 'murongfeng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=murongfeng', joinDate: '2026-07-12', status: 'active', enrollmentScore: 630 },
+  { id: 'stu-127', name: '范雨萱', studentId: 'S2024051', className: '数据科学2101班', phone: '15100009012', email: 'fanyuxuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fanyuxuan', joinDate: '2026-06-01', status: 'active', enrollmentScore: 660 },
+  { id: 'stu-128', name: '方天翊', studentId: 'S2024052', className: '数据科学2101班', phone: '15000003456', email: 'fangtianyi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fangtianyi', joinDate: '2026-06-03', status: 'active', enrollmentScore: 580 },
+  { id: 'stu-129', name: '邓欣妍', studentId: 'S2024053', className: '数据科学2101班', phone: '14900007890', email: 'dengxinyan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dengxinyan', joinDate: '2026-06-05', status: 'active', enrollmentScore: 700 },
+  { id: 'stu-130', name: '任俊豪', studentId: 'S2024054', className: '数据科学2101班', phone: '14800001234', email: 'renjunhao@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=renjunhao', joinDate: '2026-06-08', status: 'active', enrollmentScore: 555 },
+  { id: 'stu-131', name: '卢雅琪', studentId: 'S2024055', className: '数据科学2101班', phone: '14700005678', email: 'luYaqi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=luYaqi', joinDate: '2026-06-10', status: 'active', enrollmentScore: 625 },
+  { id: 'stu-132', name: '蒋泽宇', studentId: 'S2024056', className: '数据科学2101班', phone: '14600009012', email: 'jiangzeyu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jiangzeyu', joinDate: '2026-06-12', status: 'active', enrollmentScore: 690 },
+  { id: 'stu-133', name: '沈佳怡', studentId: 'S2024057', className: '数据科学2101班', phone: '14500003456', email: 'shenjiayi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shenjiayi', joinDate: '2026-06-15', status: 'inactive', enrollmentScore: 470 },
+  { id: 'stu-134', name: '韩东明', studentId: 'S2024058', className: '数据科学2101班', phone: '14400007890', email: 'handongming@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=handongming', joinDate: '2026-06-18', status: 'active', enrollmentScore: 610 },
+
+  // ====== 人工智能2101班 (12人) ======
+  { id: 'stu-135', name: '唐雨桐', studentId: 'S2024059', className: '人工智能2101班', phone: '13300001111', email: 'tangyutong@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=tangyutong', joinDate: '2026-06-01', status: 'active', enrollmentScore: 670 },
+  { id: 'stu-136', name: '段思远', studentId: 'S2024060', className: '人工智能2101班', phone: '13200002222', email: 'duansiyuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=duansiyuan', joinDate: '2026-06-03', status: 'active', enrollmentScore: 590 },
+  { id: 'stu-137', name: '雷可昕', studentId: 'S2024061', className: '人工智能2101班', phone: '13100003333', email: 'leKexin@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leKexin', joinDate: '2026-06-05', status: 'active', enrollmentScore: 640 },
+  { id: 'stu-138', name: '倪昊轩', studentId: 'S2024062', className: '人工智能2101班', phone: '13000004444', email: 'nihaoxuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=nihaoxuan', joinDate: '2026-06-08', status: 'active', enrollmentScore: 560 },
+  { id: 'stu-139', name: '阎梦瑶', studentId: 'S2024063', className: '人工智能2101班', phone: '15900005555', email: 'yanmengyao@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=yanmengyao', joinDate: '2026-06-10', status: 'active', enrollmentScore: 710 },
+  { id: 'stu-140', name: '柯俊熙', studentId: 'S2024064', className: '人工智能2101班', phone: '15800006666', email: 'kejunxi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=kejunxi', joinDate: '2026-06-12', status: 'active', enrollmentScore: 600 },
+  { id: 'stu-141', name: '蓝诗涵', studentId: 'S2024065', className: '人工智能2101班', phone: '15700007777', email: 'lanshihan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=lanshihan', joinDate: '2026-06-15', status: 'active', enrollmentScore: 635 },
+  { id: 'stu-142', name: '董子睿', studentId: 'S2024066', className: '人工智能2101班', phone: '15600008888', email: 'dongzirui@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dongzirui', joinDate: '2026-06-18', status: 'active', enrollmentScore: 575 },
+  { id: 'stu-143', name: '温馨怡', studentId: 'S2024067', className: '人工智能2101班', phone: '15500009999', email: 'wenxinyi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wenxinyi', joinDate: '2026-06-20', status: 'active', enrollmentScore: 680 },
+  { id: 'stu-144', name: '程浩宇', studentId: 'S2024068', className: '人工智能2101班', phone: '15400000000', email: 'chenghaoyu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chenghaoyu', joinDate: '2026-06-22', status: 'active', enrollmentScore: 545 },
+  { id: 'stu-145', name: '苏雅琪', studentId: 'S2024069', className: '人工智能2101班', phone: '15300001212', email: 'suyaqi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=suyaqi', joinDate: '2026-06-25', status: 'active', enrollmentScore: 620 },
+  { id: 'stu-146', name: '魏泽川', studentId: 'S2024070', className: '人工智能2101班', phone: '15200003434', email: 'weizechuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=weizechuan', joinDate: '2026-06-28', status: 'inactive', enrollmentScore: 495 },
+
+  // ====== 网络安全2101班 (8人) ======
+  { id: 'stu-147', name: '褚雨辰', studentId: 'S2024071', className: '网络安全2101班', phone: '15100005656', email: 'chuyuchen@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chuyuchen', joinDate: '2026-06-01', status: 'active', enrollmentScore: 650 },
+  { id: 'stu-148', name: '卫天明', studentId: 'S2024072', className: '网络安全2101班', phone: '15000007878', email: 'weitianming@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=weitianming', joinDate: '2026-06-03', status: 'active', enrollmentScore: 585 },
+  { id: 'stu-149', name: '蒋雨彤', studentId: 'S2024073', className: '网络安全2101班', phone: '14900009090', email: 'jiangyutong@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jiangyutong', joinDate: '2026-06-05', status: 'active', enrollmentScore: 615 },
+  { id: 'stu-150', name: '沈子轩', studentId: 'S2024074', className: '网络安全2101班', phone: '14800001212', email: 'shenzixuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=shenzixuan', joinDate: '2026-06-08', status: 'active', enrollmentScore: 570 },
+  { id: 'stu-151', name: '韩佳琪', studentId: 'S2024075', className: '网络安全2101班', phone: '14700003434', email: 'hanjiaqi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hanjiaqi', joinDate: '2026-06-10', status: 'active', enrollmentScore: 640 },
+  { id: 'stu-152', name: '杨皓宇', studentId: 'S2024076', className: '网络安全2101班', phone: '14600005656', email: 'yanghaoyu2@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=yanghaoyu2', joinDate: '2026-06-12', status: 'active', enrollmentScore: 555 },
+  { id: 'stu-153', name: '朱梦瑶', studentId: 'S2024077', className: '网络安全2101班', phone: '14500007878', email: 'zhumengyao@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhumengyao', joinDate: '2026-06-15', status: 'active', enrollmentScore: 690 },
+  { id: 'stu-154', name: '秦俊杰', studentId: 'S2024078', className: '网络安全2101班', phone: '14400009090', email: 'qinjunjie@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qinjunjie', joinDate: '2026-06-18', status: 'active', enrollmentScore: 520 },
+
+  // ====== 物联网工程2101班 (9人) ======
+  { id: 'stu-155', name: '许文博', studentId: 'S2024079', className: '物联网工程2101班', phone: '13300001122', email: 'xubenbo@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xubenbo', joinDate: '2026-06-01', status: 'active', enrollmentScore: 600 },
+  { id: 'stu-156', name: '邓雅雯', studentId: 'S2024080', className: '物联网工程2101班', phone: '13200003344', email: 'dengyawen@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dengyawen', joinDate: '2026-06-03', status: 'active', enrollmentScore: 635 },
+  { id: 'stu-157', name: '方子墨', studentId: 'S2024081', className: '物联网工程2101班', phone: '13100005566', email: 'fangzimo@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fangzimo', joinDate: '2026-06-05', status: 'active', enrollmentScore: 575 },
+  { id: 'stu-158', name: '冯思琪', studentId: 'S2024082', className: '物联网工程2101班', phone: '13000007788', email: 'fengsiqi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=fengsiqi', joinDate: '2026-06-08', status: 'active', enrollmentScore: 660 },
+  { id: 'stu-159', name: '蒋天佑', studentId: 'S2024083', className: '物联网工程2101班', phone: '15900009900', email: 'jiangtianyou@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=jiangtianyou', joinDate: '2026-06-10', status: 'active', enrollmentScore: 545 },
+  { id: 'stu-160', name: '韩雨萱', studentId: 'S2024084', className: '物联网工程2101班', phone: '15800001122', email: 'hanyuxuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=hanyuxuan', joinDate: '2026-06-12', status: 'active', enrollmentScore: 620 },
+  { id: 'stu-161', name: '罗子轩', studentId: 'S2024085', className: '物联网工程2101班', phone: '15700003344', email: 'luozixuan@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=luozixuan', joinDate: '2026-06-15', status: 'inactive', enrollmentScore: 480 },
+  { id: 'stu-162', name: '谢佳怡', studentId: 'S2024086', className: '物联网工程2101班', phone: '15600005566', email: 'xiejiayi@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xiejiayi', joinDate: '2026-06-18', status: 'active', enrollmentScore: 675 },
+  { id: 'stu-163', name: '唐浩宇', studentId: 'S2024087', className: '物联网工程2101班', phone: '15500007788', email: 'tanghaoyu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=tanghaoyu', joinDate: '2026-06-20', status: 'active', enrollmentScore: 590 },
+
+  // ====== 其他班级学生 (旧数据兼容) ======
+  { id: 'stu-19', name: '令狐冲', studentId: '2024019', className: '3班', phone: '15100009012', email: 'linghuchong@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=linghuchong', joinDate: '2026-07-14', status: 'active', enrollmentScore: 590 },
+  { id: 'stu-20', name: '杨过', studentId: '2024020', className: '3班', phone: '15000003456', email: 'yangguo@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=yangguo', joinDate: '2026-07-16', status: 'active', enrollmentScore: 540 },
+  { id: 'stu-21', name: '小龙女', studentId: '2024021', className: '3班', phone: '14900007890', email: 'xiaolongnv@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=xiaolongnv', joinDate: '2026-07-18', status: 'active', enrollmentScore: 610 },
+  { id: 'stu-22', name: '独孤求败', studentId: '2024022', className: '3班', phone: '14800000001', email: 'dugu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=dugu', joinDate: '2026-07-20', status: 'active', enrollmentScore: 720 },
+  { id: 'stu-23', name: '韦小宝', studentId: '2024023', className: '3班', phone: '14700000002', email: 'weixb@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=weixiaobao', joinDate: '2026-07-20', status: 'active', enrollmentScore: 420 },
+  { id: 'stu-24', name: '乔峰', studentId: '2024024', className: '3班', phone: '14600000003', email: 'qiaofeng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qiaofeng', joinDate: '2026-07-20', status: 'active', enrollmentScore: 680 },
 ];
 
 export const schedules: Schedule[] = [
@@ -157,38 +245,55 @@ export const enrollments: Enrollment[] = [
   { id: 'enr-47', studentId: 'stu-24', courseId: 'course-18', scheduleId: 'sch-27', enrollDate: '2026-07-20', progress: 0, status: 'enrolled' },
 ];
 
+/** AI 分层记录（key: `${courseId}||${studentId}`，与 store 中 studentTiers 一致） */
+export const studentTiers: Record<string, import('@/types').StudentTierRecord> = {
+  // course-1（React 前端开发实战）
+  'course-1||stu-1': { courseId: 'course-1', studentId: 'stu-1', tier: 'excellent', score: 92, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-22': { courseId: 'course-1', studentId: 'stu-22', tier: 'excellent', score: 95, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-2': { courseId: 'course-1', studentId: 'stu-2', tier: 'advanced', score: 84, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-15': { courseId: 'course-1', studentId: 'stu-15', tier: 'advanced', score: 86, createdAt: '2026-07-10T10:00:00.000Z' },
+  'course-1||stu-17': { courseId: 'course-1', studentId: 'stu-17', tier: 'basic', score: 62, createdAt: '2026-07-11T10:00:00.000Z' },
+  // course-4（TypeScript 高级编程）
+  'course-4||stu-1': { courseId: 'course-4', studentId: 'stu-1', tier: 'excellent', score: 90, createdAt: '2026-07-12T10:00:00.000Z' },
+  'course-4||stu-22': { courseId: 'course-4', studentId: 'stu-22', tier: 'excellent', score: 94, createdAt: '2026-07-12T10:00:00.000Z' },
+  'course-4||stu-6': { courseId: 'course-4', studentId: 'stu-6', tier: 'basic', score: 58, createdAt: '2026-07-12T10:00:00.000Z' },
+  // course-11（Vue 3 组合式 API）
+  'course-11||stu-12': { courseId: 'course-11', studentId: 'stu-12', tier: 'basic', score: 65, createdAt: '2026-07-13T10:00:00.000Z' },
+  'course-11||stu-24': { courseId: 'course-11', studentId: 'stu-24', tier: 'advanced', score: 80, createdAt: '2026-07-13T10:00:00.000Z' },
+}
+
 export const teachers: Teacher[] = [
-  { id: 't-1', name: '王老师', phone: '138****1001', email: 'wang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wang', courseIds: ['course-1', 'course-4', 'course-7', 'course-11'] },
-  { id: 't-2', name: '李老师', phone: '138****1002', email: 'li@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=li', courseIds: ['course-2', 'course-8'] },
-  { id: 't-3', name: '陈老师', phone: '138****1003', email: 'chen@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chen', courseIds: ['course-3', 'course-9'] },
-  { id: 't-4', name: '张老师', phone: '138****1004', email: 'zhang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhang', courseIds: ['course-5'] },
-  { id: 't-5', name: '刘老师', phone: '138****1005', email: 'liu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liu', courseIds: ['course-6', 'course-13'] },
-  { id: 't-6', name: '赵老师', phone: '138****1006', email: 'zhao@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhao', courseIds: ['course-10'] },
-  { id: 't-7', name: '孙老师', phone: '138****1007', email: 'sun@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sun', courseIds: ['course-12', 'course-17'] },
-  { id: 't-8', name: '周老师', phone: '138****1008', email: 'zhou@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhou', courseIds: ['course-14', 'course-18'] },
-  { id: 't-9', name: '钱老师', phone: '138****1009', email: 'qian@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qian', courseIds: ['course-15', 'course-19'] },
-  { id: 't-10', name: '吴老师', phone: '138****1010', email: 'wu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wu', courseIds: ['course-16', 'course-20'] },
-  { id: 't-11', name: '郑老师', phone: '137****2011', email: 'zheng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zheng', courseIds: [] },
-  { id: 't-12', name: '刘院长', phone: '139****3001', email: 'liuhead@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liuhead', courseIds: ['course-22'] },
+  { id: 't-1', name: '王老师', phone: '13800001001', email: 'wang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wang', courseIds: ['course-1', 'course-4', 'course-7', 'course-11'] },
+  { id: 't-2', name: '李老师', phone: '13800001002', email: 'li@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=li', courseIds: ['course-2', 'course-8'] },
+  { id: 't-3', name: '陈老师', phone: '13800001003', email: 'chen@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chen', courseIds: ['course-3', 'course-9'] },
+  { id: 't-4', name: '张老师', phone: '13800001004', email: 'zhang@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhang', courseIds: ['course-5'] },
+  { id: 't-5', name: '刘老师', phone: '13800001005', email: 'liu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liu', courseIds: ['course-6', 'course-13'] },
+  { id: 't-6', name: '赵老师', phone: '13800001006', email: 'zhao@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhao', courseIds: ['course-10'] },
+  { id: 't-7', name: '孙老师', phone: '13800001007', email: 'sun@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sun', courseIds: ['course-12', 'course-17'] },
+  { id: 't-8', name: '周老师', phone: '13800001008', email: 'zhou@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhou', courseIds: ['course-14', 'course-18'] },
+  { id: 't-9', name: '钱老师', phone: '13800001009', email: 'qian@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=qian', courseIds: ['course-15', 'course-19'] },
+  { id: 't-10', name: '吴老师', phone: '13800001010', email: 'wu@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wu', courseIds: ['course-16', 'course-20'] },
+  { id: 't-11', name: '郑老师', phone: '13700002011', email: 'zheng@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zheng', courseIds: [] },
+  { id: 't-12', name: '刘院长', phone: '13900003001', email: 'liuhead@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=liuhead', courseIds: ['course-22'] },
 ];
 
 /** 企业导师 */
 export const mentors: Mentor[] = [
-  { id: 'm-1', name: '张导师', phone: '139****2001', email: 'zhangmentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhangmentor', courseIds: ['course-1', 'course-14'] },
-  { id: 'm-2', name: '李导师', phone: '139****2002', email: 'limentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=limentor', courseIds: ['course-4', 'course-11'] },
-  { id: 'm-3', name: '王导师', phone: '139****2003', email: 'wangmentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wangmentor', courseIds: ['course-5', 'course-15'] },
-  { id: 'm-4', name: '陈导师', phone: '139****2004', email: 'chenmentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chenmentor', courseIds: ['course-3', 'course-20'] },
+  { id: 'm-1', name: '张导师', phone: '13900002001', email: 'zhangmentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=zhangmentor', courseIds: ['course-1', 'course-14'] },
+  { id: 'm-2', name: '李导师', phone: '13900002002', email: 'limentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=limentor', courseIds: ['course-4', 'course-11'] },
+  { id: 'm-3', name: '王导师', phone: '13900002003', email: 'wangmentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=wangmentor', courseIds: ['course-5', 'course-15'] },
+  { id: 'm-4', name: '陈导师', phone: '13900002004', email: 'chenmentor@example.com', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chenmentor', courseIds: ['course-3', 'course-20'] },
 ];
 
 /** 学院领导 */
 export const leaders: Leader[] = [
-  { id: 'l-1', name: '刘院长', phone: '139****3001', email: 'liuhead@example.com', categoryIds: ['cat-1', 'cat-2'], asTeacher: true },
-  { id: 'l-2', name: '陈院长', phone: '139****3002', email: 'chenhead@example.com', categoryIds: ['cat-3', 'cat-4', 'cat-5'], asMentor: false },
-  { id: 'l-3', name: '张院长', phone: '139****3003', email: 'zhanghead@example.com', categoryIds: ['cat-1', 'cat-4'], asMentor: true },
+  { id: 'l-1', name: '刘院长', phone: '13900003001', email: 'liuhead@example.com', categoryIds: ['cat-1', 'cat-2'], asTeacher: true },
+  { id: 'l-2', name: '陈院长', phone: '13900003002', email: 'chenhead@example.com', categoryIds: ['cat-3', 'cat-4', 'cat-5'], asMentor: false },
+  { id: 'l-3', name: '张院长', phone: '13900003003', email: 'zhanghead@example.com', categoryIds: ['cat-1', 'cat-4'], asMentor: true },
   // 新增演示账号
-  { id: 'l-4', name: '周院长', phone: '139****3004', email: 'zhouhead@example.com', categoryIds: ['cat-5'], asMentor: false },
-  { id: 'l-5', name: '吴院长', phone: '139****3005', email: 'wuhead@example.com', categoryIds: ['cat-3'], asMentor: true },
-  { id: 'l-6', name: '郑院长', phone: '139****3006', email: 'zhenghead@example.com', categoryIds: ['cat-1'], asTeacher: true },
+  { id: 'l-4', name: '周院长', phone: '13900003004', email: 'zhouhead@example.com', categoryIds: ['cat-5'], asMentor: false },
+  { id: 'l-5', name: '吴院长', phone: '13900003005', email: 'wuhead@example.com', categoryIds: ['cat-3'], asMentor: true },
+  { id: 'l-6', name: '郑院长', phone: '13900003006', email: 'zhenghead@example.com', categoryIds: ['cat-1'], asTeacher: true },
 ];
 
 export const grades: Grade[] = [
