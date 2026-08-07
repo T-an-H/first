@@ -64,11 +64,15 @@
           <p class="text-gray-500 mt-1">{{ filteredStudents.length }} 名学生</p>
         </div>
         <div class="flex items-center gap-2">
+          <button @click="resetStudentForm(); showStudentModal = true" class="px-4 py-2.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-2">
+            <Plus class="w-4 h-4" />
+            新增学生
+          </button>
           <button @click="triggerImport" class="px-4 py-2.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors flex items-center gap-2">
             <Upload class="w-4 h-4" />
             Excel 导入
           </button>
-          <button @click="loadClassStudents" class="px-4 py-2.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-2">
+          <button @click="loadClassStudents" class="px-4 py-2.5 bg-gray-500 text-white rounded-lg text-sm hover:bg-gray-600 transition-colors flex items-center gap-2">
             <RefreshCw class="w-4 h-4" />
             刷新
           </button>
@@ -94,6 +98,7 @@
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">学号</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">电话</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">状态</th>
+              <th class="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -113,9 +118,19 @@
                   {{ s.status === 'active' ? '正常' : '禁用' }}
                 </span>
               </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center justify-center gap-2">
+                  <button @click="openEditStudent(s)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="编辑">
+                    <Pencil class="w-4 h-4" />
+                  </button>
+                  <button @click="handleDeleteStudent(s)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="删除">
+                    <Trash2 class="w-4 h-4" />
+                  </button>
+                </div>
+              </td>
             </tr>
             <tr v-if="filteredStudents.length === 0">
-              <td colspan="4" class="px-4 py-12 text-center text-gray-400">{{ studentSearch ? '没有匹配的学生' : '该班级暂无学生' }}</td>
+              <td colspan="5" class="px-4 py-12 text-center text-gray-400">{{ studentSearch ? '没有匹配的学生' : '该班级暂无学生' }}</td>
             </tr>
           </tbody>
         </table>
@@ -178,12 +193,82 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- ====== 新增/编辑学生弹窗 ====== -->
+    <Teleport to="body">
+      <div v-if="showStudentModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="closeStudentModal" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-lg font-semibold text-gray-900">{{ isEditing ? '编辑学生' : '新增学生' }}</h3>
+            <button @click="closeStudentModal" class="text-gray-400 hover:text-gray-600">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1.5 font-medium">姓名 <span class="text-red-500">*</span></label>
+              <input v-model="studentForm.name" placeholder="请输入姓名"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1.5 font-medium">学号</label>
+              <input v-model="studentForm.studentId" placeholder="请输入学号"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1.5 font-medium">电话</label>
+              <input v-model="studentForm.phone" placeholder="请输入电话"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1.5 font-medium">邮箱</label>
+              <input v-model="studentForm.email" placeholder="请输入邮箱"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" />
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1.5 font-medium">状态</label>
+              <select v-model="studentForm.status"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:border-blue-400 outline-none">
+                <option value="active">正常</option>
+                <option value="inactive">禁用</option>
+              </select>
+            </div>
+            <div class="flex gap-3 pt-2">
+              <button @click="closeStudentModal" class="flex-1 px-4 py-2.5 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">取消</button>
+              <button @click="saveStudent" :disabled="!studentForm.name.trim()"
+                class="flex-1 px-4 py-2.5 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg transition-colors">
+                {{ isEditing ? '保存' : '新增' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ====== 确认删除弹窗 ====== -->
+    <Teleport to="body">
+      <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showDeleteModal = false" />
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center">
+          <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+            <AlertTriangle class="w-6 h-6 text-red-600" />
+          </div>
+          <h3 class="text-base font-semibold text-gray-800 mb-1">确认删除</h3>
+          <p class="text-sm text-gray-500 mb-5">确定要删除学生 <span class="font-medium text-gray-800">{{ deletingStudent?.name }}</span> 吗？此操作不可恢复。</p>
+          <div class="flex gap-3">
+            <button @click="showDeleteModal = false" class="flex-1 px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">取消</button>
+            <button @click="confirmDeleteStudent" class="flex-1 px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors">确认删除</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Users, ArrowLeft, ArrowRight, RefreshCw, LoaderCircle, Search, Upload, CheckCircle } from 'lucide-vue-next'
+import { Users, ArrowLeft, ArrowRight, RefreshCw, LoaderCircle, Search, Upload, CheckCircle, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-vue-next'
 import { fetchClasses, fetchStudents } from '@/api'
 import { useAppStore } from '@/stores/app'
 import * as XLSX from 'xlsx'
@@ -206,6 +291,93 @@ const showDuplicateModal = ref(false)
 const showResultModal = ref(false)
 const duplicateRows = ref<(StudentImportRow & { _import: boolean })[]>([])
 const importResult = ref({ added: 0, updated: 0 })
+
+// 新增/编辑学生相关
+const showStudentModal = ref(false)
+const isEditing = computed(() => !!editingStudentId.value)
+const editingStudentId = ref('')
+const studentForm = ref({
+  name: '',
+  studentId: '',
+  phone: '',
+  email: '',
+  status: 'active' as 'active' | 'inactive',
+})
+
+// 删除学生相关
+const showDeleteModal = ref(false)
+const deletingStudent = ref<Student | null>(null)
+
+function resetStudentForm() {
+  studentForm.value = { name: '', studentId: '', phone: '', email: '', status: 'active' }
+  editingStudentId.value = ''
+}
+
+function openEditStudent(student: Student) {
+  editingStudentId.value = student.id
+  studentForm.value = {
+    name: student.name,
+    studentId: student.studentId || '',
+    phone: student.phone || '',
+    email: student.email || '',
+    status: student.status,
+  }
+  showStudentModal.value = true
+}
+
+function closeStudentModal() {
+  showStudentModal.value = false
+  resetStudentForm()
+}
+
+function saveStudent() {
+  const form = studentForm.value
+  if (!form.name.trim()) return
+
+  if (isEditing.value) {
+    store.updateStudent(editingStudentId.value, {
+      name: form.name.trim(),
+      studentId: form.studentId || undefined,
+      phone: form.phone || undefined,
+      email: form.email || undefined,
+      status: form.status,
+    })
+    // 更新本地列表
+    const idx = students.value.findIndex((s) => s.id === editingStudentId.value)
+    if (idx >= 0) {
+      students.value[idx] = { ...students.value[idx], ...form }
+    }
+  } else {
+    const newStudent: Student = {
+      id: `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: form.name.trim(),
+      phone: form.phone,
+      email: form.email,
+      avatar: '',
+      joinDate: new Date().toISOString().split('T')[0],
+      status: form.status,
+      studentId: form.studentId || undefined,
+      className: selectedClass.value,
+    }
+    store.addStudent(newStudent)
+    students.value.push(newStudent)
+  }
+  closeStudentModal()
+}
+
+function handleDeleteStudent(student: Student) {
+  deletingStudent.value = student
+  showDeleteModal.value = true
+}
+
+function confirmDeleteStudent() {
+  if (deletingStudent.value) {
+    store.deleteStudent(deletingStudent.value.id)
+    students.value = students.value.filter((s) => s.id !== deletingStudent.value!.id)
+  }
+  showDeleteModal.value = false
+  deletingStudent.value = null
+}
 
 /** 用户可导入的行（含非重复数据 + 用户勾选的重复数据） */
 let pendingImportRows: StudentImportRow[] = []
