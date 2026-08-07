@@ -591,6 +591,11 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('students', students.value)
   }
 
+  function deleteStudent(id: string) {
+    students.value = students.value.filter((s) => s.id !== id)
+    saveToStorage('students', students.value)
+  }
+
   function updateStudentGroup(id: string, data: Partial<StudentGroup>) {
     studentGroups.value = studentGroups.value.map((g) => (g.id === id ? { ...g, ...data } : g))
     saveToStorage('studentGroups', studentGroups.value)
@@ -1894,7 +1899,7 @@ export const useAppStore = defineStore('app', () => {
     getCourseHomework, getCourseCloudFiles,
     submitHomework, getHomeworkSubmission,
     addEvaluation, updateEvaluation, deleteEvaluation,
-    setEvalConfig, addStudentGroup, addStudent, updateStudent, updateStudentGroup, deleteStudentGroup,
+    setEvalConfig, addStudentGroup, addStudent, updateStudent, deleteStudent, updateStudentGroup, deleteStudentGroup,
     getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
