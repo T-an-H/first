@@ -1023,9 +1023,21 @@
         <span class="text-xs text-blue-500 ml-auto">共 {{ enrolledStudents.length }} 名学生</span>
       </div>
 
-      <!-- 顶部全局操作栏：只保留新建班级和导入班级 -->
+      <!-- 顶部全局操作栏：搜索框 + 新建班级和导入班级 -->
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <h2 class="font-semibold text-gray-900 text-lg">班级管理</h2>
+        <div class="flex items-center gap-3 flex-wrap">
+          <h2 class="font-semibold text-gray-900 text-lg">班级管理</h2>
+          <!-- 学员搜索框 -->
+          <div class="relative">
+            <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input v-model="studentManageSearch" type="text" placeholder="搜索学员姓名/学号..."
+              class="w-64 pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" />
+            <button v-if="studentManageSearch" @click="studentManageSearch = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
         <div v-if="!isViewOnly" class="flex gap-2 flex-wrap">
           <button @click="showAddClass = true"
             class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors shadow-sm">
@@ -1041,7 +1053,65 @@
       </div>
 
       <!-- 班级横向等分板块 -->
-      <div v-if="classBlocks.length > 0" class="flex flex-nowrap gap-5 overflow-x-auto pb-2" style="scrollbar-width: thin;">
+      <!-- ====== 搜索结果区（当有搜索词时显示） ====== -->
+      <div v-if="studentManageSearch.trim()" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <span class="text-sm text-gray-600">
+            搜索 "<span class="font-medium text-gray-900">{{ studentManageSearch.trim() }}</span>" 找到
+            <span class="font-bold text-blue-600">{{ searchedStudentList.length }}</span> 名学员
+          </span>
+          <button @click="studentManageSearch = ''" class="text-xs text-gray-400 hover:text-gray-600">清除搜索</button>
+        </div>
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">姓名</th>
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">学号</th>
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">所在班级</th>
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">所在分组</th>
+              <th v-if="!isViewOnly" class="text-center px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in searchedStudentList" :key="item.student.id" class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-2.5">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center">
+                    <span class="text-xs font-bold text-blue-600">{{ item.student.name[0] }}</span>
+                  </div>
+                  <span class="text-sm font-medium text-gray-900">{{ item.student.name }}</span>
+                </div>
+              </td>
+              <td class="px-4 py-2.5 text-sm text-gray-600">{{ item.student.studentId || '-' }}</td>
+              <td class="px-4 py-2.5">
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ item.student.className || '未分班' }}</span>
+              </td>
+              <td class="px-4 py-2.5">
+                <span v-if="item.groupName" class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{{ item.groupName }}</span>
+                <span v-else class="text-xs text-gray-400">未分组</span>
+              </td>
+              <td v-if="!isViewOnly" class="px-4 py-2.5">
+                <div class="flex items-center justify-center gap-2">
+                  <button v-if="item.student.className" @click="handleRemoveStudentFromClass(item.student.id)"
+                    class="px-2.5 py-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 rounded transition-colors" title="移出本班">
+                    移出本班
+                  </button>
+                  <button @click="handleRemoveStudent(item.student.id)"
+                    class="px-2.5 py-1 text-xs text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors" title="移出本课程">
+                    移出本课程
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="searchedStudentList.length === 0">
+              <td :colspan="isViewOnly ? 4 : 5" class="px-4 py-12 text-center text-gray-400">没有匹配的学员</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ====== 班级板块（无搜索词时显示） ====== -->
+      <div v-if="!studentManageSearch.trim() && classBlocks.length > 0" class="flex flex-nowrap gap-5 overflow-x-auto pb-2" style="scrollbar-width: thin;">
         <div
           v-for="(classData, clsIdx) in classBlocks" :key="clsIdx"
           class="flex-1 min-w-[320px] bg-white rounded-xl border border-gray-100 shadow-sm p-5 group"
@@ -1130,7 +1200,7 @@
 
         </div>
       </div>
-      <div v-else class="text-center py-12 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+      <div v-if="!studentManageSearch.trim() && classBlocks.length === 0" class="text-center py-12 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
         <Users class="w-12 h-12 mx-auto mb-3 opacity-30" />
         <p>暂无班级数据，请先导入学生</p>
       </div>
@@ -2995,6 +3065,35 @@ const classBlocks = computed(() => {
       students: items.map(i => i.student!).filter(Boolean),
     }))
     .sort((a, b) => a.className.localeCompare(b.className, 'zh-CN'))
+})
+
+// ====== 学员搜索（班级管理顶部） ======
+const studentManageSearch = ref('')
+
+/** 获取学员所在分组名称 */
+function getStudentGroupName(studentId: string): string {
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value && g.memberIds.includes(studentId)) return g.name
+  }
+  return ''
+}
+
+/** 搜索结果列表：包含学员、所在班级、所在分组 */
+const searchedStudentList = computed(() => {
+  if (!courseId.value || !studentManageSearch.value.trim()) return []
+  const search = studentManageSearch.value.trim().toLowerCase()
+  return enrolledStudents.value
+    .filter((item) => {
+      if (!item.student) return false
+      const s = item.student
+      return s.name.toLowerCase().includes(search) ||
+             (s.studentId || '').toLowerCase().includes(search) ||
+             s.id.toLowerCase().includes(search)
+    })
+    .map((item) => ({
+      student: item.student!,
+      groupName: getStudentGroupName(item.student!.id),
+    }))
 })
 
 /** 获取某班级的分组（检查组内所有学生 className 是否匹配） */
