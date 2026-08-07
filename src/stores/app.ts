@@ -732,9 +732,10 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function submitExamScores(courseId: string, examName: string, studentIds?: string[]) {
+  function submitExamScores(courseId: string, examName: string, studentIds?: string[], type?: string) {
     examScores.value = examScores.value.map((s) => {
-      if (s.courseId === courseId && s.examName === examName && s.status === 'draft'
+      if (s.courseId === courseId && s.examName === examName
+          && (!type || s.type === type) && s.status === 'draft'
           && (!studentIds || studentIds.includes(s.studentId))) {
         return { ...s, status: 'submitted' as const, gradedAt: getNow().toISOString().split('T')[0] }
       }
@@ -743,9 +744,10 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('examScores', examScores.value)
   }
 
-  function getExamScoresForCourse(courseId: string, examName?: string): import('@/types').ExamScore[] {
+  function getExamScoresForCourse(courseId: string, examName?: string, type?: string): import('@/types').ExamScore[] {
     let result = examScores.value.filter((s) => s.courseId === courseId)
     if (examName) result = result.filter((s) => s.examName === examName)
+    if (type) result = result.filter((s) => s.type === type)
     return result
   }
 
@@ -798,16 +800,32 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 考试/项目权重配置 ======
 
+  /**
+   * 权重键：期中/期末项目可能同名，需用 名称+类型 复合键区分，
+   * 避免期中与期末同名项目（如都叫「课程设计」）的占比互相覆盖。
+   */
+  function examWeightKey(examName: string, type?: string): string {
+    return type ? `${examName}@@${type}` : examName
+  }
+
   /** 设置某个考试/项目的权重 */
-  function setExamWeight(courseId: string, examName: string, weight: number) {
+  function setExamWeight(courseId: string, examName: string, weight: number, type?: string) {
     const courseWeights = { ...(examWeights.value[courseId] || {}) }
-    courseWeights[examName] = Math.min(100, Math.max(0, weight))
+    courseWeights[examWeightKey(examName, type)] = Math.min(100, Math.max(0, weight))
     examWeights.value = { ...examWeights.value, [courseId]: courseWeights }
     saveToStorage('examWeights', examWeights.value)
   }
 
   /** 获取某个考试/项目的权重 */
-  function getExamWeight(courseId: string, examName: string): number {
+  function getExamWeight(courseId: string, examName: string, type?: string): number {
+    if (type) {
+      // 优先读复合键；兼容旧数据：未存过复合键时回退到纯名称键
+      const v = examWeights.value[courseId]?.[examWeightKey(examName, type)]
+      if (v !== undefined) return v
+      const legacy = examWeights.value[courseId]?.[examName]
+      if (legacy !== undefined) return legacy
+      return 0
+    }
     return examWeights.value[courseId]?.[examName] ?? 0
   }
 

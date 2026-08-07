@@ -544,14 +544,14 @@
                   <div v-for="e in midtermProjects" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
-                        <button @click="handleSelectExam(e.name)"
-                          :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
+                        <button @click="handleSelectExam(e.name, e.type)"
+                          :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name && selectedExamType === e.type ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                           {{ e.name }}
                         </button>
                         <div v-if="midtermProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
                           <template v-if="isProjectWeightLocked(e.name)">
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
                               disabled
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
                             <Lock class="w-3 h-3 text-amber-500" />
@@ -559,8 +559,8 @@
                               class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
                           </template>
                           <template v-else>
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
+                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v)), e.type) }"
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
                           </template>
                           <span class="text-[10px] text-gray-400">%</span>
@@ -568,7 +568,7 @@
                       </div>
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
-                    <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
+                    <div v-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
                       <div v-if="!midtermProjectShareReady" class="px-4 py-3 bg-amber-50 border-b border-amber-100 text-amber-700 flex items-center gap-2">
                         <AlertTriangle class="w-4 h-4 flex-shrink-0" />
                         <span class="text-xs font-medium">项目占比合计为 {{ midtermProjectTotalShare }}%，需调整至 100% 才能录入成绩</span>
@@ -594,7 +594,7 @@
                         <ChevronRight class="w-3 h-3 text-gray-400 flex-shrink-0" />
                       </div>
                     </div>
-                    <div v-else-if="selectedExam === e.name && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                    <div v-else-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
                       暂无学生数据
                     </div>
                   </div>
@@ -614,13 +614,13 @@
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermExams" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                      <button @click="handleSelectExam(e.name)"
-                        :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
+                      <button @click="handleSelectExam(e.name, e.type)"
+                        :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name && selectedExamType === e.type ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                         {{ e.name }}
                       </button>
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
-                    <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
+                    <div v-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
                       <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
                         @click="selectedGradeClass = classBlock.className; showGradePopup = true"
                         class="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-b-0">
@@ -637,7 +637,7 @@
                         <ChevronRight class="w-3 h-3 text-gray-400 flex-shrink-0" />
                       </div>
                     </div>
-                    <div v-else-if="selectedExam === e.name && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                    <div v-else-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
                       暂无学生数据
                     </div>
                   </div>
@@ -681,14 +681,14 @@
                   <div v-for="e in finalProjects" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
-                        <button @click="handleSelectExam(e.name)"
-                          :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
+                        <button @click="handleSelectExam(e.name, e.type)"
+                          :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name && selectedExamType === e.type ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                           {{ e.name }}
                         </button>
                         <div v-if="finalProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
                           <template v-if="isProjectWeightLocked(e.name)">
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
                               disabled
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
                             <Lock class="w-3 h-3 text-amber-500" />
@@ -696,8 +696,8 @@
                               class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
                           </template>
                           <template v-else>
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
+                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
+                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v)), e.type) }"
                               class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
                           </template>
                           <span class="text-[10px] text-gray-400">%</span>
@@ -705,7 +705,7 @@
                       </div>
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
-                    <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
+                    <div v-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
                       <div v-if="!finalProjectShareReady" class="px-4 py-3 bg-amber-50 border-b border-amber-100 text-amber-700 flex items-center gap-2">
                         <AlertTriangle class="w-4 h-4 flex-shrink-0" />
                         <span class="text-xs font-medium">项目占比合计为 {{ finalProjectTotalShare }}%，需调整至 100% 才能录入成绩</span>
@@ -731,7 +731,7 @@
                         <ChevronRight class="w-3 h-3 text-gray-400 flex-shrink-0" />
                       </div>
                     </div>
-                    <div v-else-if="selectedExam === e.name && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                    <div v-else-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
                       暂无学生数据
                     </div>
                   </div>
@@ -751,13 +751,13 @@
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalExams" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                      <button @click="handleSelectExam(e.name)"
-                        :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
+                      <button @click="handleSelectExam(e.name, e.type)"
+                        :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name && selectedExamType === e.type ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                         {{ e.name }}
                       </button>
                     </div>
                     <!-- 班级列表 - 选中时展开 -->
-                    <div v-if="selectedExam === e.name && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
+                    <div v-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length > 0" class="mt-2 ml-6 border border-gray-100 rounded-lg overflow-hidden">
                       <div v-for="(classBlock, ci) in filteredGradeClassBlocks" :key="ci"
                         @click="selectedGradeClass = classBlock.className; showGradePopup = true"
                         class="flex items-center justify-between px-3 py-2 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-b-0">
@@ -774,7 +774,7 @@
                         <ChevronRight class="w-3 h-3 text-gray-400 flex-shrink-0" />
                       </div>
                     </div>
-                    <div v-else-if="selectedExam === e.name && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
+                    <div v-else-if="selectedExam === e.name && selectedExamType === e.type && filteredGradeClassBlocks.length === 0" class="mt-2 ml-6 text-center py-3 text-[10px] text-gray-400 border border-dashed border-gray-200 rounded-lg">
                       暂无学生数据
                     </div>
                   </div>
@@ -1549,13 +1549,13 @@ onMounted(async () => {
 /** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
 function normalizeProjectShares() {
   if (!courseId.value) return
-  const apply = (projects: { name: string }[]) => {
-    const names = projects.map((p) => p.name)
-    if (names.length === 0) return
-    if (names.some((n) => store.getExamWeight(courseId.value || '', n) > 0)) return
-    const eachShare = Math.floor(100 / names.length)
-    names.forEach((n, i) =>
-      store.setExamWeight(courseId.value!, n, i === names.length - 1 ? 100 - eachShare * (names.length - 1) : eachShare))
+  const apply = (projects: { name: string; type: string }[]) => {
+    const items = projects.map((p) => ({ name: p.name, type: p.type }))
+    if (items.length === 0) return
+    if (items.some((p) => store.getExamWeight(courseId.value || '', p.name, p.type) > 0)) return
+    const eachShare = Math.floor(100 / items.length)
+    items.forEach((p, i) =>
+      store.setExamWeight(courseId.value!, p.name, i === items.length - 1 ? 100 - eachShare * (items.length - 1) : eachShare, p.type))
   }
   apply(midtermProjects.value)
   apply(finalProjects.value)
@@ -1822,6 +1822,7 @@ const newExamName = ref('')
 const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_project' | 'final_project'>('midterm_project')
 const selectedExam = ref('')
+const selectedExamType = ref('midterm_exam')
 const gradeSearch = ref('')
 const gradeEntrySearch = ref('')
 const examInputs = ref<Record<string, number>>({})
@@ -2109,9 +2110,9 @@ const finalExams = computed(() => examsWithTypes.value.filter(e => e.type === 'f
 
 /** 期中/期末项目占比合计（各项目占比之和，便于配置校验） */
 const midtermProjectTotalShare = computed(() =>
-  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name, e.type), 0) : 0)
 const finalProjectTotalShare = computed(() =>
-  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name, e.type), 0) : 0)
 
 /** 占比合计是否为 100%（不为 100% 时禁止录入项目成绩） */
 const midtermProjectShareReady = computed(() => midtermProjects.value.length === 0 || midtermProjectTotalShare.value === 100)
@@ -2131,13 +2132,15 @@ function getTypeWeightLabel(type: string): string {
 
 const currentExamFullScore = computed(() => {
   if (!courseId.value || !selectedExam.value) return 100
-  const scores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+  const scores = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
   return scores.length > 0 ? scores[0].fullScore : 100
 })
 
+const currentExamType = computed(() => selectedExamType.value || 'midterm_exam')
+
 const currentExamWeight = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
-  return store.getExamWeight(courseId.value, selectedExam.value)
+  return store.getExamWeight(courseId.value, selectedExam.value, currentExamType.value)
 })
 
 const filteredGradeStudents = computed(() => {
@@ -2291,7 +2294,7 @@ const hasExamInputs = computed(() => {
 
 const submittedExamCount = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
-  const all = store.getExamScoresForCourse(courseId.value, selectedExam.value).filter((s) => s.status === 'submitted')
+  const all = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value).filter((s) => s.status === 'submitted')
   // 弹窗打开时只统计当前班级
   if (selectedGradeClass.value) {
     const ids = currentGradeClassStudentIds.value
@@ -2307,7 +2310,7 @@ const pendingExamSubmits = computed(() => {
     : filteredGradeStudents.value
   return target.filter(({ student }) => {
     if (!student) return false
-    const score = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+    const score = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
       .find((s) => s.studentId === student.id)
     return score && score.status === 'draft'
   }).length
@@ -2315,21 +2318,21 @@ const pendingExamSubmits = computed(() => {
 
 function getStudentExamScore(studentId: string): number | null {
   if (!courseId.value || !selectedExam.value) return null
-  const score = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+  const score = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
     .find((s) => s.studentId === studentId)
   return score?.score ?? null
 }
 
 function isExamSubmitted(studentId: string): boolean {
   if (!courseId.value || !selectedExam.value) return false
-  const score = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+  const score = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
     .find((s) => s.studentId === studentId)
   return score?.status === 'submitted'
 }
 
 function getStudentExamPercent(studentId: string): string {
   if (!courseId.value || !selectedExam.value) return '-'
-  const score = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+  const score = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
     .find((s) => s.studentId === studentId)
   if (!score) return '-'
   return `${Math.round((score.score / score.fullScore) * 100)}分`
@@ -2337,12 +2340,14 @@ function getStudentExamPercent(studentId: string): string {
 
 function getExamWeightFromConfig(examName: string): number {
   if (!courseId.value) return 0
-  return store.getExamWeight(courseId.value, examName)
+  const type = examsWithTypes.value.find((e) => e.name === examName)?.type
+  return store.getExamWeight(courseId.value, examName, type)
 }
 
-function handleSelectExam(name: string) {
+function handleSelectExam(name: string, type?: string) {
   if (!courseId.value) return
   selectedExam.value = name
+  if (type) selectedExamType.value = type
 }
 
 // ---- 成绩分布图表逻辑 ----
@@ -2499,12 +2504,13 @@ function handleAddExam() {
     if (!isLocked) {
       const eachShare = Math.floor(100 / uniqueNames.length)
       uniqueNames.forEach((examName, i) =>
-        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
+        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare, type))
     }
   }
 
   showNewExamModal.value = false
   selectedExam.value = name
+  selectedExamType.value = type
   newExamName.value = ''
 
 }
@@ -2569,11 +2575,11 @@ function ensureWrittenExams() {
 
 function handleSaveExamScores() {
   if (!courseId.value || !selectedExam.value) return
-  const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+  const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
   const examType = existingScores.length > 0
     ? existingScores[0].type
     : 'midterm_exam'
-  const examWeight = store.getExamWeight(courseId.value, selectedExam.value)
+  const examWeight = store.getExamWeight(courseId.value, selectedExam.value, examType)
   // 弹窗打开时只保存当前班级的输入
   let inputsToSave = Object.entries(examInputs.value)
   if (selectedGradeClass.value) {
@@ -2615,9 +2621,9 @@ function handleSubmitExamScores() {
   handleSaveExamScores()
   if (selectedGradeClass.value) {
     const ids = Array.from(currentGradeClassStudentIds.value)
-    store.submitExamScores(courseId.value, selectedExam.value, ids.length > 0 ? ids : undefined)
+    store.submitExamScores(courseId.value, selectedExam.value, ids.length > 0 ? ids : undefined, currentExamType.value)
   } else {
-    store.submitExamScores(courseId.value, selectedExam.value)
+    store.submitExamScores(courseId.value, selectedExam.value, undefined, currentExamType.value)
   }
 
 }
@@ -2632,7 +2638,7 @@ function getStudentTotalScore(studentId: string): string | number {
   let totalWeight = 0
   const typeGroups = new Map<string, { count: number; sumPercent: number }>()
   for (const s of scores) {
-    const w = store.getExamWeight(courseId.value, s.examName)
+    const w = store.getExamWeight(courseId.value, s.examName, s.type)
     const percent = (s.score / s.fullScore) * 100
     if (w > 0) {
       weightedSum += percent * w
@@ -2679,14 +2685,15 @@ function getStudentAvgScore(studentId: string): string | number {
 
 function getStudentScoreForExam(studentId: string, examName: string): string | number {
   if (!courseId.value) return '-'
-  const score = store.getExamScoresForCourse(courseId.value, examName)
+  const type = examsWithTypes.value.find((e) => e.name === examName)?.type
+  const score = store.getExamScoresForCourse(courseId.value, examName, type)
     .find((s) => s.studentId === studentId && s.status === 'submitted')
   return score?.score ?? '-'
 }
 
 async function handleExcelImport(event: Event) {
   if (!courseId.value || !selectedExam.value) return
-  const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
+  const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value, currentExamType.value)
   const examType = existingScores.length > 0
     ? existingScores[0].type
     : 'midterm_exam'
