@@ -45,6 +45,16 @@
             待评价
           </button>
 
+          <!-- 素质评价待批改红点标记（点击可溯源到素质评价管理） -->
+          <button
+            v-if="pendingQualityCount(course.id) > 0"
+            @click.stop="goQualityEval(course.id)"
+            :title="`有 ${pendingQualityCount(course.id)} 名学生提交的素质评价待批改，点击前往素质评价管理`"
+            class="absolute top-12 left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-orange-500 text-white font-medium shadow cursor-pointer hover:bg-orange-600 transition-colors">
+            <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+            素质评价待批改 {{ pendingQualityCount(course.id) }}
+          </button>
+
           <!-- 状态标签 - 右上角 -->
           <span :class="`absolute top-3 right-3 z-10 text-xs px-2.5 py-1 rounded-full font-medium ${
             course.status === 'active'
@@ -920,6 +930,19 @@ function hasPendingEval(courseId: string) {
 /** 待评价红点溯源：直达评论管理（评价填写）tab */
 function goEval(courseId: string) {
   router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=comments`)
+}
+
+/** 该课程中「最新提交尚未批改」的素质评价学生人数（仅授课教师显示红点） */
+function pendingQualityCount(courseId: string) {
+  if (!store.currentUser) return 0
+  const course = store.courses.find((c) => c.id === courseId)
+  if (!course || course.teacher !== store.currentUser) return 0
+  return store.countPendingQualitySubmissions(courseId)
+}
+
+/** 素质评价待批改红点溯源：直达素质评价管理 tab */
+function goQualityEval(courseId: string) {
+  router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=quality-eval`)
 }
 
 // ===== 评价配置 & 批量操作（模板引用，统一放在此处） =====

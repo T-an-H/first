@@ -57,7 +57,7 @@
           <button @click="triggerCourseImport" class="flex items-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium">
             <Upload class="w-4 h-4" /> 导入Excel
           </button>
-          <button @click="openCourseModal(null)" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
+          <button @click="openCourseModal()" class="flex items-center gap-2 px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium">
             <Plus class="w-4 h-4" /> 新增课程
           </button>
           <button @click="switchDepartment" class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">

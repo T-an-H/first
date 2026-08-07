@@ -234,7 +234,7 @@ function updateChart() {
         symbol: 'circle',
         symbolSize: 8,
         itemStyle: { color: '#ef4444' },
-        data: [{ coord: [sortedGradeEntries.value.length - 1, avgScore.value] }]
+        data: [{ name: '平均分', coord: [sortedGradeEntries.value.length - 1, avgScore.value] }]
       } : undefined
     }]
   }
@@ -351,6 +351,9 @@ const gradeEntries = computed<GradeEntry[]>(() => {
     let total = g.totalScore ?? g.score ?? 0
     if (d) {
       total = store.calcTotalScore(g.courseId, d)
+    } else {
+      // 无分项成绩时，素质评价加成直接叠加在已存总分上
+      total = Math.min(100, total + store.getStudentQualityScore(g.courseId, g.studentId))
     }
     const sem = g.semester ?? (course?.createdAt ? `${course.createdAt.slice(0, 4)}年` : '2026年')
     return {
