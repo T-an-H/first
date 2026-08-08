@@ -803,17 +803,24 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 考试/项目权重配置 ======
 
-  /** 设置某个考试/项目的权重 */
-  function setExamWeight(courseId: string, examName: string, weight: number) {
+  /** 设置某个考试/项目的权重（type 可选，传入后按 类型::名称 复合键存储，避免跨类型同名冲突） */
+  function setExamWeight(courseId: string, examName: string, weight: number, type?: string) {
     const courseWeights = { ...(examWeights.value[courseId] || {}) }
-    courseWeights[examName] = Math.min(100, Math.max(0, weight))
+    const key = type ? `${type}::${examName}` : examName
+    courseWeights[key] = Math.min(100, Math.max(0, weight))
     examWeights.value = { ...examWeights.value, [courseId]: courseWeights }
     saveToStorage('examWeights', examWeights.value)
   }
 
-  /** 获取某个考试/项目的权重 */
-  function getExamWeight(courseId: string, examName: string): number {
-    return examWeights.value[courseId]?.[examName] ?? 0
+  /** 获取某个考试/项目的权重（type 可选，优先读取 类型::名称 复合键，回退到旧版纯名称键以兼容历史数据） */
+  function getExamWeight(courseId: string, examName: string, type?: string): number {
+    const courseWeights = examWeights.value[courseId]
+    if (!courseWeights) return 0
+    if (type) {
+      const compositeKey = `${type}::${examName}`
+      if (compositeKey in courseWeights) return courseWeights[compositeKey]
+    }
+    return courseWeights[examName] ?? 0
   }
 
   /** 获取课程所有考试/项目的权重配置 */
