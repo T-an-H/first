@@ -538,14 +538,14 @@
                   <div v-for="e in midtermProjects" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
-                        <button @click="handleSelectExam(e.name)"
+                        <button @click="handleSelectExam(e.name, e.type)"
                           :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                           {{ e.name }}
                         </button>
                         <div v-if="midtermProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
-                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
+                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
+                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v)), e.type) }"
                             class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
                           <Lock v-if="isProjectWeightLocked(e.name)" class="w-3 h-3 text-amber-500" />
                           <span class="text-[10px] text-gray-400">%</span>
@@ -599,7 +599,7 @@
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermExams" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                      <button @click="handleSelectExam(e.name)"
+                      <button @click="handleSelectExam(e.name, e.type)"
                         :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                         {{ e.name }}
                       </button>
@@ -660,14 +660,14 @@
                   <div v-for="e in finalProjects" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
-                        <button @click="handleSelectExam(e.name)"
+                        <button @click="handleSelectExam(e.name, e.type)"
                           :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                           {{ e.name }}
                         </button>
                         <div v-if="finalProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
-                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
+                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
+                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v)), e.type) }"
                             class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
                           <Lock v-if="isProjectWeightLocked(e.name)" class="w-3 h-3 text-amber-500" />
                           <span class="text-[10px] text-gray-400">%</span>
@@ -721,7 +721,7 @@
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalExams" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                      <button @click="handleSelectExam(e.name)"
+                      <button @click="handleSelectExam(e.name, e.type)"
                         :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                         {{ e.name }}
                       </button>
@@ -1988,13 +1988,13 @@ onMounted(async () => {
 /** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
 function normalizeProjectShares() {
   if (!courseId.value) return
-  const apply = (projects: { name: string }[]) => {
-    const names = projects.map((p) => p.name)
-    if (names.length === 0) return
-    if (names.some((n) => store.getExamWeight(courseId.value || '', n) > 0)) return
-    const eachShare = Math.floor(100 / names.length)
-    names.forEach((n, i) =>
-      store.setExamWeight(courseId.value!, n, i === names.length - 1 ? 100 - eachShare * (names.length - 1) : eachShare))
+  const apply = (projects: { name: string; type: string }[]) => {
+    const items = projects.map((p) => ({ name: p.name, type: p.type }))
+    if (items.length === 0) return
+    if (items.some((it) => store.getExamWeight(courseId.value || '', it.name, it.type) > 0)) return
+    const eachShare = Math.floor(100 / items.length)
+    items.forEach((it, i) =>
+      store.setExamWeight(courseId.value!, it.name, i === items.length - 1 ? 100 - eachShare * (items.length - 1) : eachShare, it.type))
   }
   apply(midtermProjects.value)
   apply(finalProjects.value)
@@ -2403,6 +2403,8 @@ const newExamName = ref('')
 const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_project' | 'final_project'>('midterm_project')
 const selectedExam = ref('')
+type ExamType = 'midterm_exam' | 'midterm_project' | 'final_exam' | 'final_project' | 'quiz' | 'assignment'
+const selectedExamType = ref<ExamType | ''>('')
 const gradeSearch = ref('')
 const gradeEntrySearch = ref('')
 const examInputs = ref<Record<string, number>>({})
@@ -2676,9 +2678,9 @@ const examNames = computed(() => {
 
 /** 成绩录入 - 按类型分组的考试/项目 */
 const examsWithTypes = computed(() => {
-  if (!courseId.value) return [] as { name: string; type: string }[]
+  if (!courseId.value) return [] as { name: string; type: ExamType }[]
   const scores = store.getExamScoresForCourse(courseId.value)
-  const map = new Map<string, { name: string; type: string }>()
+  const map = new Map<string, { name: string; type: ExamType }>()
   for (const s of scores) {
     // 用 名称+类型 作为唯一键，避免跨类型同名（如期中项目/期末项目同名）被吞掉
     const key = `${s.examName}@@${s.type}`
@@ -2695,9 +2697,9 @@ const finalExams = computed(() => examsWithTypes.value.filter(e => e.type === 'f
 
 /** 期中/期末项目占比合计（各项目占比之和，便于配置校验） */
 const midtermProjectTotalShare = computed(() =>
-  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name, e.type), 0) : 0)
 const finalProjectTotalShare = computed(() =>
-  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name, e.type), 0) : 0)
 
 /** 占比合计是否为 100%（不为 100% 时禁止录入项目成绩） */
 const midtermProjectShareReady = computed(() => midtermProjects.value.length === 0 || midtermProjectTotalShare.value === 100)
@@ -2739,7 +2741,7 @@ const currentExamFullScore = computed(() => {
 
 const currentExamWeight = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
-  return store.getExamWeight(courseId.value, selectedExam.value)
+  return store.getExamWeight(courseId.value, selectedExam.value, selectedExamType.value || undefined)
 })
 
 const filteredGradeStudents = computed(() => {
@@ -2937,14 +2939,15 @@ function getStudentExamPercent(studentId: string): string {
   return `${Math.round((score.score / score.fullScore) * 100)}分`
 }
 
-function getExamWeightFromConfig(examName: string): number {
+function getExamWeightFromConfig(examName: string, type?: string): number {
   if (!courseId.value) return 0
-  return store.getExamWeight(courseId.value, examName)
+  return store.getExamWeight(courseId.value, examName, type)
 }
 
-function handleSelectExam(name: string) {
+function handleSelectExam(name: string, type: ExamType) {
   if (!courseId.value) return
   selectedExam.value = name
+  selectedExamType.value = type
 }
 
 // ---- 成绩分布图表逻辑 ----
@@ -3094,19 +3097,17 @@ function handleAddExam() {
     const sameTypeExams = store.getExamScoresForCourse(courseId.value)
       .filter((s) => s.type === type)
     const uniqueNames = Array.from(new Set(sameTypeExams.map((s) => s.examName)))
-    const isLocked = type === 'midterm_project' ? midtermProjectLocked.value : finalProjectLocked.value
 
-    // 分区未锁定时：新添加项目后所有项目占比重新均分 100%（末项取余数保证合计）
-    // 分区已锁定时：保持原有占比不变，新项目占比默认 0，需解锁后才能调整
-    if (!isLocked) {
-      const eachShare = Math.floor(100 / uniqueNames.length)
-      uniqueNames.forEach((examName, i) =>
-        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
-    }
+    // 添加项目后该类项目占比始终刷新为均分 100%（末项取余数保证合计）；
+    // 占比合计变为 100% 后由 watcher 自动上锁
+    const eachShare = Math.floor(100 / uniqueNames.length)
+    uniqueNames.forEach((examName, i) =>
+      store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare, type))
   }
 
   showNewExamModal.value = false
   selectedExam.value = name
+  selectedExamType.value = type
   newExamName.value = ''
 
 }
@@ -3172,10 +3173,10 @@ function ensureWrittenExams() {
 function handleSaveExamScores() {
   if (!courseId.value || !selectedExam.value) return
   const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
-  const examType = existingScores.length > 0
-    ? existingScores[0].type
-    : 'midterm_exam'
-  const examWeight = store.getExamWeight(courseId.value, selectedExam.value)
+  // 优先使用选中时记录的类型，避免跨类型同名时 existingScores[0].type 取到错误类型
+  const examType = selectedExamType.value
+    || (existingScores.length > 0 ? existingScores[0].type : 'midterm_exam')
+  const examWeight = store.getExamWeight(courseId.value, selectedExam.value, examType)
   // 弹窗打开时只保存当前班级的输入
   let inputsToSave = Object.entries(examInputs.value)
   if (selectedGradeClass.value) {
@@ -3234,7 +3235,7 @@ function getStudentTotalScore(studentId: string): string | number {
   let totalWeight = 0
   const typeGroups = new Map<string, { count: number; sumPercent: number }>()
   for (const s of scores) {
-    const w = store.getExamWeight(courseId.value, s.examName)
+    const w = store.getExamWeight(courseId.value, s.examName, s.type)
     const percent = (s.score / s.fullScore) * 100
     if (w > 0) {
       weightedSum += percent * w
@@ -3289,9 +3290,9 @@ function getStudentScoreForExam(studentId: string, examName: string): string | n
 async function handleExcelImport(event: Event) {
   if (!courseId.value || !selectedExam.value) return
   const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
-  const examType = existingScores.length > 0
-    ? existingScores[0].type
-    : 'midterm_exam'
+  // 优先使用选中时记录的类型，避免跨类型同名时 existingScores[0].type 取到错误类型
+  const examType = selectedExamType.value
+    || (existingScores.length > 0 ? existingScores[0].type : 'midterm_exam')
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
   const file = input.files[0]
