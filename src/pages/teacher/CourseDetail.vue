@@ -29,7 +29,7 @@
       </button>
     </div>
 
-    <!-- Tab: 评价管理 -->
+    <!-- Tab: 管理评价 -->
     <div v-if="activeTab === 'comments'" class="space-y-6">
       <!-- 评价方案配置（始终展开） -->
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -197,7 +197,7 @@
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
             <ClipboardCheck class="w-5 h-5 text-gray-400" />
-            <h2 class="font-semibold text-gray-900">评价管理</h2>
+            <h2 class="font-semibold text-gray-900">管理评价</h2>
             <span class="text-xs text-gray-400">{{ enrolledStudents.length }}名学生</span>
           </div>
           <button v-if="!isViewOnly" @click="handleProcessOverdue" class="text-xs flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100">
@@ -2033,11 +2033,11 @@ const completedCount = computed(() =>
 
 // ---- Tab 配置 ----
 const tabList = [
-  { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
   { key: 'grade-config', label: '成绩配置', icon: Settings },
   { key: 'grade-entry',  label: '成绩管理', icon: TrendingUp },
   { key: 'students',     label: '学生管理', icon: Users },
+  { key: 'comments',     label: '管理评价', icon: ClipboardCheck },
 ]
 
 function formatDate(dateStr: string): string {
