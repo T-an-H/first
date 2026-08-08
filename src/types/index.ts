@@ -21,6 +21,10 @@ export interface Course {
   /** 所属学院（学院即课程分类时使用） */
   departmentId?: string;
   cover: string;
+  /** 课程开始日期 */
+  startDate?: string;
+  /** 课程结束日期 */
+  endDate?: string;
   credits: number;
   duration: number;
   status: 'active' | 'inactive' | 'draft';
@@ -224,6 +228,8 @@ export interface CloudFile {
   uploadedAt: string;
   uploadedBy: string;
   courseId?: string;
+  /** 文件可见范围 */
+  visibilityScope?: 'private' | 'students';
   /** 可见班级列表（为空则仅自己可见） */
   visibleToClassNames?: string[];
 }
@@ -351,7 +357,7 @@ export const EvalFrequencyDescs: Record<EvalFrequency, string> = {
 export type OverdueRule = 'average' | 'none' | 'zero' | 'full';
 
 export const OverdueRuleLabels: Record<OverdueRule, string> = {
-  average: '取历史平均分',
+  average: '默认60分',
   none: '不处理',
   zero: '记0分',
   full: '记满分',

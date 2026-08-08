@@ -267,13 +267,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Users, ArrowLeft, ArrowRight, RefreshCw, LoaderCircle, Search, Upload, CheckCircle, Plus, Pencil, Trash2, X, AlertTriangle } from 'lucide-vue-next'
 import { fetchClasses, fetchStudents } from '@/api'
 import { useAppStore } from '@/stores/app'
 import * as XLSX from 'xlsx'
 import type { Student, StudentImportRow } from '@/types'
 
+const route = useRoute()
+const router = useRouter()
 const store = useAppStore()
 
 const classes = ref<any[]>([])
@@ -425,11 +428,14 @@ async function loadClasses() {
 
 function selectClass(name: string) {
   selectedClass.value = name
-  studentSearch.value = ''
-  loadClassStudents()
 }
 
 async function loadClassStudents() {
+  if (!selectedClass.value) {
+    students.value = []
+    return
+  }
+
   loadingStudents.value = true
   try {
     const res = await fetchStudents({ class: selectedClass.value, pageSize: '200' })
@@ -456,6 +462,38 @@ async function loadClassStudents() {
     loadingStudents.value = false
   }
 }
+
+// URL className 双向同步：支持通过 ?className=xxx 直达班级
+watch(() => route.query.className, (className) => {
+  const nextClassName = typeof className === 'string' ? className : ''
+  if (selectedClass.value === nextClassName) return
+
+  selectedClass.value = nextClassName
+  studentSearch.value = ''
+}, { immediate: true })
+
+watch(selectedClass, (className, previousClassName) => {
+  const currentClassName = typeof route.query.className === 'string' ? route.query.className : ''
+  if (currentClassName !== className) {
+    const nextQuery = { ...route.query }
+    if (className) {
+      nextQuery.className = className
+    } else {
+      delete nextQuery.className
+    }
+    void router.replace({ query: nextQuery })
+  }
+
+  if (!className) {
+    students.value = []
+    return
+  }
+
+  if (className !== previousClassName) {
+    studentSearch.value = ''
+    void loadClassStudents()
+  }
+})
 
 // ====== Excel 导入 ======
 function triggerImport() {

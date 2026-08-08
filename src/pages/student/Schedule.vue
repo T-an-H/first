@@ -6,6 +6,7 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
+import { fetchSchedules, fetchStudents } from '@/api'
 import { renderIcon } from '@/utils/d3-renderer'
 import { isVirtualToday, getVirtualMonday } from '@/lib/date'
 
@@ -29,17 +30,13 @@ async function loadMySchedules() {
     if (!studentName) return
 
     // 从 students API 查询学生信息
-    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
-    const stuData = await stuRes.json()
-    const myInfo = stuData.students?.[0]
+    const stuRes = await fetchStudents({ search: studentName, pageSize: 1 })
+    const myInfo = stuRes.students?.[0]
     if (!myInfo?.className) return
 
     // 2. 按班级加载排课
-    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
-    const schData = await schRes.json()
-    if (schData.success) {
-      dbSchedules.value = schData.schedules
-    }
+    const schRes = await fetchSchedules({ class: myInfo.className })
+    dbSchedules.value = schRes.schedules ?? []
   } catch (e) {
     console.error('加载课表失败:', e)
   } finally {

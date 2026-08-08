@@ -29,7 +29,7 @@
       </button>
     </div>
 
-    <!-- Tab: 管理评价 -->
+    <!-- Tab: 评价管理 -->
     <div v-if="activeTab === 'comments'" class="space-y-6">
       <!-- 评价方案配置（始终展开） -->
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -113,25 +113,6 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-3">
-              <label class="text-sm font-medium text-gray-700">企业导师参与评价</label>
-              <button @click="handleSetConfig({ hasMentor: !selectedConfig?.hasMentor })"
-                :class="`relative w-10 h-5 rounded-full transition-colors ${selectedConfig?.hasMentor ? 'bg-emerald-400' : 'bg-gray-300'}`">
-                <span :class="`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${selectedConfig?.hasMentor ? 'left-5.5' : 'left-0.5'}`" />
-              </button>
-              <span class="text-xs text-gray-400">{{ selectedConfig?.hasMentor ? '已启用' : '已禁用' }}</span>
-            </div>
-
-            <div>
-              <p class="text-sm font-medium text-gray-700 mb-2">逾期未评处理规则</p>
-              <div class="flex gap-3">
-                <button v-for="rule in OVERDUE_RULE_KEYS" :key="rule"
-                  @click="handleSetConfig({ overdueRule: rule })"
-                  :class="`px-4 py-2 rounded-lg border text-sm transition-all ${selectedConfig?.overdueRule === rule ? 'border-purple-300 bg-purple-50 text-purple-700 font-medium' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`">
-                  {{ OverdueRuleLabels[rule] }}
-                </button>
-              </div>
-            </div>
           </div>
         </template>
 
@@ -173,21 +154,6 @@
               </div>
             </div>
 
-            <!-- 企业导师参与评价 -->
-            <div class="flex items-center gap-3">
-              <label class="text-sm font-medium text-gray-700">企业导师参与评价</label>
-              <span :class="`text-xs px-2.5 py-1 rounded-full border ${activeEvalConfig.hasMentor ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`">
-                {{ activeEvalConfig.hasMentor ? '已启用' : '已禁用' }}
-              </span>
-            </div>
-
-            <!-- 逾期未评处理规则 -->
-            <div>
-              <p class="text-sm font-medium text-gray-700 mb-2">逾期未评处理规则</p>
-              <span class="inline-block px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 text-sm">
-                {{ OverdueRuleLabels[activeEvalConfig.overdueRule] }}
-              </span>
-            </div>
           </div>
         </template>
       </div>
@@ -197,7 +163,7 @@
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
             <ClipboardCheck class="w-5 h-5 text-gray-400" />
-            <h2 class="font-semibold text-gray-900">管理评价</h2>
+            <h2 class="font-semibold text-gray-900">评价管理</h2>
             <span class="text-xs text-gray-400">{{ enrolledStudents.length }}名学生</span>
           </div>
           <button v-if="!isViewOnly" @click="handleProcessOverdue" class="text-xs flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100">
@@ -1760,6 +1726,11 @@
     </div>
 
     <!-- ===== 素质评价 Tab ===== -->
+    <!-- Tab: 作业管理 -->
+    <div v-if="activeTab === 'homework'" class="space-y-6">
+      <TeacherHomework :course-id="courseId" />
+    </div>
+
     <div v-if="activeTab === 'quality-eval'" class="space-y-6">
       <div class="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-xl p-5 border border-emerald-100">
         <div class="flex items-center justify-between">
@@ -1911,12 +1882,13 @@ import { useAppStore } from '@/stores/app'
 import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
+import TeacherHomework from '@/components/Homework/TeacherHomework.vue'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
   EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
-  EvalFrequencyDescs, OverdueRuleLabels, getDefaultGradeConfig
+  EvalFrequencyDescs, getDefaultGradeConfig
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import * as echarts from 'echarts'
@@ -2033,11 +2005,12 @@ const completedCount = computed(() =>
 
 // ---- Tab 配置 ----
 const tabList = [
+  { key: 'students',     label: '学生管理', icon: Users },
+  { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
+  { key: 'homework',     label: '作业管理', icon: BookOpen },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
   { key: 'grade-config', label: '成绩配置', icon: Settings },
   { key: 'grade-entry',  label: '成绩管理', icon: TrendingUp },
-  { key: 'students',     label: '学生管理', icon: Users },
-  { key: 'comments',     label: '管理评价', icon: ClipboardCheck },
 ]
 
 function formatDate(dateStr: string): string {
@@ -2055,7 +2028,6 @@ const LEVEL_OPTIONS = [
 const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
 const EVAL_TEMPLATE_KEYS = Object.keys(EvalTemplateLabels) as EvalTemplate[]
 const EVAL_FREQUENCY_KEYS = Object.keys(EvalFrequencyLabels) as EvalFrequency[]
-const OVERDUE_RULE_KEYS = Object.keys(OverdueRuleLabels) as OverdueRule[]
 const ExamTypeLabels: Record<string, string> = {
   midterm_exam: '期中考试',
   midterm_project: '期中项目',
@@ -2076,7 +2048,7 @@ const isWeightLocked = computed(() => {
 // ---- 状态 ----
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
 const activeTab = ref<string>(
-  tabList.some((t) => t.key === route.query.tab) ? (route.query.tab as string) : 'comments'
+  tabList.some((t) => t.key === route.query.tab) ? (route.query.tab as string) : 'students'
 )
 const studentSearch = ref('')
 

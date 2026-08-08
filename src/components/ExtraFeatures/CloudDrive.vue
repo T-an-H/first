@@ -1,131 +1,154 @@
 <template>
   <div class="space-y-4">
-    <!-- 上传按钮 -->
-    <div class="flex items-center gap-3">
-      <input ref="fileInputRef" type="file" @change="onFileSelected" class="hidden" />
-      <button @click="triggerUpload" class="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-800 text-white rounded-lg transition-colors text-sm font-medium">
-        <Upload class="w-4 h-4" /> 上传文件
-      </button>
-      <span class="text-sm text-gray-400">已用 {{ fileList.length }} 个文件</span>
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div class="flex items-center gap-3">
+        <input ref="fileInputRef" type="file" class="hidden" @change="onFileSelected" />
+        <button
+          class="flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-800"
+          @click="triggerUpload"
+        >
+          <Upload class="h-4 w-4" />
+          <span>上传文件</span>
+        </button>
+        <span class="text-sm text-gray-400">已用 {{ fileList.length }} 个文件</span>
+      </div>
+
+      <div
+        v-if="store.currentRole === 'teacher'"
+        class="flex flex-wrap items-center gap-3 lg:justify-end"
+      >
+        <span class="text-sm text-gray-500">上传后可见范围</span>
+        <div class="inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 p-1">
+          <button
+            type="button"
+            class="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors"
+            :class="uploadVisibility === 'private' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'"
+            @click="uploadVisibility = 'private'"
+          >
+            <Lock class="h-4 w-4" />
+            <span>仅自己可见</span>
+          </button>
+          <button
+            type="button"
+            class="flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors"
+            :class="uploadVisibility === 'students' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'"
+            @click="uploadVisibility = 'students'"
+          >
+            <Users class="h-4 w-4" />
+            <span>公开给学生可见</span>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- 空状态 -->
-    <div v-if="fileList.length === 0" class="text-center py-12 text-gray-400">
-      <Cloud class="w-12 h-12 mx-auto mb-3 opacity-50" />
+    <div v-if="fileList.length === 0" class="py-12 text-center text-gray-400">
+      <Cloud class="mx-auto mb-3 h-12 w-12 opacity-50" />
       <p>暂无文件，点击上方按钮上传</p>
     </div>
 
-    <!-- 文件列表 -->
     <div class="space-y-2">
-      <div v-for="f in fileList" :key="f.id" class="flex items-center gap-4 p-3 bg-white rounded-lg border border-gray-100 shadow-sm hover:shadow transition-shadow">
-        <div class="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center flex-shrink-0">
-          <component :is="getFileIcon(f.type)" class="w-5 h-5 text-gray-500" />
+      <div
+        v-for="file in fileList"
+        :key="file.id"
+        class="flex items-center gap-4 rounded-lg border border-gray-100 bg-white p-3 shadow-sm transition-shadow hover:shadow"
+      >
+        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gray-50">
+          <component :is="getFileIcon(file.type)" class="h-5 w-5 text-gray-500" />
         </div>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-gray-900 truncate">{{ f.name }}</p>
-          <p class="text-xs text-gray-400">{{ formatSize(f.size) }} · {{ f.uploadedBy }} · {{ formatDate(f.uploadedAt) }}</p>
-          <!-- 显示可见班级 -->
-          <p v-if="f.visibleToClassNames && f.visibleToClassNames.length > 0 && store.currentRole === 'teacher'" class="text-xs text-brand-500 mt-0.5">
-            可见班级：{{ f.visibleToClassNames.join('、') }}
+
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <p class="truncate text-sm font-medium text-gray-900">{{ file.name }}</p>
+            <span
+              v-if="store.currentRole === 'teacher'"
+              class="inline-flex flex-shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium"
+              :class="getVisibilityBadgeClass(file)"
+            >
+              {{ getVisibilityLabel(file) }}
+            </span>
+          </div>
+          <p class="text-xs text-gray-400">
+            {{ formatSize(file.size) }} · {{ file.uploadedBy }} · {{ formatDate(file.uploadedAt) }}
+          </p>
+          <p
+            v-if="file.visibleToClassNames?.length && store.currentRole === 'teacher'"
+            class="mt-0.5 text-xs text-brand-500"
+          >
+            可见班级：{{ file.visibleToClassNames.join('、') }}
           </p>
         </div>
-        <button @click="handleDownload(f)" class="p-2 rounded-lg hover:bg-brand-600/10 text-gray-600 transition-colors" title="下载">
-          <Download class="w-4 h-4" />
+
+        <button
+          class="rounded-lg p-2 text-gray-600 transition-colors hover:bg-brand-600/10"
+          title="下载"
+          @click="handleDownload(file)"
+        >
+          <Download class="h-4 w-4" />
         </button>
-        <button @click="store.deleteCloudFile(f.id)" class="p-2 rounded-lg hover:bg-brand-600/10 text-red-400 transition-colors" title="删除">
-          <Trash2 class="w-4 h-4" />
+        <button
+          v-if="canDelete(file)"
+          class="rounded-lg p-2 text-red-400 transition-colors hover:bg-brand-600/10"
+          title="删除"
+          @click="store.deleteCloudFile(file.id)"
+        >
+          <Trash2 class="h-4 w-4" />
         </button>
       </div>
     </div>
-
-    <!-- 班级选择弹窗 -->
-    <Teleport to="body">
-      <div v-if="showClassPicker" class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="absolute inset-0 bg-black/50" @click="cancelUpload" />
-        <div class="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
-          <div class="px-5 py-4 border-b border-gray-200">
-            <h3 class="text-base font-semibold text-gray-800">选择可见班级</h3>
-            <p class="text-xs text-gray-400 mt-1">选择哪些班级可以查看该文件（支持多选）</p>
-          </div>
-          <div class="px-5 py-4 max-h-64 overflow-auto">
-            <div v-if="availableClasses.length === 0" class="text-center py-6 text-gray-400 text-sm">
-              暂无可选班级，当前课程下没有学生
-            </div>
-            <label v-for="cls in availableClasses" :key="cls"
-              class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-              <input type="checkbox" :value="cls" v-model="selectedClasses"
-                class="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 cursor-pointer" />
-              <span class="text-sm text-gray-700">{{ cls }}</span>
-            </label>
-          </div>
-          <div class="px-5 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
-            <button @click="cancelUpload" class="px-4 py-2 text-sm rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">取消</button>
-            <button @click="confirmUpload" class="px-4 py-2 text-sm rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors">
-              确认上传
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Cloud, Upload, Download, Trash2, File, Image, FileSpreadsheet, FileArchive } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import {
+  Cloud,
+  Download,
+  File,
+  FileArchive,
+  FileSpreadsheet,
+  Image,
+  Lock,
+  Trash2,
+  Upload,
+  Users,
+} from 'lucide-vue-next'
+import { getNow } from '@/lib/date'
 import { useAppStore } from '@/stores/app'
 import type { CloudFile } from '@/types'
-import { getNow } from '@/lib/date'
 
 const store = useAppStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploadVisibility = ref<'private' | 'students'>('private')
+const pendingFile = ref<{ name: string; size: number; type: string; dataUrl: string } | null>(null)
 
-/** 当前用户的文件列表（教师看到自己的文件，学生看到自己上传+教师分享给本班的） */
+const isVisibleToStudents = (file: CloudFile, className?: string) => {
+  if (file.visibilityScope === 'students') return true
+  return Boolean(className && file.visibleToClassNames?.includes(className))
+}
+
 const fileList = computed(() => {
   const currentUser = store.currentUser
   if (!currentUser) return []
+
   if (store.currentRole === 'student') {
-    const student = store.students.find((s) => s.name === currentUser)
+    const student = store.students.find((item) => item.name === currentUser)
     const myClassName = student?.className
-    return store.cloudFiles.filter((f) => {
-      // 自己上传的
-      if (f.uploadedBy === currentUser) return true
-      // 教师分享给本班的
-      if (myClassName && f.visibleToClassNames?.includes(myClassName)) return true
-      return false
+
+    return store.cloudFiles.filter((file) => {
+      if (file.uploadedBy === currentUser) return true
+      return isVisibleToStudents(file, myClassName)
     })
   }
-  // 教师/管理员等：只看到自己上传的
-  return store.cloudFiles.filter((f) => f.uploadedBy === currentUser)
-})
 
-/** 教师课程相关的班级列表 */
-const availableClasses = computed<string[]>(() => {
-  if (store.currentRole !== 'teacher') return []
-  const myCourses = store.courses.filter((c) => c.teacher === store.currentUser)
-  const myCourseIds = new Set(myCourses.map((c) => c.id))
-  const classNames = new Set<string>()
-  for (const enrollment of store.enrollments) {
-    if (!myCourseIds.has(enrollment.courseId)) continue
-    const student = store.students.find((s) => s.id === enrollment.studentId)
-    if (student?.className) classNames.add(student.className)
-  }
-  return Array.from(classNames).sort()
+  return store.cloudFiles.filter((file) => file.uploadedBy === currentUser)
 })
-
-// ---- 上传流程 ----
-const showClassPicker = ref(false)
-/** 待上传的原始文件（选择文件后暂存） */
-const pendingFile = ref<{ name: string; size: number; type: string; dataUrl: string } | null>(null)
-/** 弹窗中选中的班级 */
-const selectedClasses = ref<string[]>([])
 
 const triggerUpload = () => {
   fileInputRef.value?.click()
 }
 
-const onFileSelected = (e: Event) => {
-  const target = e.target as HTMLInputElement
+const onFileSelected = (event: Event) => {
+  const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
 
@@ -137,31 +160,18 @@ const onFileSelected = (e: Event) => {
       type: file.type,
       dataUrl: reader.result as string,
     }
-    // 如果是教师，弹出班级选择框
-    if (store.currentRole === 'teacher') {
-      selectedClasses.value = []
-      showClassPicker.value = true
-    } else {
-      // 非教师直接上传
-      doUpload([])
-    }
+    doUpload()
   }
   reader.readAsDataURL(file)
-  if (fileInputRef.value) fileInputRef.value.value = ''
+
+  if (fileInputRef.value) {
+    fileInputRef.value.value = ''
+  }
 }
 
-const confirmUpload = () => {
-  showClassPicker.value = false
-  doUpload(selectedClasses.value)
-}
-
-const cancelUpload = () => {
-  showClassPicker.value = false
-  pendingFile.value = null
-}
-
-function doUpload(classNames: string[]) {
+const doUpload = () => {
   if (!pendingFile.value) return
+
   store.addCloudFile({
     id: Date.now().toString(),
     name: pendingFile.value.name,
@@ -170,21 +180,21 @@ function doUpload(classNames: string[]) {
     dataUrl: pendingFile.value.dataUrl,
     uploadedAt: getNow().toISOString(),
     uploadedBy: store.currentUser || '未知',
-    visibleToClassNames: classNames.length > 0 ? classNames : undefined,
+    visibilityScope: store.currentRole === 'teacher' ? uploadVisibility.value : 'private',
   })
+
   pendingFile.value = null
 }
 
-// ---- 工具函数 ----
 const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const formatDate = (dateStr: string): string => {
-  const d = new Date(dateStr)
-  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  const date = new Date(dateStr)
+  return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`
 }
 
 const getFileIcon = (type: string) => {
@@ -194,10 +204,24 @@ const getFileIcon = (type: string) => {
   return File
 }
 
-const handleDownload = (f: CloudFile) => {
-  const a = document.createElement('a')
-  a.href = f.dataUrl
-  a.download = f.name
-  a.click()
+const getVisibilityLabel = (file: CloudFile) => {
+  if (file.visibilityScope === 'students') return '公开给学生'
+  if (file.visibleToClassNames?.length) return '按班级公开'
+  return '仅自己可见'
+}
+
+const getVisibilityBadgeClass = (file: CloudFile) => {
+  if (file.visibilityScope === 'students') return 'bg-emerald-50 text-emerald-600'
+  if (file.visibleToClassNames?.length) return 'bg-brand-50 text-brand-600'
+  return 'bg-gray-100 text-gray-500'
+}
+
+const canDelete = (file: CloudFile) => file.uploadedBy === store.currentUser
+
+const handleDownload = (file: CloudFile) => {
+  const anchor = document.createElement('a')
+  anchor.href = file.dataUrl
+  anchor.download = file.name
+  anchor.click()
 }
 </script>

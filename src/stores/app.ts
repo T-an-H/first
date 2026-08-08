@@ -41,6 +41,11 @@ import {
 
 type UserRole = 'admin' | 'teacher' | 'student' | 'mentor' | 'leader' | null
 
+const normalizeCloudFile = (file: CloudFile): CloudFile => ({
+  ...file,
+  visibilityScope: file.visibilityScope ?? (file.visibleToClassNames?.length ? 'students' : 'private'),
+})
+
 const loadFromStorage = <T>(key: string, fallback: T): T => {
   try {
     const stored = localStorage.getItem(key)
@@ -94,7 +99,9 @@ export const useAppStore = defineStore('app', () => {
   const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', [...mockEnrollments, ...supplementaryAll.supplementaryEnrollments]))
   const teachers = ref<Teacher[]>(loadFromStorage('teachers', mockTeachers))
   const grades = ref<Grade[]>(loadFromStorage('grades', [...mockGrades, ...mockSupplementaryGrades]))
-  const cloudFiles = ref<CloudFile[]>(loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles]))
+  const loadedCloudFiles = loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles])
+  const hasLegacyCloudFiles = loadedCloudFiles.some((file) => !file.visibilityScope)
+  const cloudFiles = ref<CloudFile[]>(loadedCloudFiles.map(normalizeCloudFile))
   const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', [...mockTodos, ...supplementaryAll.supplementaryTodos]))
   const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', [...mockOnlineDocs, ...supplementaryAll.supplementaryOnlineDocs]))
   const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', [...mockNotes, ...supplementaryAll.supplementaryNotes]))
@@ -126,7 +133,14 @@ export const useAppStore = defineStore('app', () => {
       }] : [],
     }
   })
-  const gradeConfigs = ref<Record<string, GradeWeightConfig>>(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {}))
+  const gradeConfigs = ref<Record<string, GradeWeightConfig>>(
+    Object.fromEntries(
+      Object.entries(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {})).map(([courseId, config]) => [
+        courseId,
+        { ...getDefaultGradeConfig(courseId), ...config },
+      ]),
+    ),
+  )
   const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', [...mockDetailedGrades, ...supplementaryAll.supplementaryDetailedGrades]))
   const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', [...mockHomework, ...supplementaryAll.supplementaryHomework]))
   const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', [...mockHomeworkSubmissions, ...supplementaryAll.supplementaryHomeworkSubmissions]))
@@ -181,6 +195,10 @@ export const useAppStore = defineStore('app', () => {
   const lockedSessions = ref<string[]>(
     loadFromStorage<string[]>('lockedSessions', [])
   )
+
+  if (hasLegacyCloudFiles) {
+    saveToStorage('cloudFiles', cloudFiles.value)
+  }
 
   // AI 分层记录（key: `${courseId}||${studentId}`）
   const studentTiers = ref<Record<string, StudentTierRecord>>(
@@ -440,7 +458,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function addCloudFile(file: CloudFile) {
-    cloudFiles.value = [...cloudFiles.value, file]
+    cloudFiles.value = [...cloudFiles.value, normalizeCloudFile(file)]
     saveToStorage('cloudFiles', cloudFiles.value)
   }
 
@@ -1260,7 +1278,7 @@ export const useAppStore = defineStore('app', () => {
    * 逾期处理：对某课程某轮次中未提交的评价，按配置规则自动处理
    * 适用于所有评价类型（自评/教师评/导师评/组内互评/组间互评）
    * 规则：
-   *   average - 取该学生该类型的历史平均分
+   *   average - 默认记 60 分
    *   zero    - 记 0 分
    *   full    - 记 100 分
    *   none    - 不处理，跳过
@@ -1290,13 +1308,8 @@ export const useAppStore = defineStore('app', () => {
 
         switch (config.overdueRule) {
           case 'average': {
-            // 取同一学生同一评价类型的历史轮次平均分
-            const historyEvals = evaluations.value.filter(
-              (e) => e.courseId === courseId && e.studentId === enr.studentId && e.type === type && e.sessionNumber < sessionNumber
-            )
-            if (historyEvals.length === 0) continue // 无历史记录则跳过
-            score = Math.round(historyEvals.reduce((s, e) => s + e.score, 0) / historyEvals.length)
-            comment = `自动取历史平均分（逾期未评，${score}分）`
+            score = 60
+            comment = '逾期未评，默认60分'
             break
           }
           case 'zero':
@@ -1405,7 +1418,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function getGradeConfig(courseId: string): GradeWeightConfig {
-    return gradeConfigs.value[courseId] || getDefaultGradeConfig(courseId)
+    return { ...getDefaultGradeConfig(courseId), ...(gradeConfigs.value[courseId] || {}) }
   }
 
   function addDetailedGrade(dg: DetailedGrade) {
