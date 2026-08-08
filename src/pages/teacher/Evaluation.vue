@@ -120,34 +120,6 @@
                 </div>
               </div>
 
-              <!-- 企业导师参与 -->
-              <div class="flex items-center gap-3">
-                <label class="text-sm font-medium text-gray-800">企业导师参与评价</label>
-                <button
-                  @click="handleSetConfig({ hasMentor: !selectedConfig?.hasMentor })"
-                  :class="`relative w-10 h-5 rounded-full transition-colors ${selectedConfig?.hasMentor ? 'bg-brand-600' : 'bg-brand-400/10'}`"
-                >
-                  <span :class="`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${selectedConfig?.hasMentor ? 'left-5.5' : 'left-0.5'}`" />
-                </button>
-                <span class="text-xs text-gray-400">
-                  {{ selectedConfig?.hasMentor ? '已启用' : '已禁用' }}——
-                  {{ selectedConfig?.hasMentor ? '学生端将显示企业导师评价卡片' : '学生端自动隐藏企业导师评价' }}
-                </span>
-              </div>
-
-              <!-- 逾期处理规则 -->
-              <div>
-                <p class="text-sm font-medium text-gray-800 mb-2">逾期未评处理规则</p>
-                <div class="flex gap-3">
-                  <button
-                    v-for="rule in OVERDUE_RULE_KEYS" :key="rule"
-                    @click="handleSetConfig({ overdueRule: rule })"
-                    :class="`px-4 py-2 rounded-lg border text-sm transition-all ${selectedConfig?.overdueRule === rule ? 'border-brand-400 bg-brand-400/10 text-gray-800 font-medium' : 'border-brand-400/30 bg-white text-gray-400 hover:border-brand-400'}`"
-                  >
-                    {{ OverdueRuleLabels[rule] }}
-                  </button>
-                </div>
-              </div>
             </div>
           </template>
         </div>

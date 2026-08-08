@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div id="student-course-learn-root"></div>
 
 
@@ -357,44 +357,12 @@
 
           <!-- ===== 作业 ===== -->
           <div v-if="activeTab === 'homework'" class="space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-gray-800">课程作业</h3>
-              <span class="text-xs text-gray-400">{{ submittedCount }}/{{ courseHomework.length }} 已提交</span>
-            </div>
-            <div class="space-y-3">
-              <div v-for="hw in courseHomework" :key="hw.id" class="p-4 rounded-lg border border-gray-100 hover:bg-gray-50 transition-colors">
-                <div class="flex items-start justify-between mb-2">
-                  <div>
-                    <p class="text-sm font-medium text-gray-900">{{ hw.title }}</p>
-                    <p v-if="hw.description" class="text-xs text-gray-500 mt-1">{{ hw.description }}</p>
-                    <p class="text-xs text-gray-400 mt-2">截止：{{ hw.dueDate }} · 创建者：{{ hw.createdBy }}</p>
-                  </div>
-                  <span v-if="isHomeworkSubmitted(hw.id)" class="px-2 py-1 text-xs font-medium text-emerald-600 bg-emerald-50 rounded-full">已提交</span>
-                  <span v-else class="px-2 py-1 text-xs font-medium text-brand-700 bg-brand-50 rounded-full">未提交</span>
-                </div>
-                <div v-if="isHomeworkSubmitted(hw.id)" class="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
-                  <FileText class="w-4 h-4 text-gray-400" />
-                  <span class="text-xs text-gray-500">已提交：{{ getSubmissionFileName(hw.id) }}</span>
-                  <button @click="downloadSubmission(hw.id)" class="ml-auto p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                    <Download class="w-4 h-4" />
-                  </button>
-                </div>
-                <div v-else class="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
-                  <label class="flex items-center gap-2 px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg cursor-pointer transition-colors">
-                    <Upload class="w-4 h-4" />
-                    <span>选择文件</span>
-                    <input type="file" :data-homework-id="hw.id" @change="handleFileSelect($event, hw.id)" class="hidden" />
-                  </label>
-                  <button v-if="selectedFiles[hw.id]" @click="submitHomework(hw)" class="px-3 py-2 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors">
-                    提交作业
-                  </button>
-                  <span v-if="selectedFiles[hw.id]" class="text-xs text-gray-500">{{ selectedFiles[hw.id].name }}</span>
-                </div>
-              </div>
-              <div v-if="courseHomework.length === 0" class="text-center py-8 text-gray-400">暂无作业</div>
-            </div>
+            <StudentHomework
+              :course-id="courseId"
+              :student-id="myStudent?.id || ''"
+              :tier="tierFinalized ? myTier : undefined"
+            />
           </div>
-
           <!-- ===== 评价填写 ===== -->
           <div v-if="activeTab === 'evaluations'" class="space-y-4">
             <h3 class="text-sm font-semibold text-gray-800">课程评价</h3>
@@ -819,6 +787,7 @@ import {
   Download, Upload, TrendingUp, X, Calendar, BarChart3, PieChart
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
+import StudentHomework from '@/components/Homework/StudentHomework.vue'
 import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile } from '@/types'
 import Modal from '@/components/Modal.vue'
 import { getNow } from '@/lib/date'

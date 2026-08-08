@@ -21,6 +21,10 @@ export interface Course {
   /** 所属学院（学院即课程分类时使用） */
   departmentId?: string;
   cover: string;
+  /** 课程开始日期 */
+  startDate?: string;
+  /** 课程结束日期 */
+  endDate?: string;
   credits: number;
   duration: number;
   status: 'active' | 'inactive' | 'draft';
@@ -149,6 +153,8 @@ export interface GradeWeightConfig {
   regularWeight: number;
   midtermWeight: number;
   finalWeight: number;
+  /** 素质评价在总成绩中的占比（0-100，默认 0） */
+  qualityEvalWeight: number;
   selfEvalWeight: number;
   peerReviewWeight: number;
   interGroupEvalWeight: number;
@@ -158,8 +164,6 @@ export interface GradeWeightConfig {
   midtermProjectWeight: number;
   finalExamWeight: number;
   finalProjectWeight: number;
-  /** 素质评价加成上限（教师评分0-100，最终折算最多该分数加成到总成绩，默认10） */
-  qualityEvalMaxBonus: number;
 }
 
 export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
@@ -168,6 +172,7 @@ export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
     regularWeight: 40,
     midtermWeight: 0,
     finalWeight: 60,
+    qualityEvalWeight: 0,
     selfEvalWeight: 10,
     peerReviewWeight: 20,
     interGroupEvalWeight: 10,
@@ -177,7 +182,6 @@ export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
     midtermProjectWeight: 50,
     finalExamWeight: 50,
     finalProjectWeight: 50,
-    qualityEvalMaxBonus: 10,
   };
 }
 
@@ -224,6 +228,8 @@ export interface CloudFile {
   uploadedAt: string;
   uploadedBy: string;
   courseId?: string;
+  /** 文件可见范围 */
+  visibilityScope?: 'private' | 'students';
   /** 可见班级列表（为空则仅自己可见） */
   visibleToClassNames?: string[];
 }
@@ -351,7 +357,7 @@ export const EvalFrequencyDescs: Record<EvalFrequency, string> = {
 export type OverdueRule = 'average' | 'none' | 'zero' | 'full';
 
 export const OverdueRuleLabels: Record<OverdueRule, string> = {
-  average: '取历史平均分',
+  average: '默认60分',
   none: '不处理',
   zero: '记0分',
   full: '记满分',
@@ -417,7 +423,7 @@ export interface EvalAnomaly {
   warning: string;
 }
 
-/** 素质评价提交（学生上传图片/文档，教师打分直接加进总成绩） */
+/** 素质评价提交（学生上传图片/文档，教师打分后按课程权重计入总成绩） */
 export interface QualityEvalFile {
   fileName: string;
   fileType: string;

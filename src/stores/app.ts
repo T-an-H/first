@@ -41,6 +41,11 @@ import {
 
 type UserRole = 'admin' | 'teacher' | 'student' | 'mentor' | 'leader' | null
 
+const normalizeCloudFile = (file: CloudFile): CloudFile => ({
+  ...file,
+  visibilityScope: file.visibilityScope ?? (file.visibleToClassNames?.length ? 'students' : 'private'),
+})
+
 const loadFromStorage = <T>(key: string, fallback: T): T => {
   try {
     const stored = localStorage.getItem(key)
@@ -94,7 +99,9 @@ export const useAppStore = defineStore('app', () => {
   const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', [...mockEnrollments, ...supplementaryAll.supplementaryEnrollments]))
   const teachers = ref<Teacher[]>(loadFromStorage('teachers', mockTeachers))
   const grades = ref<Grade[]>(loadFromStorage('grades', [...mockGrades, ...mockSupplementaryGrades]))
-  const cloudFiles = ref<CloudFile[]>(loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles]))
+  const loadedCloudFiles = loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles])
+  const hasLegacyCloudFiles = loadedCloudFiles.some((file) => !file.visibilityScope)
+  const cloudFiles = ref<CloudFile[]>(loadedCloudFiles.map(normalizeCloudFile))
   const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', [...mockTodos, ...supplementaryAll.supplementaryTodos]))
   const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', [...mockOnlineDocs, ...supplementaryAll.supplementaryOnlineDocs]))
   const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', [...mockNotes, ...supplementaryAll.supplementaryNotes]))
@@ -126,7 +133,14 @@ export const useAppStore = defineStore('app', () => {
       }] : [],
     }
   })
-  const gradeConfigs = ref<Record<string, GradeWeightConfig>>(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {}))
+  const gradeConfigs = ref<Record<string, GradeWeightConfig>>(
+    Object.fromEntries(
+      Object.entries(loadFromStorage<Record<string, GradeWeightConfig>>('gradeConfigs', {})).map(([courseId, config]) => [
+        courseId,
+        { ...getDefaultGradeConfig(courseId), ...config },
+      ]),
+    ),
+  )
   const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', [...mockDetailedGrades, ...supplementaryAll.supplementaryDetailedGrades]))
   const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', [...mockHomework, ...supplementaryAll.supplementaryHomework]))
   const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', [...mockHomeworkSubmissions, ...supplementaryAll.supplementaryHomeworkSubmissions]))
@@ -181,6 +195,10 @@ export const useAppStore = defineStore('app', () => {
   const lockedSessions = ref<string[]>(
     loadFromStorage<string[]>('lockedSessions', [])
   )
+
+  if (hasLegacyCloudFiles) {
+    saveToStorage('cloudFiles', cloudFiles.value)
+  }
 
   // AI 分层记录（key: `${courseId}||${studentId}`）
   const studentTiers = ref<Record<string, StudentTierRecord>>(
@@ -440,7 +458,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function addCloudFile(file: CloudFile) {
-    cloudFiles.value = [...cloudFiles.value, file]
+    cloudFiles.value = [...cloudFiles.value, normalizeCloudFile(file)]
     saveToStorage('cloudFiles', cloudFiles.value)
   }
 
@@ -588,11 +606,6 @@ export const useAppStore = defineStore('app', () => {
 
   function updateStudent(id: string, data: Partial<Student>) {
     students.value = students.value.map((s) => (s.id === id ? { ...s, ...data } : s))
-    saveToStorage('students', students.value)
-  }
-
-  function deleteStudent(id: string) {
-    students.value = students.value.filter((s) => s.id !== id)
     saveToStorage('students', students.value)
   }
 
@@ -803,24 +816,17 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 考试/项目权重配置 ======
 
-  /** 设置某个考试/项目的权重（type 可选，传入后按 类型::名称 复合键存储，避免跨类型同名冲突） */
-  function setExamWeight(courseId: string, examName: string, weight: number, type?: string) {
+  /** 设置某个考试/项目的权重 */
+  function setExamWeight(courseId: string, examName: string, weight: number) {
     const courseWeights = { ...(examWeights.value[courseId] || {}) }
-    const key = type ? `${type}::${examName}` : examName
-    courseWeights[key] = Math.min(100, Math.max(0, weight))
+    courseWeights[examName] = Math.min(100, Math.max(0, weight))
     examWeights.value = { ...examWeights.value, [courseId]: courseWeights }
     saveToStorage('examWeights', examWeights.value)
   }
 
-  /** 获取某个考试/项目的权重（type 可选，优先读取 类型::名称 复合键，回退到旧版纯名称键以兼容历史数据） */
-  function getExamWeight(courseId: string, examName: string, type?: string): number {
-    const courseWeights = examWeights.value[courseId]
-    if (!courseWeights) return 0
-    if (type) {
-      const compositeKey = `${type}::${examName}`
-      if (compositeKey in courseWeights) return courseWeights[compositeKey]
-    }
-    return courseWeights[examName] ?? 0
+  /** 获取某个考试/项目的权重 */
+  function getExamWeight(courseId: string, examName: string): number {
+    return examWeights.value[courseId]?.[examName] ?? 0
   }
 
   /** 获取课程所有考试/项目的权重配置 */
@@ -1260,7 +1266,7 @@ export const useAppStore = defineStore('app', () => {
    * 逾期处理：对某课程某轮次中未提交的评价，按配置规则自动处理
    * 适用于所有评价类型（自评/教师评/导师评/组内互评/组间互评）
    * 规则：
-   *   average - 取该学生该类型的历史平均分
+   *   average - 默认记 60 分
    *   zero    - 记 0 分
    *   full    - 记 100 分
    *   none    - 不处理，跳过
@@ -1290,13 +1296,8 @@ export const useAppStore = defineStore('app', () => {
 
         switch (config.overdueRule) {
           case 'average': {
-            // 取同一学生同一评价类型的历史轮次平均分
-            const historyEvals = evaluations.value.filter(
-              (e) => e.courseId === courseId && e.studentId === enr.studentId && e.type === type && e.sessionNumber < sessionNumber
-            )
-            if (historyEvals.length === 0) continue // 无历史记录则跳过
-            score = Math.round(historyEvals.reduce((s, e) => s + e.score, 0) / historyEvals.length)
-            comment = `自动取历史平均分（逾期未评，${score}分）`
+            score = 60
+            comment = '逾期未评，默认60分'
             break
           }
           case 'zero':
@@ -1405,7 +1406,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function getGradeConfig(courseId: string): GradeWeightConfig {
-    return gradeConfigs.value[courseId] || getDefaultGradeConfig(courseId)
+    return { ...getDefaultGradeConfig(courseId), ...(gradeConfigs.value[courseId] || {}) }
   }
 
   function addDetailedGrade(dg: DetailedGrade) {
@@ -1454,9 +1455,9 @@ export const useAppStore = defineStore('app', () => {
     const midterm = ((dg.midtermExamScore ?? 0) * cfg.midtermExamWeight + (dg.midtermProjectScore ?? 0) * cfg.midtermProjectWeight) / 100
     const final = ((dg.finalExamScore ?? 0) * cfg.finalExamWeight + (dg.finalProjectScore ?? 0) * cfg.finalProjectWeight) / 100
     const base = regular * cfg.regularWeight / 100 + midterm * cfg.midtermWeight / 100 + final * cfg.finalWeight / 100
-    // 素质评价分数直接加在总成绩上（满分100，封顶 +10）
-    const bonus = getStudentQualityScore(courseId, dg.studentId)
-    return Math.round(Math.min(100, base + bonus))
+    // 素质评价按成绩配置中的权重计入总成绩
+    const qualityContribution = getStudentQualityScore(courseId, dg.studentId)
+    return Math.round(Math.min(100, base + qualityContribution))
   }
 
   // ====== 素质评价操作 ======
@@ -1521,16 +1522,15 @@ export const useAppStore = defineStore('app', () => {
     }).length
   }
 
-  /** 获取某学生素质评价加成分数（取最新一次被评分的提交分数，封顶为配置的加成上限） */
+  /** 获取某学生素质评价计入总成绩的分值（取最新一次被评分的提交分数，再按课程权重折算） */
   function getStudentQualityScore(courseId: string, studentId: string): number {
     const qe = getStudentQualityEvaluation(courseId, studentId)
     if (!qe) return 0
     const graded = qe.submissions.filter((s) => s.score !== undefined)
     if (graded.length === 0) return 0
     const latest = graded[graded.length - 1]
-    // 加成上限可配置（成绩配置-素质评价），默认10分
-    const maxBonus = gradeConfigs.value[courseId]?.qualityEvalMaxBonus ?? 10
-    return Math.min(latest.score ?? 0, maxBonus)
+    const cfg = getGradeConfig(courseId)
+    return (latest.score ?? 0) * (cfg.qualityEvalWeight ?? 0) / 100
   }
 
   // ====== 配置提醒 ======
@@ -1906,7 +1906,7 @@ export const useAppStore = defineStore('app', () => {
     getCourseHomework, getCourseCloudFiles,
     submitHomework, getHomeworkSubmission,
     addEvaluation, updateEvaluation, deleteEvaluation,
-    setEvalConfig, addStudentGroup, addStudent, updateStudent, deleteStudent, updateStudentGroup, deleteStudentGroup,
+    setEvalConfig, addStudentGroup, addStudent, updateStudent, updateStudentGroup, deleteStudentGroup,
     getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,

@@ -6,6 +6,7 @@
         <router-view />
       </div>
     </main>
+    <AgentChat />
   </div>
 </template>
 <script setup lang="ts">
@@ -13,6 +14,7 @@ import { onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useRouter, useRoute } from 'vue-router'
 import Sidebar from './Sidebar.vue'
+import AgentChat from './AgentChat.vue'
 
 const store = useAppStore()
 const router = useRouter()
