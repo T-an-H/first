@@ -609,6 +609,11 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('students', students.value)
   }
 
+  function deleteStudent(id: string) {
+    students.value = students.value.filter((s) => s.id !== id)
+    saveToStorage('students', students.value)
+  }
+
   function updateStudentGroup(id: string, data: Partial<StudentGroup>) {
     studentGroups.value = studentGroups.value.map((g) => (g.id === id ? { ...g, ...data } : g))
     saveToStorage('studentGroups', studentGroups.value)
@@ -816,17 +821,24 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 考试/项目权重配置 ======
 
-  /** 设置某个考试/项目的权重 */
-  function setExamWeight(courseId: string, examName: string, weight: number) {
+  /** 设置某个考试/项目的权重（type 可选，传入后按 类型::名称 复合键存储，避免跨类型同名冲突） */
+  function setExamWeight(courseId: string, examName: string, weight: number, type?: string) {
     const courseWeights = { ...(examWeights.value[courseId] || {}) }
-    courseWeights[examName] = Math.min(100, Math.max(0, weight))
+    const key = type ? `${type}::${examName}` : examName
+    courseWeights[key] = Math.min(100, Math.max(0, weight))
     examWeights.value = { ...examWeights.value, [courseId]: courseWeights }
     saveToStorage('examWeights', examWeights.value)
   }
 
-  /** 获取某个考试/项目的权重 */
-  function getExamWeight(courseId: string, examName: string): number {
-    return examWeights.value[courseId]?.[examName] ?? 0
+  /** 获取某个考试/项目的权重（type 可选，优先读取 类型::名称 复合键，回退到旧版纯名称键以兼容历史数据） */
+  function getExamWeight(courseId: string, examName: string, type?: string): number {
+    const courseWeights = examWeights.value[courseId]
+    if (!courseWeights) return 0
+    if (type) {
+      const compositeKey = `${type}::${examName}`
+      if (compositeKey in courseWeights) return courseWeights[compositeKey]
+    }
+    return courseWeights[examName] ?? 0
   }
 
   /** 获取课程所有考试/项目的权重配置 */
@@ -1455,9 +1467,9 @@ export const useAppStore = defineStore('app', () => {
     const midterm = ((dg.midtermExamScore ?? 0) * cfg.midtermExamWeight + (dg.midtermProjectScore ?? 0) * cfg.midtermProjectWeight) / 100
     const final = ((dg.finalExamScore ?? 0) * cfg.finalExamWeight + (dg.finalProjectScore ?? 0) * cfg.finalProjectWeight) / 100
     const base = regular * cfg.regularWeight / 100 + midterm * cfg.midtermWeight / 100 + final * cfg.finalWeight / 100
-    // 素质评价按成绩配置中的权重计入总成绩
-    const qualityContribution = getStudentQualityScore(courseId, dg.studentId)
-    return Math.round(Math.min(100, base + qualityContribution))
+    // 素质评价分数直接加在总成绩上（满分100，封顶 +10）
+    const bonus = getStudentQualityScore(courseId, dg.studentId)
+    return Math.round(Math.min(100, base + bonus))
   }
 
   // ====== 素质评价操作 ======
@@ -1522,15 +1534,16 @@ export const useAppStore = defineStore('app', () => {
     }).length
   }
 
-  /** 获取某学生素质评价计入总成绩的分值（取最新一次被评分的提交分数，再按课程权重折算） */
+  /** 获取某学生素质评价加成分数（取最新一次被评分的提交分数，封顶为配置的加成上限） */
   function getStudentQualityScore(courseId: string, studentId: string): number {
     const qe = getStudentQualityEvaluation(courseId, studentId)
     if (!qe) return 0
     const graded = qe.submissions.filter((s) => s.score !== undefined)
     if (graded.length === 0) return 0
     const latest = graded[graded.length - 1]
-    const cfg = getGradeConfig(courseId)
-    return (latest.score ?? 0) * (cfg.qualityEvalWeight ?? 0) / 100
+    // 加成上限可配置（成绩配置-素质评价），默认10分
+    const maxBonus = gradeConfigs.value[courseId]?.qualityEvalMaxBonus ?? 10
+    return Math.min(latest.score ?? 0, maxBonus)
   }
 
   // ====== 配置提醒 ======
@@ -1906,7 +1919,7 @@ export const useAppStore = defineStore('app', () => {
     getCourseHomework, getCourseCloudFiles,
     submitHomework, getHomeworkSubmission,
     addEvaluation, updateEvaluation, deleteEvaluation,
-    setEvalConfig, addStudentGroup, addStudent, updateStudent, updateStudentGroup, deleteStudentGroup,
+    setEvalConfig, addStudentGroup, addStudent, updateStudent, deleteStudent, updateStudentGroup, deleteStudentGroup,
     getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,

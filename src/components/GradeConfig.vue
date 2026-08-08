@@ -16,7 +16,6 @@
           <Slider label="平时成绩" :val="cfg.regularWeight" @change="(v: number) => update('regularWeight', v)" />
           <Slider label="期中成绩" :val="cfg.midtermWeight" @change="(v: number) => update('midtermWeight', v)" />
           <Slider label="期末成绩" :val="cfg.finalWeight" @change="(v: number) => update('finalWeight', v)" />
-          <Slider label="素质评价" :val="cfg.qualityEvalWeight" @change="(v: number) => update('qualityEvalWeight', v)" />
         </Section>
 
         <Section title="平时成绩构成" :hint="`合计：${regularTotal}%${regularTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="regularTotal === 100">
@@ -76,7 +75,7 @@ const update = (key: keyof GradeWeightConfig, val: number) => {
   cfg.value = { ...cfg.value, [key]: Math.max(0, Math.min(100, val || 0)) }
 }
 
-const mainTotal = computed(() => cfg.value.regularWeight + cfg.value.midtermWeight + cfg.value.finalWeight + cfg.value.qualityEvalWeight)
+const mainTotal = computed(() => cfg.value.regularWeight + cfg.value.midtermWeight + cfg.value.finalWeight)
 const regularTotal = computed(() => cfg.value.selfEvalWeight + cfg.value.peerReviewWeight + cfg.value.interGroupEvalWeight + cfg.value.teacherScoreWeight + cfg.value.mentorScoreWeight)
 const midtermSubTotal = computed(() => cfg.value.midtermExamWeight + cfg.value.midtermProjectWeight)
 const finalSubTotal = computed(() => cfg.value.finalExamWeight + cfg.value.finalProjectWeight)

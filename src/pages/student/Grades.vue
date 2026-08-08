@@ -92,9 +92,6 @@
               + 期中成绩(×<span class="font-medium">{{ cfgMap[modalEntry.grade.courseId]?.midtermWeight }}%</span>)
             </template>
             + 期末成绩(×<span class="font-medium">{{ cfgMap[modalEntry.grade.courseId]?.finalWeight ?? 60 }}%</span>)
-            <template v-if="(cfgMap[modalEntry.grade.courseId]?.qualityEvalWeight ?? 0) > 0">
-              + 素质评价(×<span class="font-medium">{{ cfgMap[modalEntry.grade.courseId]?.qualityEvalWeight }}%</span>)
-            </template>
           </p>
           <p v-if="modalEntry.detail" class="text-xs text-brand-600 leading-relaxed">
             <span class="font-medium">平时成绩</span> =
@@ -120,7 +117,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import type { DetailedGrade, Grade } from '@/types'
 import { getDefaultGradeConfig } from '@/types'
@@ -154,8 +150,6 @@ const Building2 = iconView('building2')
 const GraduationCap = iconView('graduationCap')
 const Briefcase = iconView('briefcase')
 
-const route = useRoute()
-const router = useRouter()
 const store = useAppStore()
 const semester = ref('')
 const chartRef = ref<HTMLElement | null>(null)
@@ -293,9 +287,6 @@ onMounted(async () => {
   // 初始化成绩列表
   const el = document.getElementById('student-grades-root')
   if (el) renderGrades(el)
-
-  await nextTick()
-  openCourseFromQuery()
 })
 
 // 弹窗状态
@@ -307,16 +298,9 @@ function openModal(entry: GradeEntry) {
   modalEntry.value = entry
   modalOpen.value = true
 }
-function clearCourseQuery() {
-  const query = { ...route.query }
-  if (!query.courseId) return
-  delete query.courseId
-  void router.replace({ query })
-}
 function closeModal() {
   modalOpen.value = false
   modalEntry.value = null
-  clearCourseQuery()
 }
 
 const student = computed(() => store.students.find((s) => s.name === store.currentUser) ?? store.students[0])
@@ -368,7 +352,7 @@ const gradeEntries = computed<GradeEntry[]>(() => {
     if (d) {
       total = store.calcTotalScore(g.courseId, d)
     } else {
-      // 无分项成绩时，素质评价按课程权重计入已存总分
+      // 无分项成绩时，素质评价加成直接叠加在已存总分上
       total = Math.min(100, total + store.getStudentQualityScore(g.courseId, g.studentId))
     }
     const sem = g.semester ?? (course?.createdAt ? `${course.createdAt.slice(0, 4)}年` : '2026年')
@@ -481,15 +465,6 @@ const sortedGradeEntries = computed(() => {
 
 const gradedCourses = computed(() => gradeEntries.value.length)
 
-function openCourseFromQuery() {
-  const courseId = typeof route.query.courseId === 'string' ? route.query.courseId : ''
-  if (!courseId) return
-  const entry = gradeEntries.value.find((item) => item.grade.courseId === courseId)
-  if (entry) {
-    openModal(entry)
-  }
-}
-
 function renderGrades(root: HTMLElement) {
   const container = d3.select(root)
   container.selectAll('*').remove()
@@ -558,8 +533,6 @@ watch(gradeEntries, async () => {
   updateChart()
   const el = document.getElementById('student-grades-root')
   if (el) renderGrades(el)
-  await nextTick()
-  openCourseFromQuery()
 }, { deep: true })
 
 watch(semester, async () => {
@@ -568,8 +541,4 @@ watch(semester, async () => {
   const el = document.getElementById('student-grades-root')
   if (el) renderGrades(el)
 })
-
-watch(() => route.query.courseId, () => {
-  void nextTick(openCourseFromQuery)
-}, { immediate: true })
 </script>

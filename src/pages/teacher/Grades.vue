@@ -135,7 +135,7 @@
 
     <!-- 权重摘要 -->
     <div v-if="currentCfg" class="bg-brand-400/10 rounded-xl p-4 border border-brand-400/50 text-sm text-gray-800 flex flex-wrap gap-x-6 gap-y-1">
-      <span>总成绩 = 平时 {{ currentCfg.regularWeight }}% + 期中 {{ currentCfg.midtermWeight }}% + 期末 {{ currentCfg.finalWeight }}% + 素质评价 {{ currentCfg.qualityEvalWeight ?? 0 }}%</span>
+      <span>总成绩 = 平时 {{ currentCfg.regularWeight }}% + 期中 {{ currentCfg.midtermWeight }}% + 期末 {{ currentCfg.finalWeight }}%</span>
       <span>平时 = 自评 {{ currentCfg.selfEvalWeight }}% + 组内互评 {{ currentCfg.peerReviewWeight }}% + 组间互评 {{ currentCfg.interGroupEvalWeight }}% + 教师 {{ currentCfg.teacherScoreWeight }}% + 企业导师 {{ currentCfg.mentorScoreWeight }}%</span>
     </div>
 
@@ -485,7 +485,7 @@ function getStudentTotal(enr: Enrollment): number | null {
   return Math.min(100, g.score + getQualityBonus(enr.courseId, enr.studentId))
 }
 
-/** 素质评价按课程配置权重计入总成绩 */
+/** 素质评价加成（封顶为配置的加成上限，直接加在总成绩上） */
 function getQualityBonus(courseId: string, studentId: string): number {
   return store.getStudentQualityScore(courseId, studentId)
 }

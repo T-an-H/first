@@ -54,7 +54,7 @@
             {{ cfg.finalWeight > 0 ? `+ ${finalScore.toFixed(1)}×${cfg.finalWeight}%` : '' }}
             =
             {{ regularContrib.toFixed(1) }}{{ cfg.midtermWeight > 0 ? ` + ${midtermContrib.toFixed(1)}` : '' }}{{ cfg.finalWeight > 0 ? ` + ${finalContrib.toFixed(1)}` : '' }}
-            <span v-if="qualityContribution > 0" class="text-emerald-600">+ 素质评价 {{ qualityContribution.toFixed(1) }}</span>
+            <span v-if="qualityBonus > 0" class="text-emerald-600">+ 素质加成 {{ qualityBonus.toFixed(1) }}</span>
             =
             <span class="font-semibold">{{ (totalScore ?? 0).toFixed(1) }}</span>
           </p>
@@ -72,7 +72,7 @@
         </div>
 
         <div class="bg-brand-400/10 rounded-xl p-4 text-xs text-gray-400 space-y-1">
-          <p><span class="font-medium">权重配置：</span>平时 {{ cfg.regularWeight }}% + 期中 {{ cfg.midtermWeight }}% + 期末 {{ cfg.finalWeight }}% + 素质评价 {{ cfg.qualityEvalWeight ?? 0 }}%</p>
+          <p><span class="font-medium">权重配置：</span>平时 {{ cfg.regularWeight }}% + 期中 {{ cfg.midtermWeight }}% + 期末 {{ cfg.finalWeight }}%</p>
           <p v-if="cfg.regularWeight > 0">
             平时构成：自评 {{ cfg.selfEvalWeight }}% · 组内互评 {{ cfg.peerReviewWeight }}% · 组间互评 {{ cfg.interGroupEvalWeight }}% · 教师 {{ cfg.teacherScoreWeight }}% · 企业导师 {{ cfg.mentorScoreWeight }}%
           </p>
@@ -103,7 +103,7 @@ const props = defineProps<{
 
 const store = useAppStore()
 
-const qualityContribution = computed(() => {
+const qualityBonus = computed(() => {
   if (!props.courseId || !props.studentId) return 0
   return store.getStudentQualityScore(props.courseId, props.studentId)
 })

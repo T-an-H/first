@@ -240,7 +240,7 @@ function getCourseName(courseId: string): string {
   return store.courses.find((c) => c.id === courseId)?.title || '未知'
 }
 
-/** 获取学生某课程的最终成绩（grade.score + 素质评价计入分），若未出则返回 null */
+/** 获取学生某课程的最终成绩（grade.score + 素质评价加成），若未出则返回 null */
 function getFinalScore(studentId: string, courseId: string): number | null {
   const g = store.grades.find((g) => g.studentId === studentId && g.courseId === courseId)
   if (g?.score == null) return null

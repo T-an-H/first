@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div id="student-course-learn-root"></div>
 
 
@@ -364,8 +364,19 @@
             />
           </div>
           <!-- ===== 评价填写 ===== -->
-          <div v-if="activeTab === 'evaluations'" class="space-y-4">
-            <h3 class="text-sm font-semibold text-gray-800">课程评价</h3>
+          <div v-if="activeTab === 'evaluations'" class="space-y-6">
+            <!-- ===== 课程评价板块 ===== -->
+            <div class="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 space-y-4">
+            <!-- 课程评价标题卡片 -->
+            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+              <div class="flex items-center gap-2 mb-2">
+                <ClipboardCheck class="w-5 h-5 text-blue-600" />
+                <h3 class="text-base font-semibold text-blue-800">课程评价</h3>
+              </div>
+              <p class="text-sm text-blue-700">
+                按照教师配置的评价方案，完成自评、组内互评、组间互评等评价任务，评价结果将计入课程成绩。
+              </p>
+            </div>
             <div v-if="isReadOnly" class="bg-brand-400/5 border border-brand-400/30 rounded-xl p-6 text-center text-sm text-gray-400">
               <Eye class="w-8 h-8 mx-auto mb-2 text-gray-400/60" />
               <p>课程已结束，评价填写功能已关闭</p>
@@ -373,9 +384,10 @@
             </div>
             <StudentEvaluation v-else :course-id="courseId" :student-id="myStudent?.id || ''"
               :student-name="myStudent?.name || store.currentUser || ''" />
+            </div>
 
-            <!-- ===== 素质评价（合并入评价填写） ===== -->
-            <div class="space-y-4 mt-8 pt-6 border-t border-brand-400/20">
+            <!-- ===== 素质评价板块 ===== -->
+            <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm p-5 space-y-4">
               <div class="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-2xl p-5 border border-emerald-100">
                 <div class="flex items-center gap-2 mb-2">
                   <UserCheck class="w-5 h-5 text-emerald-600" />
