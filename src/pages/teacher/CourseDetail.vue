@@ -25,7 +25,13 @@
       <button v-for="tab in tabList" :key="tab.key"
         @click="activeTab = tab.key"
         :class="`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${activeTab === tab.key ? 'bg-white text-blue-600 border border-b-0 border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-700'}`">
-        <component :is="tab.icon" class="w-4 h-4 inline mr-1.5" />{{ tab.label }}
+        <component :is="tab.icon" class="w-4 h-4 inline mr-1.5" />
+        <span class="relative inline-flex items-center">
+          {{ tab.label }}
+          <span v-if="tabBadgeCount(tab.key) > 0"
+            :title="tabBadgeTitle(tab.key)"
+            class="absolute -top-1 -right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
+          </span>
       </button>
     </div>
 
@@ -1902,15 +1908,21 @@ const course = computed(() => store.courses.find((c) => c.id === courseId.value)
 const isReadOnly = computed(() => course.value?.status !== 'active')
 /** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由（我的课程/详情均为导师视图） */
 const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
-/** 领导视图：学院领导身份进入课程详情（只读查看） */
-const isLeaderView = computed(() => store.currentRole === 'leader' || route.path.startsWith('/leader'))
+/** 领导以教师身份进入 /teacher 路由（教师部分视图） */
+const isLeaderTeacherRoute = computed(() => store.currentRole === 'leader' && route.path.startsWith('/teacher'))
+/** 领导视图：学院领导身份进入 /leader 路由（领导段，只读查看） */
+const isLeaderView = computed(() => store.currentRole === 'leader' && route.path.startsWith('/leader'))
 /**
- * 是否仅查看：非该课程授课教师（导师 / 领导 / 其他教师）只能查看老师录入的内容，
+ * 是否仅查看：导师 / 领导段 / 非本课程授课教师只能查看老师录入的内容，
  * 不能修改课程配置、成绩、评价方案、学生管理等。导师仍可在评价管理中提交自己的导师评价。
+ * 领导在教师段时：仅当课程为其专属授课课程时与普通教师一致（可完整管理），否则只读。
  */
 const isViewOnly = computed(() => {
   if (isMentor.value || isLeaderView.value) return true
   const c = course.value
+  if (isLeaderTeacherRoute.value) {
+    return c ? !store.isLeaderTeacherCourse(store.currentUser || '', c.id) : true
+  }
   return c ? c.teacher !== store.currentUser : false
 })
 /** 能否操作评价管理：授课教师可评教师评价，企业导师（含领导以导师身份进入）可提交自己的导师评价；领导/其他教师仅查看 */
@@ -2012,6 +2024,45 @@ const tabList = [
   { key: 'grade-config', label: '成绩配置', icon: Settings },
   { key: 'grade-entry',  label: '成绩管理', icon: TrendingUp },
 ]
+
+/** Tab 红点提醒：检测该 tab 下未处理的事务数量，支持红点一路溯源 */
+function tabBadgeCount(tabKey: string): number {
+  if (!courseId.value) return 0
+  const user = store.currentUser || ''
+  if (tabKey === 'comments') {
+    // 当前用户在该课程待完成的评价（教师→自己作为授课者收到的提醒，导师→自己作为导师收到的提醒）
+    const myTargetId = store.currentRole === 'student'
+      ? (store.students.find((s) => s.name === user)?.id ?? '')
+      : user
+    return store.evalReminders.filter(
+      (r) => r.courseId === courseId.value && r.studentId === myTargetId && r.status !== 'completed'
+    ).length
+  }
+  if (tabKey === 'quality-eval') {
+    // 仅授课教师/领导专属授课可批改，其余角色（导师/领导只读段/非授课教师）不提醒
+    if (isViewOnly.value) return 0
+    return store.countPendingQualitySubmissions(courseId.value)
+  }
+  if (tabKey === 'grade-config') {
+    if (isViewOnly.value || isReadOnly.value) return 0
+    return store.isCourseConfigPending(courseId.value) ? 1 : 0
+  }
+  return 0
+}
+
+/** Tab 红点 tooltip：说明具体待处理事项，点击即可前往处理 */
+function tabBadgeTitle(tabKey: string): string {
+  if (tabKey === 'comments') {
+    const n = tabBadgeCount('comments')
+    return `有 ${n} 条未完成的评价，点击前往`
+  }
+  if (tabKey === 'quality-eval') {
+    const n = tabBadgeCount('quality-eval')
+    return `有 ${n} 份素质评价待批改，点击前往`
+  }
+  if (tabKey === 'grade-config') return '成绩权重/评价方案尚未配置完成，点击前往'
+  return ''
+}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)

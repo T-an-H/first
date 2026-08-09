@@ -359,6 +359,26 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  /** 为课程分配企业导师：更新课程 mentor 字段，并同步导师记录的 courseIds */
+  function assignMentorToCourse(courseId: string, mentorName: string) {
+    if (!mentorName) return
+    const course = courses.value.find((c) => c.id === courseId)
+    if (course && course.mentor !== mentorName) {
+      courses.value = courses.value.map((c) =>
+        c.id === courseId ? { ...c, mentor: mentorName } : c
+      )
+      saveToStorage('courses', courses.value)
+    }
+    // 同步导师记录 courseIds（与 addCourse 的教师同步逻辑一致）
+    const mentor = mentors.value.find((m) => m.name === mentorName)
+    if (mentor && !mentor.courseIds.includes(courseId)) {
+      mentors.value = mentors.value.map((m) =>
+        m.name === mentorName ? { ...m, courseIds: [...m.courseIds, courseId] } : m
+      )
+      saveToStorage('mentors', mentors.value)
+    }
+  }
+
   function deleteCourse(id: string) {
     const old = courses.value.find((c) => c.id === id)
     courses.value = courses.value.filter((c) => c.id !== id)
@@ -462,6 +482,14 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage('cloudFiles', cloudFiles.value)
   }
 
+  /** 更新云盘文件（用于编辑可见课程/班级范围） */
+  function updateCloudFile(id: string, data: Partial<CloudFile>) {
+    cloudFiles.value = cloudFiles.value.map((f) =>
+      f.id === id ? normalizeCloudFile({ ...f, ...data }) : f
+    )
+    saveToStorage('cloudFiles', cloudFiles.value)
+  }
+
   function deleteCloudFile(id: string) {
     cloudFiles.value = cloudFiles.value.filter((f) => f.id !== id)
     saveToStorage('cloudFiles', cloudFiles.value)
@@ -535,7 +563,22 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function getCourseCloudFiles(courseId: string): CloudFile[] {
-    return cloudFiles.value.filter((f) => f.courseId === courseId)
+    // 当前学生身份（仅学生端调用，需结合班级可见性过滤）
+    const student = students.value.find((s) => s.name === currentUser.value)
+    const myClassName = student?.className
+
+    return cloudFiles.value.filter((f) => {
+      // 课程匹配（优先新字段 courseIds，兼容旧字段 courseId）
+      const courseMatched = f.courseIds
+        ? f.courseIds.includes(courseId)
+        : f.courseId === courseId
+      if (!courseMatched) return false
+
+      // 未限制班级：该课程学生全部可见（含旧数据与公开给学生）
+      if (!f.visibleToClassNames?.length) return true
+      // 按班级可见：需当前学生所在班级在可见班级列表中
+      return Boolean(myClassName && f.visibleToClassNames.includes(myClassName))
+    })
   }
 
   function submitHomework(submission: HomeworkSubmission) {
@@ -1064,23 +1107,29 @@ export const useAppStore = defineStore('app', () => {
 
     for (const enr of courseEnrollments) {
       for (const type of enabledTypes) {
-        const targetIsTeacher = type === 'teacher' || type === 'mentor'
-        // 教师/导师评价 → 提醒对象是教师，自评/互评 → 提醒对象是学生
-        const targetId = targetIsTeacher ? course.teacher : enr.studentId
-        const reminderId = `session-reminder-${courseId}-${targetId}-${type}-${sessionNumber}`
+        // 教师评价 → 课程教师 + 作为教师的领导；导师评价 → 课程导师 + 作为导师的领导；自评/互评 → 学生
+        const targetIds = type === 'teacher'
+          ? getCourseTeacherTargets(courseId)
+          : type === 'mentor'
+            ? getCourseMentorTargets(courseId)
+            : [enr.studentId]
 
-        // 已存在提醒则跳过
-        if (evalReminders.value.some((r) => r.id === reminderId)) continue
+        for (const targetId of targetIds) {
+          const reminderId = `session-reminder-${courseId}-${targetId}-${type}-${sessionNumber}`
 
-        newEvalReminders.push({
-          id: reminderId,
-          courseId,
-          courseTitle: course.title,
-          studentId: targetId,
-          sessionNumber,
-          deadline,
-          status: 'pending',
-        })
+          // 已存在提醒则跳过
+          if (evalReminders.value.some((r) => r.id === reminderId)) continue
+
+          newEvalReminders.push({
+            id: reminderId,
+            courseId,
+            courseTitle: course.title,
+            studentId: targetId,
+            sessionNumber,
+            deadline,
+            status: 'pending',
+          })
+        }
       }
     }
 
@@ -1191,8 +1240,13 @@ export const useAppStore = defineStore('app', () => {
     for (const enr of courseEnrollments) {
       for (let s = 1; s <= totalSessions; s++) {
         for (const type of enabledTypes) {
-          // 教师/导师评价的提醒对象是课程教师，自评/互评的提醒对象是学生
-          const targetIsTeacher = type === 'teacher' || type === 'mentor'
+          // 教师评价 → 课程教师 + 作为教师的领导；导师评价 → 课程导师 + 作为导师的领导；自评/互评 → 学生
+          const targetIds = type === 'teacher'
+            ? getCourseTeacherTargets(courseId)
+            : type === 'mentor'
+              ? getCourseMentorTargets(courseId)
+              : [enr.studentId]
+
           const hasEval = evaluations.value.some(
             (e) => e.courseId === courseId && e.studentId === enr.studentId && e.sessionNumber === s && e.type === type
           )
@@ -1203,20 +1257,21 @@ export const useAppStore = defineStore('app', () => {
           deadline.setDate(deadline.getDate() + weekOffset * 7)
           const deadlineStr = deadline.toISOString().split('T')[0]
 
-          const targetId = targetIsTeacher ? course.teacher : enr.studentId
-          const reminderId = `reminder-${courseId}-${targetId}-${type}-${s}`
-          const exists = evalReminders.value.some((r) => r.id === reminderId)
-          if (exists) continue
+          for (const targetId of targetIds) {
+            const reminderId = `reminder-${courseId}-${targetId}-${type}-${s}`
+            const exists = evalReminders.value.some((r) => r.id === reminderId)
+            if (exists) continue
 
-          reminders.push({
-            id: reminderId,
-            courseId,
-            courseTitle: course.title,
-            studentId: targetId,
-            sessionNumber: s,
-            deadline: deadlineStr,
-            status: new Date(deadlineStr) < getNow() ? 'overdue' : 'pending',
-          })
+            reminders.push({
+              id: reminderId,
+              courseId,
+              courseTitle: course.title,
+              studentId: targetId,
+              sessionNumber: s,
+              deadline: deadlineStr,
+              status: new Date(deadlineStr) < getNow() ? 'overdue' : 'pending',
+            })
+          }
         }
       }
     }
@@ -1618,10 +1673,19 @@ export const useAppStore = defineStore('app', () => {
     generateAutoTodos()
   }
 
+  /** 获取当前用户的授课课程（普通教师=自己教的课；领导 asTeacher=专属授课课程，与教师端"我的课程"一致） */
+  function getTeacherCoursesForUser(user: string): Course[] {
+    const leader = leaders.value.find((l) => l.name === user)
+    if (leader?.asTeacher) {
+      return courses.value.filter((c) => leader.teacherCourseIds?.includes(c.id) || c.teacher === user)
+    }
+    return courses.value.filter((c) => c.teacher === user)
+  }
+
   /** 获取有未完成配置的课程列表（排除已锁定课程，仅当前教师自己的课程） */
   function getPendingConfigCourses(): { courseId: string; courseTitle: string; missing: string[] }[] {
-    const activeCourses = courses.value.filter(
-      (c) => c.status === 'active' && c.teacher === currentUser.value
+    const activeCourses = getTeacherCoursesForUser(currentUser.value || '').filter(
+      (c) => c.status === 'active'
     )
     const result: { courseId: string; courseTitle: string; missing: string[] }[] = []
     for (const course of activeCourses) {
@@ -1639,6 +1703,42 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 企业导师相关 ======
 
+  /**
+   * 某课程教师评价的提醒对象：课程教师 + 教师记录 courseIds 归属的教师 + 将该课程作为专属授课课程的学院领导（asTeacher）
+   * 使"领导-教师部分"与普通教师一样能收到评价待办
+   */
+  function getCourseTeacherTargets(courseId: string): string[] {
+    const course = courses.value.find((c) => c.id === courseId)
+    if (!course) return []
+    const targets = new Set<string>()
+    if (course.teacher) targets.add(course.teacher)
+    teachers.value.forEach((t) => {
+      if (t.courseIds.includes(courseId)) targets.add(t.name)
+    })
+    leaders.value.forEach((l) => {
+      if (l.asTeacher && l.teacherCourseIds?.includes(courseId)) targets.add(l.name)
+    })
+    return [...targets]
+  }
+
+  /**
+   * 某课程导师评价的提醒对象：课程导师 + 导师记录 courseIds 归属的导师 + 将该课程作为专属导师课程的学院领导（asMentor）
+   * 使"领导-导师部分"与普通导师一样能收到评价待办
+   */
+  function getCourseMentorTargets(courseId: string): string[] {
+    const course = courses.value.find((c) => c.id === courseId)
+    if (!course) return []
+    const targets = new Set<string>()
+    if (course.mentor) targets.add(course.mentor)
+    mentors.value.forEach((m) => {
+      if (m.courseIds.includes(courseId)) targets.add(m.name)
+    })
+    leaders.value.forEach((l) => {
+      if (l.asMentor && l.mentorCourseIds?.includes(courseId)) targets.add(l.name)
+    })
+    return [...targets]
+  }
+
   /** 获取某导师负责的所有课程ID */
   function getMentorCourseIds(mentorName: string): string[] {
     const mentor = mentors.value.find((m) => m.name === mentorName)
@@ -1646,9 +1746,10 @@ export const useAppStore = defineStore('app', () => {
     // 也检查课程 mentor 字段
     const byMentorField = courses.value.filter((c) => c.mentor === mentorName).map((c) => c.id)
     if (byMentorField.length > 0) return byMentorField
-    // 如果是领导以 asMentor 身份访问，按分类获取课程
+    // 领导以 asMentor 身份访问：优先用其专属导师课程（与普通导师一致），未配置时退回按管辖分类
     const leader = leaders.value.find((l) => l.name === mentorName)
     if (leader?.asMentor) {
+      if (leader.mentorCourseIds?.length) return leader.mentorCourseIds
       return courses.value.filter((c) => leader.categoryIds.includes(c.categoryId)).map((c) => c.id)
     }
     return []
@@ -1661,6 +1762,92 @@ export const useAppStore = defineStore('app', () => {
     const leader = leaders.value.find((l) => l.name === leaderName)
     if (!leader) return []
     return courses.value.filter((c) => leader.categoryIds.includes(c.categoryId))
+  }
+
+  /** 获取某领导作为教师授课的专属课程（与教师端"我的课程"逻辑一致） */
+  function getLeaderTeacherCourses(leaderName: string): Course[] {
+    const leader = leaders.value.find((l) => l.name === leaderName)
+    if (!leader?.asTeacher) return []
+    return courses.value.filter(
+      (c) => leader.teacherCourseIds?.includes(c.id) || c.teacher === leaderName
+    )
+  }
+
+  /** 判断某课程是否为该领导作为教师的授课课程（可完整管理） */
+  function isLeaderTeacherCourse(leaderName: string, courseId: string): boolean {
+    return getLeaderTeacherCourses(leaderName).some((c) => c.id === courseId)
+  }
+
+  // ====== 待处理事务统计（用于侧边栏红点提醒与一路溯源） ======
+
+  /** 当前用户在该课程是否有待完成的评价（按当前用户自身的提醒判断） */
+  function hasPendingEvalForCourse(courseId: string): boolean {
+    const user = currentUser.value
+    if (!user) return false
+    const myTargetId = currentRole.value === 'student'
+      ? (students.value.find((s) => s.name === user)?.id ?? '')
+      : user
+    return evalReminders.value.some(
+      (r) => r.courseId === courseId && r.studentId === myTargetId && r.status !== 'completed'
+    )
+  }
+
+  /** 该课程是否仍有未完成的配置（成绩权重/评价方案） */
+  function isCourseConfigPending(courseId: string): boolean {
+    if (isFirstClassStarted(courseId)) return false // 第一节课已结束，配置已锁定，不再提醒
+    const done = configCompleted.value[courseId]
+    return !(done?.weights && done?.evalConfig)
+  }
+
+  /**
+   * 获取当前用户在某范围内有未处理事务的课程 ID
+   * scope: 'teacher'（教师端我的课程）/ 'mentor'（导师端我的课程）/ 'student'（学生端我的课程）/ 'leader'（领导端课程总览）
+   */
+  function getMyPendingCourseIds(scope: 'teacher' | 'mentor' | 'student' | 'leader'): string[] {
+    const user = currentUser.value
+    if (!user) return []
+    const result = new Set<string>()
+
+    if (scope === 'teacher') {
+      for (const c of getTeacherCoursesForUser(user)) {
+        if (hasPendingEvalForCourse(c.id) || isCourseConfigPending(c.id) || countPendingQualitySubmissions(c.id) > 0) {
+          result.add(c.id)
+        }
+      }
+    } else if (scope === 'mentor') {
+      for (const courseId of getMentorCourseIds(user)) {
+        const hasPending = evalReminders.value.some(
+          (r) => r.courseId === courseId && r.studentId === user && r.status !== 'completed'
+        )
+        if (hasPending) result.add(courseId)
+      }
+    } else if (scope === 'student') {
+      const student = students.value.find((s) => s.name === user)
+      if (student) {
+        const enrolled = enrollments.value.filter((e) => e.studentId === student.id && e.status !== 'dropped')
+        const aiTierPending = new Set(getPendingAITierTests(student.id).map((t) => t.courseId))
+        for (const enr of enrolled) {
+          const courseId = enr.courseId
+          const hasEval = evalReminders.value.some(
+            (r) => r.courseId === courseId && r.studentId === student.id && r.status !== 'completed'
+          )
+          const hasHomework = homework.value.some(
+            (h) => h.courseId === courseId && !homeworkSubmissions.value.some((s) => s.homeworkId === h.id && s.studentId === student.id)
+          )
+          if (hasEval || aiTierPending.has(courseId) || hasHomework) result.add(courseId)
+        }
+      }
+    } else if (scope === 'leader') {
+      // 领导段：仅统计教师/导师类待评（非学生自评），避免因学生自评未交导致的常亮红点
+      const studentIds = new Set(students.value.map((s) => s.id))
+      for (const c of getLeaderCourses(user)) {
+        const hasPendingEval = evalReminders.value.some(
+          (r) => r.courseId === c.id && r.status !== 'completed' && !studentIds.has(r.studentId)
+        )
+        if (hasPendingEval || countPendingQualitySubmissions(c.id) > 0) result.add(c.id)
+      }
+    }
+    return [...result]
   }
 
   /** 获取某领导管辖的所有学生（去重） */
@@ -1711,11 +1898,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /**
-   * 全自动待办生成：扫描所有源（评价提醒/配置任务/AI分层测试/作业），
-   * 自动创建或清理对应的待办事项。
-   * 教师端：评价待办 + 配置待办
+   * 全自动待办生成：扫描所有源（评价提醒/配置任务/素质评价/AI分层测试/作业），
+   * 自动创建或清理对应的待办事项；底层源完成后待办自动消失。
+   * 教师端/领导教师部分：评价待办 + 配置待办 + 素质评价批改待办
    * 学生端：评价待办 + AI分层测试待办 + 作业待办
-   * 企业导师端：评价待办
+   * 企业导师端/领导导师部分：评价待办
    */
   function generateAutoTodos() {
     const now = getNow()
@@ -1723,6 +1910,13 @@ export const useAppStore = defineStore('app', () => {
       if (currentRole.value !== 'student' || !currentUser.value) return null
       return students.value.find((s) => s.name === currentUser.value)?.id ?? null
     })()
+    // 当前用户在评价提醒中的目标 id：学生用学生 id，其余角色用姓名（领导教师/导师的提醒直接指向其姓名）
+    const myTargetId = currentStudentId || currentUser.value || ''
+    // 是否教师身份（普通教师 或 领导 asTeacher 在教师部分有专属授课课程）
+    const isTeacherLike = !!currentUser.value && (
+      currentRole.value === 'teacher' ||
+      (currentRole.value === 'leader' && getTeacherCoursesForUser(currentUser.value).length > 0)
+    )
     // 收集当前所有的 auto- 前缀待办 ID（用于去重）
     const autoTodoIds = new Set(todos.value.map((t) => t.id))
     const newTodos: TodoItem[] = []
@@ -1731,19 +1925,16 @@ export const useAppStore = defineStore('app', () => {
     // ── 辅助函数：检查 auto 待办是否已存在 ──
     const hasAutoTodo = (id: string) => autoTodoIds.has(id) || newTodos.some((t) => t.id === id)
 
-    // ── 1. 评价待办 ──
+    // ── 1. 评价待办（教师/领导教师、导师/领导导师、学生） ──
     const myPendingEvalReminders = evalReminders.value.filter((r) => {
       if (r.status === 'completed' || r.status === 'overdue') return false
-      if (currentRole.value === 'teacher') return r.studentId === currentUser.value
-      if (currentRole.value === 'mentor') return r.studentId === currentUser.value
-      if (currentRole.value === 'student' && currentStudentId) return r.studentId === currentStudentId
-      return false
+      return r.studentId === myTargetId
     })
     for (const r of myPendingEvalReminders) {
       const todoId = `auto-eval-${r.courseId}-${r.sessionNumber}`
       if (hasAutoTodo(todoId)) continue
-      // 判断哪些类型与该角色相关
-      const roleType = currentRole.value === 'teacher' ? '教师评' : currentRole.value === 'mentor' ? '导师评' : ''
+      // 从提醒 id 判断类型：session-reminder-{courseId}-{targetId}-{type}-{session}
+      const roleType = r.id.includes('-teacher-') ? '教师评' : r.id.includes('-mentor-') ? '导师评' : ''
       const title = currentRole.value === 'student'
         ? `[评价] ${r.courseTitle} 第${r.sessionNumber}次评价`
         : `[评价] ${r.courseTitle} 第${r.sessionNumber}次评价 (${roleType})`
@@ -1758,8 +1949,8 @@ export const useAppStore = defineStore('app', () => {
       changed = true
     }
 
-    // ── 2. 配置待办（仅教师） ──
-    if (currentRole.value === 'teacher') {
+    // ── 2. 配置待办（教师/领导教师） ──
+    if (isTeacherLike) {
       const pendingConfigs = getPendingConfigCourses()
       for (const cfg of pendingConfigs) {
         const todoId = `auto-config-${cfg.courseId}`
@@ -1767,6 +1958,24 @@ export const useAppStore = defineStore('app', () => {
         newTodos.push({
           id: todoId,
           title: `[配置] ${cfg.courseTitle} - 未配置：${cfg.missing.join('、')}`,
+          completed: false,
+          createdAt: now.toISOString().split('T')[0],
+          createdBy: currentUser.value || 'system',
+        })
+        changed = true
+      }
+    }
+
+    // ── 2.5 素质评价批改待办（教师/领导教师） ──
+    if (isTeacherLike) {
+      for (const c of getTeacherCoursesForUser(currentUser.value || '')) {
+        const pending = countPendingQualitySubmissions(c.id)
+        if (pending <= 0) continue
+        const todoId = `auto-quality-${c.id}`
+        if (hasAutoTodo(todoId)) continue
+        newTodos.push({
+          id: todoId,
+          title: `[素质评价] ${c.title} - ${pending}份待批改`,
           completed: false,
           createdAt: now.toISOString().split('T')[0],
           createdBy: currentUser.value || 'system',
@@ -1816,18 +2025,19 @@ export const useAppStore = defineStore('app', () => {
       }
     }
 
-    // ── 5. 清理：当底层源已完成时，标记对应 auto-todo 为已完成 ──
+    // ── 5. 清理：当底层源已完成时，标记对应 auto-todo 为已完成（自动消失） ──
     todos.value = todos.value.map((t) => {
       if (t.completed) return t
 
-      // 评价待办清理
+      // 评价待办清理（课程 ID 可能含连字符，用 lastIndexOf 解析；按当前用户自身提醒判断）
       if (t.id.startsWith('auto-eval-')) {
-        const parts = t.id.split('-') // ['auto', 'eval', courseId, sessionNum]
-        if (parts.length >= 4) {
-          const courseId = parts[2]
-          const sessionNum = parseInt(parts[3])
+        const rest = t.id.replace('auto-eval-', '')
+        const sepIdx = rest.lastIndexOf('-')
+        if (sepIdx > 0) {
+          const courseId = rest.substring(0, sepIdx)
+          const sessionNum = parseInt(rest.substring(sepIdx + 1))
           const related = evalReminders.value.filter(
-            (r) => r.courseId === courseId && r.sessionNumber === sessionNum
+            (r) => r.courseId === courseId && r.sessionNumber === sessionNum && r.studentId === myTargetId
           )
           if (related.length > 0 && related.every((r) => r.status === 'completed')) {
             changed = true
@@ -1841,6 +2051,15 @@ export const useAppStore = defineStore('app', () => {
         const courseId = t.id.replace('auto-config-', '')
         const pending = getPendingConfigCourses()
         if (!pending.some((c) => c.courseId === courseId)) {
+          changed = true
+          return { ...t, completed: true }
+        }
+      }
+
+      // 素质评价待办清理
+      if (t.id.startsWith('auto-quality-')) {
+        const courseId = t.id.replace('auto-quality-', '')
+        if (countPendingQualitySubmissions(courseId) === 0) {
           changed = true
           return { ...t, completed: true }
         }
@@ -1906,12 +2125,12 @@ export const useAppStore = defineStore('app', () => {
     studentTiers,
     // actions
     login, logout,
-    addCourse, updateCourse, deleteCourse,
+    addCourse, updateCourse, deleteCourse, assignMentorToCourse,
     addCategory, updateCategory, deleteCategory,
     addSchedule, updateSchedule, deleteSchedule,
     addEnrollment, updateEnrollment, deleteEnrollment,
     addGrade, updateGrade, deleteGrade,
-    addCloudFile, deleteCloudFile,
+    addCloudFile, updateCloudFile, deleteCloudFile,
     addTodo, updateTodo, deleteTodo,
     addOnlineDoc, updateOnlineDoc, deleteOnlineDoc,
     addNote, updateNote, deleteNote,
@@ -1941,6 +2160,10 @@ export const useAppStore = defineStore('app', () => {
     qualityEvaluations, submitQualityEvaluation, scoreQualityEvaluation,
     getQualityEvaluationsForCourse, getStudentQualityEvaluation, getStudentQualityScore, countPendingQualitySubmissions,
     getMentorCourseIds, getLeaderCourses, getLeaderStudents,
+    getLeaderTeacherCourses, isLeaderTeacherCourse,
+    getTeacherCoursesForUser, getCourseTeacherTargets, getCourseMentorTargets,
+    // 待处理事务统计（红点提醒）
+    hasPendingEvalForCourse, isCourseConfigPending, getMyPendingCourseIds,
     getStudentTier, determineTier, submitAITierTest,
     isSecondClassStarted, getPendingAITierTests, autoAssignOverdueBasicTier,
     // department actions

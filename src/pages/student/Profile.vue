@@ -568,9 +568,12 @@ function renderProfile(root: HTMLElement) {
     // 统计信息
     if (currentStat && currentStat.hasTrend) {
       const change = currentStat.change!
-      const changeColor = change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-500' : 'text-gray-500'
-      const changeText = change > 0 ? `进步 ${change.toFixed(1)} 分` : change < 0 ? `退步 ${Math.abs(change).toFixed(1)} 分` : '保持不变'
-      courseHeader.append('span').attr('class', `text-sm font-medium ${changeColor}`).text(changeText)
+      // 分数无变化时不显示统计文字（原为"保持不变"）
+      if (change !== 0) {
+        const changeColor = change > 0 ? 'text-emerald-600' : 'text-red-500'
+        const changeText = change > 0 ? `进步 ${change.toFixed(1)} 分` : `退步 ${Math.abs(change).toFixed(1)} 分`
+        courseHeader.append('span').attr('class', `text-sm font-medium ${changeColor}`).text(changeText)
+      }
     } else {
       courseHeader.append('span').attr('class', 'text-xs text-gray-400').text('首次评价，暂无对比')
     }
@@ -814,7 +817,7 @@ onMounted(async () => {
   if (el) renderProfile(el)
 })
 
-watch([myEnrollments, myGrades, todaySchedules, hasMidtermAndFinal, avgProgress], () => {
+watch([myEnrollments, myGrades, todaySchedules, hasMidtermAndFinal, avgProgress, store.evaluations, store.courses], () => {
   const el = document.getElementById('student-profile-root')
   if (el) renderProfile(el)
 }, { deep: true })

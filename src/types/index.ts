@@ -65,6 +65,10 @@ export interface Leader {
   asTeacher?: boolean;
   /** 同时是企业导师（可选） */
   asMentor?: boolean;
+  /** 作为教师授课的专属课程ID（教师端部分显示，与普通教师一致） */
+  teacherCourseIds?: string[];
+  /** 作为企业导师负责的课程ID（导师端部分显示，与普通导师一致） */
+  mentorCourseIds?: string[];
 }
 
 export interface Grade {
@@ -129,6 +133,8 @@ export interface Schedule {
   timeSlot: string;
   room: string;
   teacher: string;
+  /** 企业导师 */
+  mentor?: string;
 }
 
 export interface Enrollment {
@@ -227,7 +233,10 @@ export interface CloudFile {
   dataUrl: string;
   uploadedAt: string;
   uploadedBy: string;
+  /** 关联课程（旧字段，单课程） */
   courseId?: string;
+  /** 可见课程列表（新字段，可多选课程） */
+  courseIds?: string[];
   /** 文件可见范围 */
   visibilityScope?: 'private' | 'students';
   /** 可见班级列表（为空则仅自己可见） */

@@ -287,13 +287,13 @@ export const mentors: Mentor[] = [
 
 /** 学院领导 */
 export const leaders: Leader[] = [
-  { id: 'l-1', name: '刘院长', phone: '13900003001', email: 'liuhead@example.com', categoryIds: ['cat-1', 'cat-2'], asTeacher: true },
+  { id: 'l-1', name: '刘院长', phone: '13900003001', email: 'liuhead@example.com', categoryIds: ['cat-1', 'cat-2'], asTeacher: true, teacherCourseIds: ['course-1', 'course-11'] },
   { id: 'l-2', name: '陈院长', phone: '13900003002', email: 'chenhead@example.com', categoryIds: ['cat-3', 'cat-4', 'cat-5'], asMentor: false },
-  { id: 'l-3', name: '张院长', phone: '13900003003', email: 'zhanghead@example.com', categoryIds: ['cat-1', 'cat-4'], asMentor: true },
+  { id: 'l-3', name: '张院长', phone: '13900003003', email: 'zhanghead@example.com', categoryIds: ['cat-1', 'cat-4'], asMentor: true, mentorCourseIds: ['course-6', 'course-16'] },
   // 新增演示账号
   { id: 'l-4', name: '周院长', phone: '13900003004', email: 'zhouhead@example.com', categoryIds: ['cat-5'], asMentor: false },
-  { id: 'l-5', name: '吴院长', phone: '13900003005', email: 'wuhead@example.com', categoryIds: ['cat-3'], asMentor: true },
-  { id: 'l-6', name: '郑院长', phone: '13900003006', email: 'zhenghead@example.com', categoryIds: ['cat-1'], asTeacher: true },
+  { id: 'l-5', name: '吴院长', phone: '13900003005', email: 'wuhead@example.com', categoryIds: ['cat-3'], asMentor: true, mentorCourseIds: ['course-3', 'course-9'] },
+  { id: 'l-6', name: '郑院长', phone: '13900003006', email: 'zhenghead@example.com', categoryIds: ['cat-1'], asTeacher: true, teacherCourseIds: ['course-4', 'course-7'] },
 ];
 
 export const grades: Grade[] = [
