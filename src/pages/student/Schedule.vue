@@ -8,7 +8,7 @@ import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { fetchSchedules, fetchStudents } from '@/api'
 import { renderIcon } from '@/utils/d3-renderer'
-import { isVirtualToday, getVirtualMonday } from '@/lib/date'
+import { isVirtualToday, getVirtualMonday, getTodayStart, getSemesterOf } from '@/lib/date'
 
 const store = useAppStore()
 
@@ -24,6 +24,7 @@ onMounted(async () => {
 
 async function loadMySchedules() {
   loading.value = true
+  let remoteSchedules: any[] | null = null
   try {
     // 1. 找当前学生的班级
     const studentName = store.currentUser
@@ -32,14 +33,25 @@ async function loadMySchedules() {
     // 从 students API 查询学生信息
     const stuRes = await fetchStudents({ search: studentName, pageSize: 1 })
     const myInfo = stuRes.students?.[0]
-    if (!myInfo?.className) return
 
     // 2. 按班级加载排课
-    const schRes = await fetchSchedules({ class: myInfo.className })
-    dbSchedules.value = schRes.schedules ?? []
+    if (myInfo?.className) {
+      const schRes = await fetchSchedules({ class: myInfo.className })
+      remoteSchedules = schRes.schedules ?? []
+    }
   } catch (e) {
     console.error('加载课表失败:', e)
   } finally {
+    // 后端可用且有数据则用后端数据，否则降级为本地 mock（按学生选课匹配排课）
+    if (remoteSchedules && remoteSchedules.length > 0) {
+      dbSchedules.value = remoteSchedules
+    } else {
+      const myStudent = store.students.find((s) => s.name === store.currentUser)
+      const myCourseIds = new Set(
+        store.enrollments.filter((e) => e.studentId === myStudent?.id).map((e) => e.courseId)
+      )
+      dbSchedules.value = store.schedules.filter((s) => myCourseIds.has(s.courseId))
+    }
     loading.value = false
   }
 }
@@ -82,10 +94,121 @@ const weekNumber = computed(() => {
 
 function prevWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() - 7); weekStart.value = d; reRender() }
 function nextWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() + 7); weekStart.value = d; reRender() }
-function todayFn() { weekStart.value = getVirtualMonday(); reRender() }
+
+// ---- "今天"按钮：第一次点击展开日历选择日期，第二次点击直接跳转今天 ----
+const showCalendar = ref(false)
+const calendarMonth = ref(getTodayStart())
+
+function todayFn() {
+  if (showCalendar.value) {
+    // 第二次点击：直接跳转到今天所在周
+    showCalendar.value = false
+    weekStart.value = getVirtualMonday()
+  } else {
+    // 第一次点击：展开日期选择日历
+    calendarMonth.value = getTodayStart()
+    showCalendar.value = true
+  }
+  reRender()
+}
+
+/** 跳转到所选日期所在周 */
+function goToDate(date: Date) {
+  weekStart.value = getMonday(date)
+  showCalendar.value = false
+  reRender()
+}
+
+/** 渲染日期选择日历 */
+function renderCalendar(navWrap: d3.Selection<any, any, any, any>) {
+  if (!showCalendar.value) return
+  const cal = navWrap.append('div')
+    .attr('class', 'cal-panel absolute right-0 top-full mt-2 z-30 w-72 bg-white rounded-xl border border-gray-200 shadow-xl p-4')
+    .on('click', (event: Event) => event.stopPropagation())
+
+  const cm = calendarMonth.value
+  const y = cm.getFullYear()
+  const m = cm.getMonth()
+
+  // 月份切换
+  const calHeader = cal.append('div').attr('class', 'flex items-center justify-between mb-3')
+  const prevM = calHeader.append('button').attr('class', 'p-1.5 rounded-md hover:bg-gray-100 transition-colors').on('click', () => {
+    const d = new Date(calendarMonth.value)
+    d.setMonth(d.getMonth() - 1)
+    calendarMonth.value = d
+    reRender()
+  })
+  renderIcon(prevM, 'chevronLeft').attr('class', 'w-4 h-4 text-gray-400')
+  calHeader.append('span').attr('class', 'text-sm font-semibold text-gray-800').text(`${y}年${m + 1}月`)
+  const nextM = calHeader.append('button').attr('class', 'p-1.5 rounded-md hover:bg-gray-100 transition-colors').on('click', () => {
+    const d = new Date(calendarMonth.value)
+    d.setMonth(d.getMonth() + 1)
+    calendarMonth.value = d
+    reRender()
+  })
+  renderIcon(nextM, 'chevronRight').attr('class', 'w-4 h-4 text-gray-400')
+
+  // 星期表头
+  const dowRow = cal.append('div').attr('class', 'grid grid-cols-7 gap-1 text-center text-[11px] text-gray-400 mb-1')
+  ;['日', '一', '二', '三', '四', '五', '六'].forEach((l) => dowRow.append('div').text(l))
+
+  // 日期网格
+  const grid = cal.append('div').attr('class', 'grid grid-cols-7 gap-1')
+  const firstDay = new Date(y, m, 1)
+  const daysInMonth = new Date(y, m + 1, 0).getDate()
+  const leading = firstDay.getDay() // 0=周日
+  for (let i = 0; i < leading; i++) grid.append('div')
+
+  const today = getTodayStart()
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cellDate = new Date(y, m, d)
+    const isToday = cellDate.getTime() === today.getTime()
+    grid.append('button')
+      .attr('class', `h-8 text-xs rounded-lg transition-colors ${isToday ? 'bg-indigo-600 text-white font-semibold' : 'text-gray-600 hover:bg-indigo-50'}`)
+      .text(String(d))
+      .on('click', () => goToDate(cellDate))
+  }
+}
 
 // ---- 学生课表数据（从数据库按班级加载） ----
 const mySchedules = computed(() => dbSchedules.value)
+
+// ---- 学期选择（只列出有排课数据的学期） ----
+const semesterOptions = computed(() => {
+  const set = new Set<string>()
+  mySchedules.value.forEach((s) => {
+    const sem = getSemesterOf(s.startDate)
+    if (sem) set.add(sem)
+  })
+  return [...set].sort()
+})
+
+const selectedSemester = ref<string>('')
+
+watch(semesterOptions, (opts) => {
+  if (opts.length === 0) return
+  if (!selectedSemester.value || !opts.includes(selectedSemester.value)) {
+    selectedSemester.value = opts[0]
+  }
+}, { immediate: true })
+
+/** 当前学期下的排课 */
+const filteredSchedules = computed(() => {
+  if (!selectedSemester.value) return mySchedules.value
+  return mySchedules.value.filter((s) => getSemesterOf(s.startDate) === selectedSemester.value)
+})
+
+/** 切换学期时跳到该学期第一堂课的周一 */
+function onSemesterChange() {
+  const first = filteredSchedules.value
+    .map((s) => s.startDate)
+    .filter(Boolean)
+    .sort()
+  if (first.length > 0) {
+    weekStart.value = getMonday(new Date(first[0]))
+  }
+  reRender()
+}
 
 // ---- 提取课程的周规律 ----
 interface CoursePattern {
@@ -98,7 +221,7 @@ interface CoursePattern {
 
 const coursePatterns = computed(() => {
   const map = new Map<string, CoursePattern[]>()
-  mySchedules.value.forEach((s) => {
+  filteredSchedules.value.forEach((s) => {
     const sd = new Date(s.startDate)
     const day = sd.getDay()
     const dow = day === 0 ? 6 : day - 1
@@ -262,6 +385,16 @@ function renderSchedule(root: HTMLElement) {
   const container = d3.select(root)
   container.selectAll('*').remove()
 
+  // 点击日历外部区域时关闭日期选择器
+  d3.select(root).on('click', (event: Event) => {
+    const target = event.target as Element | null
+    // target.isConnected：排除点击目标已被 reRender 移除的情况（如点击"今天"展开日历后旧按钮被 detached），避免误判为点击外部
+    if (showCalendar.value && target?.isConnected && target.closest && !target.closest('.cal-panel') && !target.closest('.cal-nav')) {
+      showCalendar.value = false
+      renderSchedule(root)
+    }
+  })
+
   const days = weekDays.value
   const legends = courseColorsMap.value
 
@@ -274,12 +407,31 @@ function renderSchedule(root: HTMLElement) {
   subtitle.append('span').attr('class', 'w-1 h-1 rounded-full bg-indigo-400/60')
   subtitle.append('span').text(`第${weekNumber.value}周`)
 
-  const navDiv = headerDiv.append('div').attr('class', 'flex items-center gap-1 bg-white rounded-lg border border-gray-200 shadow-sm p-0.5')
+  const navWrap = headerDiv.append('div').attr('class', 'relative flex items-center gap-2 cal-nav')
+
+  // 学期选择：只列出有排课数据的学期
+  if (semesterOptions.value.length > 0) {
+    const semSel = navWrap.append('select')
+      .attr('class', 'px-2 py-1.5 text-xs font-medium text-gray-600 bg-white rounded-lg border border-gray-200 shadow-sm cursor-pointer outline-none')
+      .on('change', (event: Event) => {
+        selectedSemester.value = (event.target as HTMLSelectElement).value
+        onSemesterChange()
+      })
+    semesterOptions.value.forEach((sem) => {
+      semSel.append('option').attr('value', sem).text(sem)
+    })
+    semSel.property('value', selectedSemester.value)
+  }
+
+  const navDiv = navWrap.append('div').attr('class', 'flex items-center gap-1 bg-white rounded-lg border border-gray-200 shadow-sm p-0.5')
   const prevBtn = navDiv.append('button').attr('class', 'p-2 rounded-md hover:bg-indigo-50 transition-colors').attr('title', '上一周').on('click', prevWeek)
   renderIcon(prevBtn, 'chevronLeft').attr('class', 'w-4 h-4 text-gray-400')
   navDiv.append('button').attr('class', 'px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-indigo-50 rounded-md transition-colors').on('click', todayFn).text('今天')
   const nextBtn = navDiv.append('button').attr('class', 'p-2 rounded-md hover:bg-indigo-50 transition-colors').attr('title', '下一周').on('click', nextWeek)
   renderIcon(nextBtn, 'chevronRight').attr('class', 'w-4 h-4 text-gray-400')
+
+  // 日期选择日历（"今天"按钮展开）
+  renderCalendar(navWrap)
 
   // 统计本周是否有课
   const hasCards = days.some(d => getDayCourseCards(d.date).length > 0)

@@ -11,6 +11,16 @@
         </p>
       </div>
       <div class="flex items-center gap-1 bg-white rounded-lg border border-brand-400/30 shadow-sm p-0.5">
+        <!-- 学期选择：只列出有排课数据的学期 -->
+        <select
+          v-if="semesterOptions.length > 0"
+          v-model="selectedSemester"
+          @change="onSemesterChange"
+          class="px-2 py-1.5 text-xs font-medium text-gray-600 bg-transparent outline-none cursor-pointer"
+          title="选择学期"
+        >
+          <option v-for="sem in semesterOptions" :key="sem" :value="sem">{{ sem }}</option>
+        </select>
         <button @click="prevWeek" class="p-2 rounded-md hover:bg-brand-400/10 transition-colors" title="上一周">
           <ChevronLeft class="w-4 h-4 text-gray-400" />
         </button>
@@ -103,13 +113,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-vue-next'
-import { getNow, isVirtualToday, getVirtualMonday } from '@/lib/date'
+import { getNow, isVirtualToday, getVirtualMonday, getSemesterOf } from '@/lib/date'
 import { fetchSchedules } from '@/api'
 
 const store = useAppStore()
+const route = useRoute()
 
 // 从数据库加载排课
 const dbSchedules = ref<any[]>([])
@@ -163,32 +175,79 @@ const weekNumber = computed(() => {
   return Math.ceil(((s.getTime() - y.getTime()) / 86400000 + y.getDay() + 1) / 7)
 })
 
-const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
-
 // ---- 课表数据 ----
-/** 根据角色获取当前用户的课程安排 */
+/** 根据当前路由身份获取课程安排（领导在教师段→教师课程，导师段→导师课程，领导段→管辖课程） */
 const userSchedules = computed(() => {
   const currentUser = store.currentUser || ''
   const role = store.currentRole
+  // 路由身份判定：领导在 /mentor 段时按导师处理，/teacher 段时按教师处理
+  const isMentorRoute = role === 'mentor' || route.path.startsWith('/mentor')
+  const isTeacherRoute = role === 'teacher' || route.path.startsWith('/teacher')
+  const isLeaderRoute = role === 'leader' && route.path.startsWith('/leader')
 
-  // 领导：查带头衔的课程 或 自己教的课程
-  if (role === 'leader') {
+  // 导师：看导师负责的课程
+  if (isMentorRoute) {
+    const mentorCourseIds = store.getMentorCourseIds(currentUser)
+    return store.schedules.filter((s) => mentorCourseIds.includes(s.courseId))
+  }
+  // 教师：看自己教的课；领导作为教师时看专属授课课程
+  if (isTeacherRoute) {
+    if (role === 'leader') {
+      const teacherCourseIds = store.getLeaderTeacherCourses(currentUser).map((c) => c.id)
+      return store.schedules.filter((s) =>
+        teacherCourseIds.includes(s.courseId) || s.teacher === currentUser
+      )
+    }
+    return store.schedules.filter((s) => s.teacher === currentUser)
+  }
+  // 领导段：管辖课程 或 自己教的课
+  if (isLeaderRoute) {
     const leaderCourseIds = store.getLeaderCourses(currentUser).map((c) => c.id)
     return store.schedules.filter((s) =>
       leaderCourseIds.includes(s.courseId) || s.teacher === currentUser
     )
   }
-  // 教师
-  if (role === 'teacher') {
-    return store.schedules.filter((s) => s.teacher === currentUser)
-  }
-  if (store.currentRole === 'mentor') {
-    const mentorCourseIds = store.getMentorCourseIds(store.currentUser)
-    return store.schedules.filter((s) => mentorCourseIds.includes(s.courseId))
-  }
   // fallback: 按教师名称
-  return store.schedules.filter((s) => s.teacher === store.currentUser)
+  return store.schedules.filter((s) => s.teacher === currentUser)
 })
+
+// ---- 学期选择（只列出有排课数据的学期） ----
+const semesterOptions = computed(() => {
+  const set = new Set<string>()
+  userSchedules.value.forEach((s) => {
+    const sem = getSemesterOf(s.startDate)
+    if (sem) set.add(sem)
+  })
+  return [...set].sort()
+})
+
+const selectedSemester = ref<string>('')
+
+// 默认选中当前时间所在学期，否则选第一个有数据的学期
+watch(semesterOptions, (opts) => {
+  if (opts.length === 0) return
+  const todaySem = getSemesterOf(getNow().toISOString())
+  if (!selectedSemester.value || !opts.includes(selectedSemester.value)) {
+    selectedSemester.value = opts.includes(todaySem) ? todaySem : opts[0]
+  }
+}, { immediate: true })
+
+/** 当前学期下的排课 */
+const filteredSchedules = computed(() => {
+  if (!selectedSemester.value) return userSchedules.value
+  return userSchedules.value.filter((s) => getSemesterOf(s.startDate) === selectedSemester.value)
+})
+
+/** 切换学期时跳到该学期第一堂课的周一 */
+function onSemesterChange() {
+  const first = filteredSchedules.value
+    .map((s) => s.startDate)
+    .filter(Boolean)
+    .sort()
+  if (first.length > 0) {
+    weekStart.value = getMonday(new Date(first[0]))
+  }
+}
 
 // ---- 提取课程的周规律 ----
 interface CoursePattern {
@@ -201,7 +260,7 @@ interface CoursePattern {
 
 const coursePatterns = computed(() => {
   const map = new Map<string, CoursePattern[]>()
-  userSchedules.value.forEach((s) => {
+  filteredSchedules.value.forEach((s) => {
     const sd = new Date(s.startDate)
     const day = sd.getDay()
     const dow = day === 0 ? 6 : day - 1
@@ -311,7 +370,7 @@ const PALETTE: CourseColor[] = [
 
 const courseColorMap = computed(() => {
   const map = new Map<string, CourseColor>()
-  const ids = Array.from(new Map(userSchedules.value.map((s) => [s.courseId, s])).keys())
+  const ids = Array.from(new Map(filteredSchedules.value.map((s) => [s.courseId, s])).keys())
   ids.forEach((id, i) => map.set(id, PALETTE[i % PALETTE.length]))
   return map
 })

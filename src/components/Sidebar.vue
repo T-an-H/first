@@ -56,11 +56,32 @@ const hasLeaderAccess = computed(() => {
   return store.currentRole === 'leader' || store.secondaryRoles.includes('leader')
 })
 
-const showExtraBadge = (item: { to: string; label: string }) => {
-  if (item.label !== '额外功能') return false
-  if (!store.currentUser) return false
-  return store.todos.some((t) => t.createdBy === store.currentUser && !t.completed)
+function getNavBadgeCount(item: { to: string; label: string }): number {
+  if (!store.currentUser) return 0
+  if (item.label === '额外功能') {
+    return store.todos.filter((t) => t.createdBy === store.currentUser && !t.completed).length
+  }
+  if (item.label === '我的课程') {
+    if (item.to.startsWith('/teacher')) return store.getMyPendingCourseIds('teacher').length
+    if (item.to.startsWith('/mentor')) return store.getMyPendingCourseIds('mentor').length
+    if (item.to.startsWith('/student')) return store.getMyPendingCourseIds('student').length
+  }
+  if (item.to === '/leader/courses') return store.getMyPendingCourseIds('leader').length
+  return 0
 }
+
+/** 待处理事务的汇总签名（用于驱动侧边栏红点重渲染） */
+const pendingSig = computed(() => {
+  const user = store.currentUser || ''
+  if (!user) return ''
+  return [
+    store.getMyPendingCourseIds('teacher').length,
+    store.getMyPendingCourseIds('mentor').length,
+    store.getMyPendingCourseIds('student').length,
+    store.getMyPendingCourseIds('leader').length,
+    store.todos.filter((t) => t.createdBy === user && !t.completed).length,
+  ].join('|')
+})
 
 // ===== D3 渲染 =====
 
@@ -79,9 +100,11 @@ function renderNavLink(
   item: { to: string; icon: string; label: string },
 ) {
   const active = isActive(item)
+  const badgeCount = getNavBadgeCount(item)
   const link = container.append('a')
     .attr('href', 'javascript:void(0)')
     .attr('class', `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-200 ${active ? 'bg-white/15 text-white font-medium' : 'text-gray-300 hover:text-white hover:bg-black/10'}`)
+    .attr('title', badgeCount > 0 ? `有 ${badgeCount} 项待处理事务，点击进入` : null)
     .on('click', () => router.push(item.to))
 
   renderIcon(link, item.icon as any, 'w-5 h-5 flex-shrink-0')
@@ -89,9 +112,9 @@ function renderNavLink(
   const span = link.append('span').attr('class', 'relative')
     .text(item.label)
 
-  if (showExtraBadge(item)) {
+  if (badgeCount > 0) {
     span.append('span')
-      .attr('class', 'absolute -top-2 -right-3 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white/50')
+      .attr('class', 'absolute -top-0.5 -right-2.5 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white/50')
   }
 }
 
@@ -181,9 +204,9 @@ onMounted(() => {
   }
 })
 
-// 路由变化或状态变化时重新渲染
+// 路由变化或状态变化时重新渲染（含待处理事务红点）
 watch(
-  () => [route.path, store.currentRole, store.secondaryRoles, store.evalReminders.length, JSON.stringify(store.todos.map(t => ({id: t.id, c: t.completed})))],
+  () => [route.path, store.currentRole, store.secondaryRoles, pendingSig.value],
   () => { renderSidebar() },
   { flush: 'post' },
 )

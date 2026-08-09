@@ -169,6 +169,12 @@ function getTodoTrace(t: { id: string; title: string }): TodoTrace | null {
     if (!courseId) return null
     return { path: `/teacher/courses/${courseId}?tab=grade-config`, label: '去配置' }
   }
+  // [素质评价] auto-quality-{courseId}（教师/领导教师批改）
+  if (t.id.startsWith('auto-quality-')) {
+    const courseId = t.id.replace('auto-quality-', '')
+    if (!courseId) return null
+    return { path: `/teacher/courses/${courseId}?tab=quality-eval`, label: '去批改' }
+  }
   // [AI分层] auto-ai-tier-{courseId}-{studentId}
   if (t.id.startsWith('auto-ai-tier-') && currentStudentId) {
     const courseId = t.id.replace('auto-ai-tier-', '').slice(0, -currentStudentId.length - 1)
