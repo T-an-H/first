@@ -56,7 +56,10 @@ const myTodos = computed(() => store.todos.filter((t) => t.createdBy === store.c
 const activeTodos = computed(() => myTodos.value.filter((t) => !t.completed))
 const doneTodos = computed(() => myTodos.value.filter((t) => t.completed))
 
-onMounted(() => {
+onMounted(async () => {
+  if (store.currentRole === 'student') {
+    await store.syncStudentHomeworkTodos()
+  }
   store.generateAutoTodos()
 })
 
@@ -158,7 +161,7 @@ function getTodoTrace(t: { id: string; title: string }): TodoTrace | null {
   // [作业] auto-homework-{homeworkId}-{studentId}
   if (t.id.startsWith('auto-homework-') && currentStudentId) {
     const hwId = t.id.replace('auto-homework-', '').slice(0, -currentStudentId.length - 1)
-    const hw = store.homework.find((h) => h.id === hwId)
+    const hw = store.findStudentHomeworkSummary(hwId) || store.homework.find((h) => h.id === hwId)
     if (!hw) return null
     return { path: `/student/courses/${hw.courseId}?tab=homework`, label: '去完成' }
   }

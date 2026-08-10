@@ -1,221 +1,239 @@
-/**
- * API 工具模块
- *
- * 封装与后端的 HTTP 通信
- */
+import type { AssistantAgentRequest, AssistantAgentResponse } from '@/lib/assistantAgent'
 
-// 后端地址（开发时 Express 运行在 3000 端口）
-const API_BASE = 'http://localhost:3000/api';
+const API_PROTOCOL = window.location.protocol === 'https:' ? 'https:' : 'http:'
+const API_HOST = window.location.hostname || '127.0.0.1'
+const API_PORT = (import.meta.env.VITE_API_PORT as string | undefined) ?? '3002'
+export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? `${API_PROTOCOL}//${API_HOST}:${API_PORT}/api`
 
-/** 通用请求封装 */
-async function request(url, options = {}) {
-  // 3 秒超时 —— 避免后端未启动时用户卡在"登录中..."
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3000);
+type RequestOptions = RequestInit & {
+  timeoutMs?: number
+}
 
-  const config = {
+type RequestError = Error & {
+  code?: string
+  status?: number
+}
+
+async function request(url: string, options: RequestOptions = {}) {
+  const { timeoutMs = 3000, ...fetchOptions } = options
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  const config: RequestInit = {
     headers: { 'Content-Type': 'application/json' },
     signal: controller.signal,
-    ...options,
-  };
+    ...fetchOptions,
+  }
 
   try {
-    const response = await fetch(`${API_BASE}${url}`, config);
-    const data = await response.json();
+    const response = await fetch(`${API_BASE}${url}`, config)
+    const data = await response.json().catch(() => ({}))
 
-    if (!response.ok && !data.success) {
-      throw new Error(data.message || `请求失败 (${response.status})`);
+    if (!response.ok || data.success === false) {
+      if (typeof data.code === 'string') {
+        const error = new Error(data.message || `Request failed (${response.status})`) as RequestError
+        error.code = data.code
+        error.status = response.status
+        throw error
+      }
+      throw new Error(data.message || `请求失败 (${response.status})`)
     }
 
-    return data;
+    return data
   } finally {
-    clearTimeout(timeoutId);
+    window.clearTimeout(timeoutId)
   }
 }
 
-/** 统一登录（所有角色：管理员/教师/学生） */
-export async function unifiedLogin(account, password) {
+export async function unifiedLogin(account: string, password: string) {
   return request('/user/login', {
     method: 'POST',
     body: JSON.stringify({ account, password }),
-  });
+  })
 }
 
-/** 学生登录（旧的，暂时保留） */
-export async function studentLogin(studentId, password) {
+export async function studentLogin(studentId: string, password: string) {
   return request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ studentId, password }),
-  });
+  })
 }
 
-/** 学生注册 */
-export async function studentRegister(data) {
+export async function studentRegister(data: any) {
   return request('/auth/register', {
     method: 'POST',
     body: JSON.stringify(data),
-  });
+  })
 }
 
-/** 验证 token 是否有效 */
-export async function verifyToken(token) {
+export async function verifyToken(token: string) {
   return request('/auth/verify', {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-  });
+  })
 }
 
-/** 获取学生列表（管理员用） */
-export async function fetchStudents(params = {}) {
-  const query = new URLSearchParams(params).toString();
-  return request(`/students${query ? '?' + query : ''}`);
+export async function fetchStudents(params: Record<string, any> = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).flatMap(([key, value]) => (value == null ? [] : [[key, String(value)]])),
+  ).toString()
+  return request(`/students${query ? `?${query}` : ''}`)
 }
 
-/** 获取班级列表 */
 export async function fetchClasses() {
-  return request('/students/classes');
+  return request('/students/classes')
 }
 
-/** 获取分类列表 */
 export async function fetchCategories() {
-  return request('/categories');
+  return request('/categories')
 }
 
-/** 获取课程列表 */
 export async function fetchCourses() {
-  return request('/categories/courses');
+  return request('/categories/courses')
 }
 
-/** 从排课同步分类和课程 */
 export async function syncCategoriesFromSchedules() {
-  return request('/categories/sync', { method: 'POST' });
+  return request('/categories/sync', { method: 'POST' })
 }
 
-/** 批量导入排课 */
-export async function bulkImportSchedules(schedules) {
+export async function bulkImportSchedules(schedules: any) {
   return request('/schedules/bulk', {
     method: 'POST',
     body: JSON.stringify({ schedules }),
-  });
+  })
 }
 
-/** 获取排课列表 */
-export async function fetchSchedules() {
-  return request('/schedules');
+export async function fetchSchedules(params: Record<string, any> = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).flatMap(([key, value]) => (value == null ? [] : [[key, String(value)]])),
+  ).toString()
+  return request(`/schedules${query ? `?${query}` : ''}`)
 }
 
-/** 获取某教师的课程列表 */
-export async function fetchTeacherCourses(teacherName) {
-  return request(`/courses/teacher/${encodeURIComponent(teacherName)}`);
+export async function fetchTeacherCourses(teacherName: string) {
+  return request(`/courses/teacher/${encodeURIComponent(teacherName)}`)
 }
 
-/** 批量导入选课 */
-export async function bulkImportEnrollments(enrollments) {
+export async function bulkImportEnrollments(enrollments: any) {
   return request('/teaching/enrollments/bulk', {
     method: 'POST',
     body: JSON.stringify({ enrollments }),
-  });
+  })
 }
 
-/** 更新学生信息（如设置班级） */
-export async function updateStudent(studentId, data) {
+export async function updateStudent(studentId: string, data: any) {
   return request(`/teaching/students/${studentId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  })
 }
 
-/** 批量导入成绩 */
-export async function bulkImportScores(scores) {
+export async function bulkImportScores(scores: any) {
   return request('/teaching/scores/bulk', {
     method: 'POST',
     body: JSON.stringify({ scores }),
-  });
+  })
 }
 
-/** 批量导入分组 */
-export async function bulkImportGroups(groups) {
+export async function bulkImportGroups(groups: any) {
   return request('/teaching/groups/bulk', {
     method: 'POST',
     body: JSON.stringify({ groups }),
-  });
+  })
 }
 
-// ==================== 评价系统 ====================
-
-/** 获取评价配置 */
-export async function fetchEvalConfig(courseId) {
-  return request(`/eval/config/${courseId}`);
+export async function fetchEvalConfig(courseId: string) {
+  return request(`/eval/config/${courseId}`)
 }
 
-/** 保存评价配置 */
-export async function saveEvalConfig(config) {
-  return request('/eval/config', { method: 'POST', body: JSON.stringify(config) });
+export async function saveEvalConfig(config: any) {
+  return request('/eval/config', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  })
 }
 
-/** 保存一条评价 */
-export async function saveEvaluation(ev) {
-  return request('/eval/save', { method: 'POST', body: JSON.stringify(ev) });
+export async function saveEvaluation(ev: any) {
+  return request('/eval/save', {
+    method: 'POST',
+    body: JSON.stringify(ev),
+  })
 }
 
-/** 批量保存评价 */
-export async function batchSaveEvaluations(evaluations) {
-  return request('/eval/batch', { method: 'POST', body: JSON.stringify({ evaluations }) });
+export async function batchSaveEvaluations(evaluations: any) {
+  return request('/eval/batch', {
+    method: 'POST',
+    body: JSON.stringify({ evaluations }),
+  })
 }
 
-/** 删除评价 */
-export async function deleteEvaluation(id) {
-  return request(`/eval/${id}`, { method: 'DELETE' });
+export async function deleteEvaluation(id: string) {
+  return request(`/eval/${id}`, { method: 'DELETE' })
 }
 
-/** 标记教师评价已提交 */
-export async function submitTeacherEval(data) {
-  return request('/eval/submit', { method: 'POST', body: JSON.stringify(data) });
+export async function submitTeacherEval(data: any) {
+  return request('/eval/submit', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
-/** 批量保存提醒 */
-export async function saveEvalReminders(reminders) {
-  return request('/eval/reminders', { method: 'POST', body: JSON.stringify({ reminders }) });
+export async function saveEvalReminders(reminders: any) {
+  return request('/eval/reminders', {
+    method: 'POST',
+    body: JSON.stringify({ reminders }),
+  })
 }
 
-/** 更新提醒状态 */
-export async function updateEvalReminder(id, status) {
-  return request(`/eval/reminders/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+export async function updateEvalReminder(id: string, status: string) {
+  return request(`/eval/reminders/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  })
 }
 
-/** 获取某课程成绩 */
-export async function fetchCourseScores(courseId) {
-  return request(`/teaching/scores/${courseId}`);
+export async function fetchCourseScores(courseId: string) {
+  return request(`/teaching/scores/${courseId}`)
 }
 
-/** 获取学生所有成绩 */
-export async function fetchStudentScores(studentId) {
-  return request(`/teaching/scores/student/${studentId}`);
+export async function fetchStudentScores(studentId: string) {
+  return request(`/teaching/scores/student/${studentId}`)
 }
 
-/** 获取某院系所有课程 */
-export async function fetchDepartmentCourses(department) {
-  return request(`/courses/department/${encodeURIComponent(department)}`);
+export async function fetchDepartmentCourses(department: string) {
+  return request(`/courses/department/${encodeURIComponent(department)}`)
 }
 
-/** 获取某院系所有学生 */
-export async function fetchDepartmentStudents(department) {
-  return request(`/students/department/${encodeURIComponent(department)}`);
+export async function fetchDepartmentStudents(department: string) {
+  return request(`/students/department/${encodeURIComponent(department)}`)
 }
 
-/** 更新一条排课 */
-export async function updateSchedule(id, data) {
+export async function updateCourse(id: string, data: any) {
+  return request(`/courses/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateSchedule(id: string, data: any) {
   return request(`/schedules/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
-  });
+  })
 }
 
-/** 删除一条排课 */
-export async function deleteSchedule(id) {
+export async function deleteSchedule(id: string) {
   return request(`/schedules/${id}`, {
     method: 'DELETE',
-  });
+  })
+}
+
+export async function invokeAssistant(payload: AssistantAgentRequest): Promise<AssistantAgentResponse> {
+  return request('/assistant/navigate', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    timeoutMs: 30000,
+  })
 }

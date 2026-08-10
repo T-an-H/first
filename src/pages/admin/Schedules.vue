@@ -205,7 +205,7 @@
               <p class="text-[10px] text-gray-400 mt-0.5">自动使用所选课程名称</p>
             </div>
 
-            <!-- 授课教师（手动输入） -->
+            <!-- 授课教师（必填） -->
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1.5">授课教师</label>
               <input v-model="form.teacher" type="text" placeholder="输入教师姓名" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
@@ -213,8 +213,8 @@
 
             <!-- 企业导师（手动输入） -->
             <div>
-              <label class="block text-xs font-medium text-gray-500 mb-1.5">企业导师</label>
-              <input v-model="form.mentor" type="text" placeholder="输入企业导师姓名" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">企业导师（选填）</label>
+              <input v-model="form.mentor" type="text" placeholder="输入企业导师姓名（选填）" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
               <p class="text-[10px] text-gray-400 mt-0.5">选填，将同步到课程的导师分配</p>
             </div>
 
@@ -725,12 +725,21 @@ function timesOverlap(a: string, b: string): boolean {
   return toMin(aStart) < toMin(bEnd) && toMin(bStart) < toMin(aEnd)
 }
 
+function normalizeScheduleOptionalValue(value?: string | null): string {
+  const normalized = String(value ?? '').trim()
+  return normalized === '未指定' ? '' : normalized
+}
+
 function isConflicting(sch: any): boolean {
   return dbSchedules.value.some((other: any) => {
     if (other.id === sch.id) return false
     if (getDayLabel(other) !== getDayLabel(sch)) return false
-    const sameTeacher = other.teacher === sch.teacher && timesOverlap(other.timeSlot, sch.timeSlot)
-    const sameRoom = other.room === sch.room && timesOverlap(other.timeSlot, sch.timeSlot)
+    const otherTeacher = normalizeScheduleOptionalValue(other.teacher)
+    const currentTeacher = normalizeScheduleOptionalValue(sch.teacher)
+    const otherRoom = normalizeScheduleOptionalValue(other.room)
+    const currentRoom = normalizeScheduleOptionalValue(sch.room)
+    const sameTeacher = !!otherTeacher && otherTeacher === currentTeacher && timesOverlap(other.timeSlot, sch.timeSlot)
+    const sameRoom = !!otherRoom && otherRoom === currentRoom && timesOverlap(other.timeSlot, sch.timeSlot)
     return sameTeacher || sameRoom
   })
 }
@@ -753,8 +762,12 @@ const courseConflictPairs = computed(() => {
       const b = list[j]
       if (getDayLabel(a) !== getDayLabel(b)) continue
       const reasons: string[] = []
-      if (a.teacher === b.teacher && timesOverlap(a.timeSlot, b.timeSlot)) reasons.push('教师时间冲突')
-      if (a.room === b.room && timesOverlap(a.timeSlot, b.timeSlot)) reasons.push('教室冲突')
+      const teacherA = normalizeScheduleOptionalValue(a.teacher)
+      const teacherB = normalizeScheduleOptionalValue(b.teacher)
+      const roomA = normalizeScheduleOptionalValue(a.room)
+      const roomB = normalizeScheduleOptionalValue(b.room)
+      if (teacherA && teacherA === teacherB && timesOverlap(a.timeSlot, b.timeSlot)) reasons.push('教师时间冲突')
+      if (roomA && roomA === roomB && timesOverlap(a.timeSlot, b.timeSlot)) reasons.push('教室冲突')
       if (reasons.length && (isCourseSchedule(a) || isCourseSchedule(b))) {
         pairs.push({ a, b, reasons })
       }
@@ -886,7 +899,8 @@ function createFormState(course: Course | null, schedule?: Schedule | null): Sch
 const form = ref<ScheduleForm>(createFormState(null))
 
 const conflictWarning = computed(() => {
-  if (!selectedCourse.value || !form.value.teacher || selectedSlots.value.length === 0) return ''
+  const teacherName = normalizeScheduleOptionalValue(form.value.teacher)
+  if (!selectedCourse.value || !teacherName || selectedSlots.value.length === 0) return ''
 
   // 检查每个已选时段是否有教师时间冲突
   for (const sel of selectedSlots.value) {
@@ -894,11 +908,11 @@ const conflictWarning = computed(() => {
     const conflict = dbSchedules.value.some((s: any) => {
       if (editingSchedule.value && s.id === editingSchedule.value.id) return false
       if (getDayLabel(s) !== sel.dayLabel) return false
-      if (s.teacher !== form.value.teacher) return false
+      if (normalizeScheduleOptionalValue(s.teacher) !== teacherName) return false
       return timesOverlap(s.timeSlot, timeSlot)
     })
     if (conflict) {
-      return `「${form.value.teacher}」在 ${sel.dayLabel} ${timeSlot} 已有排课`
+      return `「${teacherName}」在 ${sel.dayLabel} ${timeSlot} 已有排课`
     }
   }
   return ''
@@ -993,7 +1007,7 @@ function handleSave() {
       startDate: form.value.startDate,
       endDate: form.value.endDate,
       timeSlot: `${slot.start}-${slot.end}`,
-      room: slot.room,
+      room: slot.room.trim(),
       teacher,
       mentor,
     }
@@ -1016,7 +1030,7 @@ function handleSave() {
     startDate: form.value.startDate,
     endDate: form.value.endDate,
     timeSlot: `${slot.start}-${slot.end}`,
-    room: slot.room,
+    room: slot.room.trim(),
     teacher,
     mentor,
   }))

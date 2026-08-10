@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div id="d3-sidebar-root" class="flex-shrink-0"></div>
 </template>
 <script setup lang="ts">
@@ -7,6 +7,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
+import doubaoIcon from '@/assets/doubao.svg'
 
 const store = useAppStore()
 const route = useRoute()
@@ -18,8 +19,8 @@ const adminNavItems = [
 ]
 
 const teacherNavItems = [
-  { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
   { to: '/teacher/courses', icon: 'bookOpen' as const, label: '我的课程' },
+  { to: '/teacher/schedule', icon: 'calendar' as const, label: '课程表' },
   { to: '/teacher/extra', icon: 'lightbulb' as const, label: '额外功能' },
 ]
 
@@ -56,42 +57,58 @@ const hasLeaderAccess = computed(() => {
   return store.currentRole === 'leader' || store.secondaryRoles.includes('leader')
 })
 
-const showExtraBadge = (item: { to: string; label: string }) => {
-  if (item.label !== '额外功能') return false
-  if (!store.currentUser) return false
-  return store.todos.some((t) => t.createdBy === store.currentUser && !t.completed)
+function getNavBadgeCount(item: { to: string; label: string }): number {
+  if (!store.currentUser) return 0
+  if (item.label === '额外功能') {
+    return store.todos.filter((t) => t.createdBy === store.currentUser && !t.completed).length
+  }
+  if (item.label === '我的课程') {
+    if (item.to.startsWith('/teacher')) return store.getMyPendingCourseIds('teacher').length
+    if (item.to.startsWith('/mentor')) return store.getMyPendingCourseIds('mentor').length
+    if (item.to.startsWith('/student')) return store.getMyPendingCourseIds('student').length
+  }
+  if (item.to === '/leader/courses') return store.getMyPendingCourseIds('leader').length
+  return 0
 }
 
-// ===== D3 渲染 =====
+const pendingSig = computed(() => {
+  const user = store.currentUser || ''
+  if (!user) return ''
+  return [
+    store.getMyPendingCourseIds('teacher').length,
+    store.getMyPendingCourseIds('mentor').length,
+    store.getMyPendingCourseIds('student').length,
+    store.getMyPendingCourseIds('leader').length,
+    store.todos.filter((t) => t.createdBy === user && !t.completed).length,
+  ].join('|')
+})
 
 let rootEl: HTMLElement | null = null
 
-/** 判断 item 是否 active */
 function isActive(item: { to: string }) {
-  // 对于 /mentor/courses 与 /teacher/courses 等，检查 startsWith
   const path = route.path
   return path.startsWith(item.to)
 }
 
-/** 判断是否是 nav items 数组中的任一 items 的活跃路径 */
 function renderNavLink(
   container: d3.Selection<any, any, any, any>,
   item: { to: string; icon: string; label: string },
 ) {
   const active = isActive(item)
+  const badgeCount = getNavBadgeCount(item)
   const link = container.append('a')
     .attr('href', 'javascript:void(0)')
     .attr('class', `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-200 ${active ? 'bg-white/15 text-white font-medium' : 'text-gray-300 hover:text-white hover:bg-black/10'}`)
+    .attr('title', badgeCount > 0 ? `有 ${badgeCount} 项待处理事务，点击进入` : null)
     .on('click', () => router.push(item.to))
 
   renderIcon(link, item.icon as any, 'w-5 h-5 flex-shrink-0')
 
-  const span = link.append('span').attr('class', 'relative')
-    .text(item.label)
+  const span = link.append('span').attr('class', 'relative').text(item.label)
 
-  if (showExtraBadge(item)) {
+  if (badgeCount > 0) {
     span.append('span')
-      .attr('class', 'absolute -top-2 -right-3 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white/50')
+      .attr('class', 'absolute -top-0.5 -right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white/50')
   }
 }
 
@@ -101,11 +118,9 @@ function renderSidebar() {
   const root = d3.select(rootEl)
   const cfg = config.value
 
-  // ---- aside ----
   const aside = root.append('aside')
     .attr('class', 'w-64 bg-brand-750 text-white flex flex-col h-screen sticky top-0')
 
-  // ---- header ----
   const header = aside.append('div')
     .attr('class', 'p-6 border-b border-white/10')
 
@@ -114,21 +129,22 @@ function renderSidebar() {
 
   const logoBox = headerFlex.append('div')
     .attr('class', `w-10 h-10 rounded-lg ${cfg.color} flex items-center justify-center`)
-  renderIcon(logoBox, 'graduationCap', 'w-6 h-6 text-white')
+
+  logoBox.append('img')
+    .attr('src', doubaoIcon)
+    .attr('alt', '')
+    .attr('class', 'w-6 h-6')
 
   const headerText = headerFlex.append('div')
-  headerText.append('h1').attr('class', 'font-bold text-lg').text('课程管理')
+  headerText.append('h1').attr('class', 'font-bold text-lg').text('人类高光时刻')
   headerText.append('p').attr('class', 'text-xs text-white/50').text(cfg.label)
 
-  // ---- nav ----
   const nav = aside.append('nav')
     .attr('class', 'flex-1 p-4 space-y-1')
 
-  // 构建合并后的菜单项列表，保持各自原有顺序
   let fullItems: any[]
 
   if (store.currentRole === 'leader') {
-    // 以 leader 身份登入：先加 teacher/mentor 菜单，最后加 leader 菜单
     fullItems = []
     const leader = store.leaders.find((l) => l.name === store.currentUser)
     if (leader?.asTeacher) {
@@ -142,7 +158,6 @@ function renderSidebar() {
     cfg.items.forEach((item) => fullItems.push(item))
   } else {
     fullItems = [...cfg.items]
-    // 非 leader 主角色但有 leader 副角色时，追加 leader 菜单
     if (hasLeaderAccess.value) {
       fullItems.push({ separator: true, label: '学院管理' } as any)
       leaderNavItems.forEach((item) => fullItems.push(item))
@@ -158,7 +173,6 @@ function renderSidebar() {
     renderNavLink(nav, item)
   })
 
-  // ---- footer ----
   const footer = aside.append('div')
     .attr('class', 'p-4 border-t border-white/10')
 
@@ -181,9 +195,8 @@ onMounted(() => {
   }
 })
 
-// 路由变化或状态变化时重新渲染
 watch(
-  () => [route.path, store.currentRole, store.secondaryRoles, store.evalReminders.length, JSON.stringify(store.todos.map(t => ({id: t.id, c: t.completed})))],
+  () => [route.path, store.currentRole, store.secondaryRoles, pendingSig.value],
   () => { renderSidebar() },
   { flush: 'post' },
 )

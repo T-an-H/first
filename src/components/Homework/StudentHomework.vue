@@ -218,10 +218,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen } from 'lucide-vue-next'
 import { API_BASE } from '@/api'
+import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{ courseId: string; studentId: string; tier?: string }>()
 
 const router = useRouter()
+const store = useAppStore()
 const API = `${API_BASE}/homeworks`
 
 const homeworks = ref<any[]>([])
@@ -245,7 +247,7 @@ watch(
 )
 
 const submittedCount = computed(() =>
-  homeworks.value.filter((h) => h.submission?.status === 'graded').length,
+  homeworks.value.filter((h) => h.submission && h.submission.status !== 'submitted').length,
 )
 
 const allAnswered = computed(() =>
@@ -278,6 +280,8 @@ async function loadHomeworks() {
     const data = await res.json()
     if (data.success) {
       homeworks.value = data.homeworks
+      store.setStudentHomeworkSummaries(props.courseId, data.homeworks)
+      store.generateAutoTodos()
     }
   } catch (e) {
     console.error('加载作业列表失败:', e)
@@ -334,6 +338,7 @@ async function submitAnswers() {
     }
 
     cancelAnswer()
+    await store.syncStudentHomeworkTodos(props.courseId, props.studentId)
     await router.push({
       name: 'StudentHomeworkResult',
       params: {
