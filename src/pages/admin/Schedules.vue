@@ -141,6 +141,7 @@
             <tr class="bg-gray-50 border-b border-gray-100">
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">课程</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">教师</th>
+              <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">企业导师</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">教室</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">周几</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">时间段</th>
@@ -157,6 +158,7 @@
                 </div>
               </td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ sch.teacher }}</td>
+              <td class="px-4 py-3 text-sm text-gray-600">{{ sch.mentor || '-' }}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ sch.room }}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ getDayLabel(sch) }}</td>
               <td class="px-4 py-3 text-sm text-gray-600">{{ sch.timeSlot }}</td>
@@ -166,7 +168,7 @@
               </td>
             </tr>
             <tr v-if="courseSchedules.length === 0">
-              <td colspan="6" class="text-center py-12 text-gray-400 text-sm">
+              <td colspan="7" class="text-center py-12 text-gray-400 text-sm">
                 <CalendarX class="w-8 h-8 mx-auto mb-2 text-gray-200" />
                 {{ searchText ? '没有匹配的排课记录' : '该课程暂无排课记录' }}
               </td>
@@ -192,10 +194,10 @@
       <!-- 新增/编辑排课弹窗 -->
       <div v-if="showModal" class="fixed inset-0 z-50 flex items-center justify-center" @click.self="closeModal">
         <div class="absolute inset-0 bg-black/30" @click="closeModal" />
-        <div class="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-          <h3 class="text-lg font-bold text-gray-900 mb-5">{{ editingSchedule ? '编辑排课' : '新增排课' }}</h3>
+        <div class="relative bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4 max-h-[90vh] flex flex-col">
+          <h3 class="text-lg font-bold text-gray-900 mb-5 flex-shrink-0">{{ editingSchedule ? '编辑排课' : '新增排课' }}</h3>
 
-          <div class="space-y-4">
+          <div class="space-y-4 flex-1 overflow-y-auto pr-1 -mr-1">
             <!-- 课程名称（自动填为所选课程） -->
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-1.5">课程名称</label>
@@ -209,10 +211,43 @@
               <input v-model="form.teacher" type="text" placeholder="输入教师姓名" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
             </div>
 
+            <!-- 企业导师（手动输入） -->
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1.5">企业导师</label>
+              <input v-model="form.mentor" type="text" placeholder="输入企业导师姓名" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+              <p class="text-[10px] text-gray-400 mt-0.5">选填，将同步到课程的导师分配</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1.5">开始时间</label>
+                <input v-model="form.startDate" type="date" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1.5">结束时间</label>
+                <input v-model="form.endDate" type="date" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1.5">总课时</label>
+                <input v-model.number="form.duration" type="number" min="1" step="1" placeholder="填写总课时" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-500 mb-1.5">学分</label>
+                <input v-model.number="form.credits" type="number" min="0.5" step="0.5" placeholder="填写学分" class="w-full px-3 py-2.5 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none text-sm" />
+              </div>
+            </div>
+
+            <div v-if="dateRangeWarning" class="text-xs text-red-500">
+              {{ dateRangeWarning }}
+            </div>
+
             <!-- 周课表选时间 -->
             <div>
               <label class="block text-xs font-medium text-gray-500 mb-2">
-                选择上课时间（单击空格多选，首个格子填写上课地点）
+                选择上课时间（单击空格多选，地点选填，可填写在各格子内）
                 <span v-if="selectedSlots.length" class="text-brand-600 ml-1">— 已选 {{ selectedSlots.length }} 个时段</span>
               </label>
               <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -234,7 +269,7 @@
                           <input
                             v-model="getSelectedSlot(dayLabels.indexOf(d), slot.start, slot.end).room"
                             @click.stop
-                            placeholder="地点"
+                            placeholder="地点（选填）"
                             class="w-full h-full min-h-[32px] bg-transparent text-center text-[11px] text-brand-700 outline-none placeholder:text-brand-300"
                           />
                         </div>
@@ -279,7 +314,7 @@
             </div>
           </div>
 
-          <div class="flex justify-end gap-2 mt-6">
+          <div class="flex justify-end gap-2 mt-6 flex-shrink-0">
             <button @click="closeModal" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg transition-colors">取消</button>
             <button @click="handleSave" :disabled="!canSave" class="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">
               {{ editingSchedule ? '保存修改' : '确认添加' }}
@@ -411,15 +446,15 @@
           <h3 class="text-lg font-semibold text-gray-900 mb-4">新增课程</h3>
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">课程名称</label>
+              <label class="block text-sm font-medium text-gray-700 mb-1">课程名称<span class="text-red-500">*</span></label>
               <input v-model="courseForm.title" type="text" placeholder="如：数据结构" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm" />
             </div>
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">课程描述</label>
-              <textarea v-model="courseForm.description" rows="2" placeholder="课程简介（可选）" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm"></textarea>
+              <label class="block text-sm font-medium text-gray-700 mb-1">课程简介</label>
+              <textarea v-model="courseForm.description" rows="3" placeholder="介绍课程内容、目标等" class="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-blue-500 outline-none text-sm resize-none"></textarea>
             </div>
             <div class="flex gap-3 pt-2">
-              <button @click="handleSaveCourse" :disabled="!courseForm.title.trim()" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">保存</button>
+              <button @click="handleSaveCourse" :disabled="!canSaveCourse" class="flex-1 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed">保存</button>
               <button @click="closeCourseModal" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
             </div>
           </div>
@@ -434,7 +469,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { Plus, Search, CalendarX, AlertTriangle, Upload, RefreshCw, BookOpen, ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
 import type { Schedule, Course, Department } from '@/types'
-import { bulkImportSchedules, fetchSchedules, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
+import { bulkImportSchedules, fetchSchedules, updateCourse as apiUpdateCourse, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
@@ -476,10 +511,24 @@ function getCourseScheduleCount(course: Course): number {
 
 // ====== 新增课程 ======
 const showCourseModal = ref(false)
-const courseForm = ref({ title: '', description: '' })
+type CourseForm = {
+  title: string
+  description: string
+}
+
+function createCourseForm(): CourseForm {
+  return {
+    title: '',
+    description: '',
+  }
+}
+
+const courseForm = ref<CourseForm>(createCourseForm())
+
+const canSaveCourse = computed(() => Boolean(courseForm.value.title.trim()))
 
 function openCourseModal() {
-  courseForm.value = { title: '', description: '' }
+  courseForm.value = createCourseForm()
   showCourseModal.value = true
 }
 
@@ -488,7 +537,7 @@ function closeCourseModal() {
 }
 
 function handleSaveCourse() {
-  if (!courseForm.value.title.trim()) return
+  if (!canSaveCourse.value) return
   if (store.courses.some((c) => c.title === courseForm.value.title.trim())) {
     courseImportMsg.value = { success: false, text: '课程名称已存在，请更换名称' }
     return
@@ -810,12 +859,31 @@ function handleSlotClick(day: string, slot: { start: string; end: string; label:
 // ====== 新增/编辑弹窗 ======
 const showModal = ref(false)
 const editingSchedule = ref<Schedule | null>(null)
-const form = ref({
-  teacher: '',
-  startDate: '',
-  startTime: '09:00',
-  endTime: '11:00',
-})
+type ScheduleForm = {
+  teacher: string
+  mentor: string
+  startDate: string
+  endDate: string
+  duration: number | ''
+  credits: number | ''
+}
+
+function toFormNumber(value?: number | null): number | '' {
+  return typeof value === 'number' && value > 0 ? value : ''
+}
+
+function createFormState(course: Course | null, schedule?: Schedule | null): ScheduleForm {
+  return {
+    teacher: schedule?.teacher || course?.teacher || '',
+    mentor: schedule?.mentor || course?.mentor || '',
+    startDate: schedule?.startDate || '',
+    endDate: schedule?.endDate || '',
+    duration: toFormNumber(course?.duration),
+    credits: toFormNumber(course?.credits),
+  }
+}
+
+const form = ref<ScheduleForm>(createFormState(null))
 
 const conflictWarning = computed(() => {
   if (!selectedCourse.value || !form.value.teacher || selectedSlots.value.length === 0) return ''
@@ -836,26 +904,34 @@ const conflictWarning = computed(() => {
   return ''
 })
 
-const canSave = computed(() =>
-  selectedCourse.value && form.value.teacher && selectedSlots.value.length > 0 &&
-  selectedSlots.value.every((s) => !!s.room && s.room.trim())
-)
+const dateRangeWarning = computed(() => {
+  if (!form.value.startDate || !form.value.endDate) return ''
+  return form.value.endDate < form.value.startDate ? '结束时间不能早于开始时间' : ''
+})
+
+const canSave = computed(() => Boolean(
+  selectedCourse.value &&
+  form.value.teacher.trim() &&
+  form.value.startDate &&
+  form.value.endDate &&
+  !dateRangeWarning.value &&
+  typeof form.value.duration === 'number' &&
+  form.value.duration > 0 &&
+  typeof form.value.credits === 'number' &&
+  form.value.credits > 0 &&
+  selectedSlots.value.length > 0
+))
 
 function openAdd() {
   editingSchedule.value = null
-  form.value = { teacher: '', startDate: '', startTime: '', endTime: '' }
+  form.value = createFormState(selectedCourse.value)
   selectedSlots.value = []
   showModal.value = true
 }
 
 function openEdit(sch: Schedule) {
   editingSchedule.value = sch
-  form.value = {
-    teacher: sch.teacher,
-    startDate: sch.startDate,
-    startTime: sch.timeSlot.split('-')[0],
-    endTime: sch.timeSlot.split('-')[1] || '11:00',
-  }
+  form.value = createFormState(selectedCourse.value, sch)
   // 预填该排课的时段与地点，编辑时可直接调整
   const dayLabel = getDayLabel(sch as any)
   const dayIdx = dayLabels.indexOf(dayLabel)
@@ -880,9 +956,32 @@ function closeModal() {
   selectedSlots.value = []
 }
 
+function syncSelectedCourseMeta(data: Pick<Course, 'duration' | 'credits'>) {
+  if (!selectedCourse.value) return
+  selectedCourse.value = { ...selectedCourse.value, ...data }
+}
+
+function persistCourseMeta(courseId: string, data: Pick<Course, 'duration' | 'credits'>) {
+  apiUpdateCourse(courseId, data).catch(() => null)
+  store.updateCourse(courseId, data)
+  syncSelectedCourseMeta(data)
+}
+
 function handleSave() {
-  if (!selectedCourse.value || selectedSlots.value.length === 0) return
+  if (!selectedCourse.value || !canSave.value) return
   const course = selectedCourse.value
+  const teacher = form.value.teacher.trim()
+  const mentor = form.value.mentor.trim()
+  const courseUpdates = {
+    duration: Number(form.value.duration),
+    credits: Number(form.value.credits),
+  }
+
+  persistCourseMeta(course.id, courseUpdates)
+  // 企业导师同步到课程（导师记录 + 课程 mentor 字段）
+  if (mentor) {
+    store.assignMentorToCourse(course.id, mentor)
+  }
 
   // 编辑：更新单条排课
   if (editingSchedule.value) {
@@ -891,11 +990,12 @@ function handleSave() {
       courseId: course.id,
       title: course.title,
       day: slot.dayLabel,
-      startDate: slot.dateStr,
-      endDate: slot.dateStr,
+      startDate: form.value.startDate,
+      endDate: form.value.endDate,
       timeSlot: `${slot.start}-${slot.end}`,
       room: slot.room,
-      teacher: form.value.teacher,
+      teacher,
+      mentor,
     }
     const id = editingSchedule.value.id
     apiUpdateSchedule(id, updated)
@@ -913,11 +1013,12 @@ function handleSave() {
     courseId: course.id,
     title: course.title,
     day: slot.dayLabel,
-    startDate: slot.dateStr,
-    endDate: slot.dateStr,
+    startDate: form.value.startDate,
+    endDate: form.value.endDate,
     timeSlot: `${slot.start}-${slot.end}`,
     room: slot.room,
-    teacher: form.value.teacher,
+    teacher,
+    mentor,
   }))
 
   // 发送到后端
@@ -941,6 +1042,7 @@ function handleSave() {
           timeSlot: s.timeSlot,
           room: s.room,
           teacher: s.teacher,
+          mentor: s.mentor,
         })
       })
       // 重新加载（从 store 取数据）

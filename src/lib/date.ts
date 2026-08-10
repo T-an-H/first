@@ -39,3 +39,19 @@ export function getVirtualMonday(): Date {
   d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))
   return d
 }
+
+/**
+ * 根据日期推导所属学期
+ * - 2~7 月 → 该年春季学期
+ * - 8~12 月 → 该年秋季学期
+ * - 1 月 → 上一年秋季学期
+ */
+export function getSemesterOf(dateStr: string): string {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  const m = d.getMonth() + 1
+  const y = d.getFullYear()
+  if (m >= 2 && m <= 7) return `${y}春季学期`
+  if (m >= 8) return `${y}秋季学期`
+  return `${y - 1}秋季学期`
+}

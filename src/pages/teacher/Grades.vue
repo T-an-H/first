@@ -135,7 +135,7 @@
 
     <!-- 权重摘要 -->
     <div v-if="currentCfg" class="bg-brand-400/10 rounded-xl p-4 border border-brand-400/50 text-sm text-gray-800 flex flex-wrap gap-x-6 gap-y-1">
-      <span>总成绩 = 平时 {{ currentCfg.regularWeight }}% + 期中 {{ currentCfg.midtermWeight }}% + 期末 {{ currentCfg.finalWeight }}%</span>
+      <span>总成绩 = 平时 {{ currentCfg.regularWeight }}% + 期中 {{ currentCfg.midtermWeight }}% + 期末 {{ currentCfg.finalWeight }}%{{ getQualitySummary(currentCfg) }}</span>
       <span>平时 = 自评 {{ currentCfg.selfEvalWeight }}% + 组内互评 {{ currentCfg.peerReviewWeight }}% + 组间互评 {{ currentCfg.interGroupEvalWeight }}% + 教师 {{ currentCfg.teacherScoreWeight }}% + 企业导师 {{ currentCfg.mentorScoreWeight }}%</span>
     </div>
 
@@ -485,9 +485,16 @@ function getStudentTotal(enr: Enrollment): number | null {
   return Math.min(100, g.score + getQualityBonus(enr.courseId, enr.studentId))
 }
 
-/** 素质评价加成（封顶为配置的加成上限，直接加在总成绩上） */
+/** 素质评价按课程配置计入总成绩：有权重时按占比，否则按加成上限封顶 */
 function getQualityBonus(courseId: string, studentId: string): number {
   return store.getStudentQualityScore(courseId, studentId)
+}
+
+function getQualitySummary(cfg: { qualityEvalWeight?: number; qualityEvalMaxBonus?: number }): string {
+  if ((cfg.qualityEvalWeight ?? 0) > 0) {
+    return ` + 素质评价 ${cfg.qualityEvalWeight ?? 0}%`
+  }
+  return `；素质加成上限 ${cfg.qualityEvalMaxBonus ?? 10} 分`
 }
 
 /** 获取评阅时间 */

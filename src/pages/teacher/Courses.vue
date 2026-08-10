@@ -45,14 +45,24 @@
             待评价
           </button>
 
+          <!-- 待配置红点标记（点击可溯源到成绩配置） -->
+          <button
+            v-if="isConfigPending(course.id)"
+            @click.stop="goConfig(course.id)"
+            title="成绩权重/评价方案尚未配置完成，点击前往成绩配置"
+            class="absolute top-12 left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-amber-500 text-white font-medium shadow cursor-pointer hover:bg-amber-600 transition-colors">
+            <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+            待配置
+          </button>
+
           <!-- 素质评价待批改红点标记（点击可溯源到素质评价管理） -->
           <button
             v-if="pendingQualityCount(course.id) > 0"
             @click.stop="goQualityEval(course.id)"
             :title="`有 ${pendingQualityCount(course.id)} 名学生提交的素质评价待批改，点击前往素质评价管理`"
-            class="absolute top-12 left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-orange-500 text-white font-medium shadow cursor-pointer hover:bg-orange-600 transition-colors">
+            class="absolute top-[84px] left-3 z-20 flex items-center gap-1.5 text-[10px] px-2.5 py-1 rounded-full bg-orange-500 text-white font-medium shadow cursor-pointer hover:bg-orange-600 transition-colors">
             <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-            素质评价待批改 {{ pendingQualityCount(course.id) }}
+            素质评价待批改
           </button>
 
           <!-- 状态标签 - 右上角 -->
@@ -551,11 +561,11 @@ const sortedAndFilteredCourses = computed(() => {
     list = dbCourses.value as any
   } else if (loading.value) {
     return []
-  } else if (isLeaderWithTeaching.value) {
-    list = store.getLeaderCourses(store.currentUser || '')
   } else if (isMentor.value) {
     const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')
     list = store.courses.filter((c) => mentorCourseIds.includes(c.id))
+  } else if (isLeaderWithTeaching.value) {
+    list = store.getLeaderTeacherCourses(store.currentUser || '')
   } else {
     list = store.courses.filter((c) => c.teacher === store.currentUser)
   }
@@ -573,12 +583,12 @@ const sortedAndFilteredCourses = computed(() => {
 })
 
 const myCourses = computed(() => {
-  if (isLeaderWithTeaching.value) {
-    return store.getLeaderCourses(store.currentUser || '')
-  }
   if (isMentor.value) {
     const mentorCourseIds = store.getMentorCourseIds(store.currentUser || '')
     return store.courses.filter((c) => mentorCourseIds.includes(c.id))
+  }
+  if (isLeaderWithTeaching.value) {
+    return store.getLeaderTeacherCourses(store.currentUser || '')
   }
   return store.courses.filter((c) => c.teacher === store.currentUser)
 })
@@ -918,13 +928,7 @@ function goDetail(courseId: string) {
 
 /** 当前教师/导师是否有该课程的待完成评价（用于红点溯源） */
 function hasPendingEval(courseId: string) {
-  if (!store.currentUser) return false
-  return store.evalReminders.some(
-    (r) =>
-      r.courseId === courseId &&
-      r.studentId === store.currentUser &&
-      (r.status === 'pending' || r.status === 'overdue')
-  )
+  return store.hasPendingEvalForCourse(courseId)
 }
 
 /** 待评价红点溯源：直达评论管理（评价填写）tab */
@@ -932,11 +936,27 @@ function goEval(courseId: string) {
   router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=comments`)
 }
 
-/** 该课程中「最新提交尚未批改」的素质评价学生人数（仅授课教师显示红点） */
+/** 该课程是否仍有未完成的成绩权重/评价方案配置（教师/领导教师显示红点） */
+function isConfigPending(courseId: string) {
+  if (!store.currentUser) return false
+  const course = store.courses.find((c) => c.id === courseId)
+  if (!course) return false
+  const canConfig = course.teacher === store.currentUser || store.isLeaderTeacherCourse(store.currentUser, courseId)
+  return canConfig && store.isCourseConfigPending(courseId)
+}
+
+/** 待配置红点溯源：直达成绩配置 tab */
+function goConfig(courseId: string) {
+  router.push(`${isMentor.value ? '/mentor' : '/teacher'}/courses/${courseId}?tab=grade-config`)
+}
+
+/** 该课程中「最新提交尚未批改」的素质评价学生人数（授课教师/领导教师显示红点） */
 function pendingQualityCount(courseId: string) {
   if (!store.currentUser) return 0
   const course = store.courses.find((c) => c.id === courseId)
-  if (!course || course.teacher !== store.currentUser) return 0
+  if (!course) return 0
+  const canGrade = course.teacher === store.currentUser || store.isLeaderTeacherCourse(store.currentUser, courseId)
+  if (!canGrade) return 0
   return store.countPendingQualitySubmissions(courseId)
 }
 

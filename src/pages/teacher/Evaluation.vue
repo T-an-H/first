@@ -120,7 +120,6 @@
                 </div>
               </div>
 
-              <!-- 企业导师参与 -->
               <div class="flex items-center gap-3">
                 <label class="text-sm font-medium text-gray-800">企业导师参与评价</label>
                 <button
@@ -135,7 +134,6 @@
                 </span>
               </div>
 
-              <!-- 逾期处理规则 -->
               <div>
                 <p class="text-sm font-medium text-gray-800 mb-2">逾期未评处理规则</p>
                 <div class="flex gap-3">
@@ -148,6 +146,7 @@
                   </button>
                 </div>
               </div>
+
             </div>
           </template>
         </div>

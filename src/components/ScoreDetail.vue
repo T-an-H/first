@@ -54,7 +54,7 @@
             {{ cfg.finalWeight > 0 ? `+ ${finalScore.toFixed(1)}×${cfg.finalWeight}%` : '' }}
             =
             {{ regularContrib.toFixed(1) }}{{ cfg.midtermWeight > 0 ? ` + ${midtermContrib.toFixed(1)}` : '' }}{{ cfg.finalWeight > 0 ? ` + ${finalContrib.toFixed(1)}` : '' }}
-            <span v-if="qualityBonus > 0" class="text-emerald-600">+ 素质加成 {{ qualityBonus.toFixed(1) }}</span>
+            <span v-if="qualityValue > 0" class="text-emerald-600">+ {{ qualityLabel }} {{ qualityValue.toFixed(1) }}</span>
             =
             <span class="font-semibold">{{ (totalScore ?? 0).toFixed(1) }}</span>
           </p>
@@ -72,7 +72,7 @@
         </div>
 
         <div class="bg-brand-400/10 rounded-xl p-4 text-xs text-gray-400 space-y-1">
-          <p><span class="font-medium">权重配置：</span>平时 {{ cfg.regularWeight }}% + 期中 {{ cfg.midtermWeight }}% + 期末 {{ cfg.finalWeight }}%</p>
+          <p><span class="font-medium">权重配置：</span>平时 {{ cfg.regularWeight }}% + 期中 {{ cfg.midtermWeight }}% + 期末 {{ cfg.finalWeight }}%{{ qualityConfigText }}</p>
           <p v-if="cfg.regularWeight > 0">
             平时构成：自评 {{ cfg.selfEvalWeight }}% · 组内互评 {{ cfg.peerReviewWeight }}% · 组间互评 {{ cfg.interGroupEvalWeight }}% · 教师 {{ cfg.teacherScoreWeight }}% · 企业导师 {{ cfg.mentorScoreWeight }}%
           </p>
@@ -103,9 +103,18 @@ const props = defineProps<{
 
 const store = useAppStore()
 
-const qualityBonus = computed(() => {
+const qualityValue = computed(() => {
   if (!props.courseId || !props.studentId) return 0
   return store.getStudentQualityScore(props.courseId, props.studentId)
+})
+
+const usesQualityWeight = computed(() => (props.cfg.qualityEvalWeight ?? 0) > 0)
+const qualityLabel = computed(() => usesQualityWeight.value ? '素质评价' : '素质加成')
+const qualityConfigText = computed(() => {
+  if (usesQualityWeight.value) {
+    return ` + 素质评价 ${props.cfg.qualityEvalWeight ?? 0}%`
+  }
+  return `；素质加成上限 ${props.cfg.qualityEvalMaxBonus ?? 10} 分`
 })
 
 const wAvg = (subScores: { score: number | undefined; weight: number }[]): number => {

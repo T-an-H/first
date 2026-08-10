@@ -25,7 +25,13 @@
       <button v-for="tab in tabList" :key="tab.key"
         @click="activeTab = tab.key"
         :class="`px-5 py-2.5 text-sm font-medium rounded-t-lg transition-all ${activeTab === tab.key ? 'bg-white text-blue-600 border border-b-0 border-gray-200 -mb-px' : 'text-gray-500 hover:text-gray-700'}`">
-        <component :is="tab.icon" class="w-4 h-4 inline mr-1.5" />{{ tab.label }}
+        <component :is="tab.icon" class="w-4 h-4 inline mr-1.5" />
+        <span class="relative inline-flex items-center">
+          {{ tab.label }}
+          <span v-if="tabBadgeCount(tab.key) > 0"
+            :title="tabBadgeTitle(tab.key)"
+            class="absolute -top-1 -right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-white"></span>
+          </span>
       </button>
     </div>
 
@@ -113,25 +119,6 @@
               </div>
             </div>
 
-            <div class="flex items-center gap-3">
-              <label class="text-sm font-medium text-gray-700">企业导师参与评价</label>
-              <button @click="handleSetConfig({ hasMentor: !selectedConfig?.hasMentor })"
-                :class="`relative w-10 h-5 rounded-full transition-colors ${selectedConfig?.hasMentor ? 'bg-emerald-400' : 'bg-gray-300'}`">
-                <span :class="`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${selectedConfig?.hasMentor ? 'left-5.5' : 'left-0.5'}`" />
-              </button>
-              <span class="text-xs text-gray-400">{{ selectedConfig?.hasMentor ? '已启用' : '已禁用' }}</span>
-            </div>
-
-            <div>
-              <p class="text-sm font-medium text-gray-700 mb-2">逾期未评处理规则</p>
-              <div class="flex gap-3">
-                <button v-for="rule in OVERDUE_RULE_KEYS" :key="rule"
-                  @click="handleSetConfig({ overdueRule: rule })"
-                  :class="`px-4 py-2 rounded-lg border text-sm transition-all ${selectedConfig?.overdueRule === rule ? 'border-purple-300 bg-purple-50 text-purple-700 font-medium' : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'}`">
-                  {{ OverdueRuleLabels[rule] }}
-                </button>
-              </div>
-            </div>
           </div>
         </template>
 
@@ -173,21 +160,6 @@
               </div>
             </div>
 
-            <!-- 企业导师参与评价 -->
-            <div class="flex items-center gap-3">
-              <label class="text-sm font-medium text-gray-700">企业导师参与评价</label>
-              <span :class="`text-xs px-2.5 py-1 rounded-full border ${activeEvalConfig.hasMentor ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-gray-50 text-gray-400 border-gray-200'}`">
-                {{ activeEvalConfig.hasMentor ? '已启用' : '已禁用' }}
-              </span>
-            </div>
-
-            <!-- 逾期未评处理规则 -->
-            <div>
-              <p class="text-sm font-medium text-gray-700 mb-2">逾期未评处理规则</p>
-              <span class="inline-block px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-purple-700 text-sm">
-                {{ OverdueRuleLabels[activeEvalConfig.overdueRule] }}
-              </span>
-            </div>
           </div>
         </template>
       </div>
@@ -532,37 +504,22 @@
                       class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                       <Plus class="w-3 h-3" /> 添加项目
                     </button>
-                    <button v-if="midtermProjects.length > 1" @click="toggleMidtermProjectLock()"
-                      :disabled="!canLockProjectWeight('midterm') || isReadOnly || !canManageProjects"
-                      class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      :class="midtermProjectLocked ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'">
-                      <Lock class="w-3 h-3" /> {{ midtermProjectLocked ? '解锁' : '锁定' }}
-                    </button>
                   </div>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermProjects" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
-                        <button @click="handleSelectExam(e.name)"
+                        <button @click="handleSelectExam(e.name, e.type)"
                           :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                           {{ e.name }}
                         </button>
                         <div v-if="midtermProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
-                          <template v-if="isProjectWeightLocked(e.name)">
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                              disabled
-                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
-                            <Lock class="w-3 h-3 text-amber-500" />
-                            <button v-if="!isReadOnly && canManageProjects" @click="unlockProjectWeight(e.name)"
-                              class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
-                          </template>
-                          <template v-else>
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
-                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
-                          </template>
+                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
+                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v)), e.type) }"
+                            class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
+                          <Lock v-if="isProjectWeightLocked(e.name)" class="w-3 h-3 text-amber-500" />
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
                       </div>
@@ -614,7 +571,7 @@
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in midtermExams" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                      <button @click="handleSelectExam(e.name)"
+                      <button @click="handleSelectExam(e.name, e.type)"
                         :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                         {{ e.name }}
                       </button>
@@ -669,37 +626,22 @@
                       class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg bg-white text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                       <Plus class="w-3 h-3" /> 添加项目
                     </button>
-                    <button v-if="finalProjects.length > 1" @click="toggleFinalProjectLock()"
-                      :disabled="!canLockProjectWeight('final') || isReadOnly || !canManageProjects"
-                      class="flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      :class="finalProjectLocked ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'">
-                      <Lock class="w-3 h-3" /> {{ finalProjectLocked ? '解锁' : '锁定' }}
-                    </button>
                   </div>
                 </div>
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalProjects" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-3">
-                        <button @click="handleSelectExam(e.name)"
+                        <button @click="handleSelectExam(e.name, e.type)"
                           :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                           {{ e.name }}
                         </button>
                         <div v-if="finalProjects.length > 1" class="flex items-center gap-1.5">
                           <span class="text-[10px] text-gray-400">占比</span>
-                          <template v-if="isProjectWeightLocked(e.name)">
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                              disabled
-                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center bg-gray-50 text-gray-400" />
-                            <Lock class="w-3 h-3 text-amber-500" />
-                            <button v-if="!isReadOnly && canManageProjects" @click="unlockProjectWeight(e.name)"
-                              class="text-[10px] px-2 py-1 rounded text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors">修改</button>
-                          </template>
-                          <template v-else>
-                            <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name)"
-                              @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v))) }"
-                              class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
-                          </template>
+                          <input type="number" min="0" max="100" :value="store.getExamWeight(courseId, e.name, e.type)"
+                            @change="(ev) => { const v = parseInt((ev.target as HTMLInputElement).value); if (!isNaN(v)) store.setExamWeight(courseId, e.name, Math.min(100, Math.max(0, v)), e.type) }"
+                            class="w-14 px-2 py-1 border border-gray-200 rounded text-[10px] text-center" :disabled="isReadOnly || !canManageProjects" />
+                          <Lock v-if="isProjectWeightLocked(e.name)" class="w-3 h-3 text-amber-500" />
                           <span class="text-[10px] text-gray-400">%</span>
                         </div>
                       </div>
@@ -751,7 +693,7 @@
                 <div class="divide-y divide-gray-50">
                   <div v-for="e in finalExams" :key="e.name" class="px-4 py-3">
                     <div class="flex items-center justify-between">
-                      <button @click="handleSelectExam(e.name)"
+                      <button @click="handleSelectExam(e.name, e.type)"
                         :class="`text-xs px-2.5 py-1.5 rounded-lg border transition-all ${selectedExam === e.name ? 'bg-emerald-50 text-emerald-600 border-emerald-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
                         {{ e.name }}
                       </button>
@@ -1023,27 +965,121 @@
         <span class="text-xs text-blue-500 ml-auto">共 {{ enrolledStudents.length }} 名学生</span>
       </div>
 
-      <!-- 顶部全局操作栏：只保留新建班级和导入班级 -->
+      <!-- 顶部全局操作栏：搜索框 + 新建班级（含导入班级成员） -->
       <div class="flex items-center justify-between flex-wrap gap-2">
-        <h2 class="font-semibold text-gray-900 text-lg">班级管理</h2>
+        <div class="flex items-center gap-3 flex-wrap">
+          <h2 class="font-semibold text-gray-900 text-lg">班级管理</h2>
+          <!-- 学员搜索框 -->
+          <div class="relative">
+            <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input v-model="studentManageSearch" type="text" placeholder="搜索学员姓名/学号..."
+              class="w-64 pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none" />
+            <button v-if="studentManageSearch" @click="studentManageSearch = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
         <div v-if="!isViewOnly" class="flex gap-2 flex-wrap">
-          <button @click="showAddClass = true"
+          <button @click="openAddStudentModal"
+            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors shadow-sm">
+            <UserPlus class="w-3.5 h-3.5" />
+            新增学生
+          </button>
+          <button @click="openAddClassModal"
             class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-cyan-600 hover:bg-cyan-700 rounded-lg transition-colors shadow-sm">
             <Plus class="w-3.5 h-3.5" />
             新建班级
-          </button>
-          <button @click="handleImportClassDetail"
-            class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm">
-            <Upload class="w-3.5 h-3.5" />
-            导入班级
           </button>
         </div>
       </div>
 
       <!-- 班级横向等分板块 -->
-      <div v-if="classBlocks.length > 0" class="flex flex-nowrap gap-5 overflow-x-auto pb-2" style="scrollbar-width: thin;">
+      <!-- ====== 搜索结果区（当有搜索词时显示） ====== -->
+      <div v-if="studentManageSearch.trim()" class="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+          <span class="text-sm text-gray-600">
+            搜索 "<span class="font-medium text-gray-900">{{ studentManageSearch.trim() }}</span>" 找到
+            <span class="font-bold text-blue-600">{{ searchedStudentList.length }}</span> 名学员
+          </span>
+          <button @click="studentManageSearch = ''" class="text-xs text-gray-400 hover:text-gray-600">清除搜索</button>
+        </div>
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">姓名</th>
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">学号</th>
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">所在班级</th>
+              <th class="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">所在分组</th>
+              <th v-if="!isViewOnly" class="text-center px-4 py-2.5 text-xs font-medium text-gray-500 uppercase">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in searchedStudentList" :key="item.student.id" class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-2.5">
+                <div class="flex items-center gap-2">
+                  <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center">
+                    <span class="text-xs font-bold text-blue-600">{{ item.student.name[0] }}</span>
+                  </div>
+                  <span class="text-sm font-medium text-gray-900">{{ item.student.name }}</span>
+                </div>
+              </td>
+              <td class="px-4 py-2.5 text-sm text-gray-600">{{ item.student.studentId || '-' }}</td>
+              <td class="px-4 py-2.5">
+                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ item.student.className || '未分班' }}</span>
+              </td>
+              <td class="px-4 py-2.5">
+                <span v-if="item.groupName" class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{{ item.groupName }}</span>
+                <span v-else class="text-xs text-gray-400">未分组</span>
+              </td>
+              <td v-if="!isViewOnly" class="px-4 py-2.5">
+                <div class="flex flex-col gap-1.5 items-end">
+                  <!-- 分组操作 -->
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-gray-400 w-7 text-right">分组</span>
+                    <button v-if="item.groupName" @click="quickRemoveFromGroup(item.student.id)"
+                      class="px-2 py-0.5 text-[11px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors" title="移出当前分组">
+                      移出分组
+                    </button>
+                    <button v-else @click="openQuickAddToGroup(item.student.id)"
+                      class="px-2 py-0.5 text-[11px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors" title="加入分组">
+                      加入分组
+                    </button>
+                  </div>
+                  <!-- 班级操作 -->
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-gray-400 w-7 text-right">班级</span>
+                    <button v-if="item.student.className" @click="handleRemoveStudentFromClass(item.student.id)"
+                      class="px-2 py-0.5 text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 rounded transition-colors" title="移出当前班级">
+                      移出班级
+                    </button>
+                    <button v-else @click="openQuickAddToClass(item.student.id)"
+                      class="px-2 py-0.5 text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 rounded transition-colors" title="加入班级">
+                      加入班级
+                    </button>
+                  </div>
+                  <!-- 课程操作 -->
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-[10px] text-gray-400 w-7 text-right">课程</span>
+                    <button @click="handleRemoveStudent(item.student.id)"
+                      class="px-2 py-0.5 text-[11px] text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors" title="移出本课程">
+                      移出课程
+                    </button>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="searchedStudentList.length === 0">
+              <td :colspan="isViewOnly ? 4 : 5" class="px-4 py-12 text-center text-gray-400">没有匹配的学员</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ====== 班级板块（无搜索词时显示，排除未分班） ====== -->
+      <div v-if="!studentManageSearch.trim() && classedBlocks.length > 0" class="flex flex-nowrap gap-5 overflow-x-auto pb-2" style="scrollbar-width: thin;">
         <div
-          v-for="(classData, clsIdx) in classBlocks" :key="clsIdx"
+          v-for="(classData, clsIdx) in classedBlocks" :key="clsIdx"
           class="flex-1 min-w-[320px] bg-white rounded-xl border border-gray-100 shadow-sm p-5 group"
         >
           <!-- 班级标题 + 人数 + 操作 -->
@@ -1054,6 +1090,9 @@
               <span class="text-xs text-gray-400 font-normal">（{{ classData.students.length }}人）</span>
             </h3>
             <div v-if="!isViewOnly && classData.className" class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button @click.stop="openAddStudentToClass(classData.className)" class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="添加学员到班级">
+                <UserPlus class="w-3.5 h-3.5" />
+              </button>
               <button @click.stop="handleImportGroupsForClass(classData.className)" class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded" title="导入分组">
                 <Upload class="w-3.5 h-3.5" />
               </button>
@@ -1083,6 +1122,9 @@
                   </div>
                 </div>
                 <div v-if="!isViewOnly" class="flex gap-1 opacity-0 group-hover/grp:opacity-100 transition-opacity">
+                  <button @click.stop="openAddMemberToGroup(group)" class="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded" title="添加本班级未分组学员">
+                    <UserPlus class="w-3.5 h-3.5" />
+                  </button>
                   <button @click.stop="openEditGroupModal(group)" class="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="编辑分组">
                     <Pencil class="w-3.5 h-3.5" />
                   </button>
@@ -1092,10 +1134,16 @@
                 </div>
               </div>
               <div class="flex flex-wrap gap-1">
-                <span v-for="sid in group.memberIds" :key="sid"
-                  class="text-[11px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  {{ getStudentName(sid) }}
-                </span>
+                <template v-for="sid in group.memberIds" :key="sid">
+                  <span class="group/tag relative inline-flex items-center gap-1 text-[11px] pl-2 pr-1 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                    {{ getStudentName(sid) }}
+                    <button v-if="!isViewOnly" @click.stop="openRemoveMemberModal(group.id, sid)"
+                      class="w-3.5 h-3.5 rounded-full flex items-center justify-center text-indigo-400 hover:text-white hover:bg-red-500 transition-colors" title="移除学员">
+                      <X class="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                </template>
+                <span v-if="group.memberIds.length === 0" class="text-[11px] text-gray-400 italic">暂无成员</span>
               </div>
             </div>
           </div>
@@ -1115,9 +1163,86 @@
               <RefreshCw class="w-3.5 h-3.5" />一键分组
             </button>
           </div>
+
         </div>
       </div>
-      <div v-else class="text-center py-12 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
+
+      <!-- ====== 未分班学员面板（固定展开，位于班级板块下方） ====== -->
+      <div v-if="!studentManageSearch.trim() && unclassedStudents.length > 0" class="mt-4 bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+        <div class="flex items-center gap-2 px-5 py-3 bg-amber-50">
+          <Users class="w-4 h-4 text-amber-600" />
+          <span class="text-sm font-semibold text-amber-800">未分班学员</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-amber-200 text-amber-800">{{ unclassedStudents.length }}人</span>
+          <span class="text-xs text-amber-500">对其分组 / 班级 / 课程进行移出与加入</span>
+        </div>
+        <div class="p-4">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-gray-100">
+                <th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">姓名</th>
+                <th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">学号</th>
+                <th class="text-left px-3 py-2 text-xs font-medium text-gray-500 uppercase">所在分组</th>
+                <th v-if="!isViewOnly" class="text-center px-3 py-2 text-xs font-medium text-gray-500 uppercase">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="stu in unclassedStudents" :key="stu.id" class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td class="px-3 py-2.5">
+                  <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center">
+                      <span class="text-xs font-bold text-amber-600">{{ stu.name[0] }}</span>
+                    </div>
+                    <span class="text-sm font-medium text-gray-900">{{ stu.name }}</span>
+                  </div>
+                </td>
+                <td class="px-3 py-2.5 text-sm text-gray-600">{{ stu.studentId || stu.id }}</td>
+                <td class="px-3 py-2.5">
+                  <span v-if="getStudentGroupName(stu.id)" class="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{{ getStudentGroupName(stu.id) }}</span>
+                  <span v-else class="text-xs text-gray-400">未分组</span>
+                </td>
+                <td v-if="!isViewOnly" class="px-3 py-2.5">
+                  <div class="flex flex-col gap-1.5 items-end">
+                    <!-- 分组操作 -->
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] text-gray-400 w-7 text-right">分组</span>
+                      <button v-if="getStudentGroupName(stu.id)" @click="quickRemoveFromGroup(stu.id)"
+                        class="px-2 py-0.5 text-[11px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors" title="移出当前分组">
+                        移出分组
+                      </button>
+                      <button v-else @click="openQuickAddToGroup(stu.id)"
+                        class="px-2 py-0.5 text-[11px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors" title="加入分组">
+                        加入分组
+                      </button>
+                    </div>
+                    <!-- 班级操作 -->
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] text-gray-400 w-7 text-right">班级</span>
+                      <button v-if="stu.className" @click="handleRemoveStudentFromClass(stu.id)"
+                        class="px-2 py-0.5 text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 rounded transition-colors" title="移出当前班级">
+                        移出班级
+                      </button>
+                      <button v-else @click="openQuickAddToClass(stu.id)"
+                        class="px-2 py-0.5 text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 rounded transition-colors" title="加入班级">
+                        加入班级
+                      </button>
+                    </div>
+                    <!-- 课程操作 -->
+                    <div class="flex items-center gap-1.5">
+                      <span class="text-[10px] text-gray-400 w-7 text-right">课程</span>
+                      <button @click="handleRemoveStudent(stu.id)"
+                        class="px-2 py-0.5 text-[11px] text-red-700 bg-red-50 hover:bg-red-100 rounded transition-colors" title="移出本课程">
+                        移出课程
+                      </button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div v-if="!studentManageSearch.trim() && classBlocks.length === 0" class="text-center py-12 text-gray-400 bg-white rounded-xl border border-dashed border-gray-200">
         <Users class="w-12 h-12 mx-auto mb-3 opacity-30" />
         <p>暂无班级数据，请先导入学生</p>
       </div>
@@ -1134,19 +1259,12 @@
               <button @click="showOneClickGroup = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
             </div>
             <div class="space-y-4">
-              <!-- 选择班级 -->
+              <!-- 当前班级（只读显示） -->
               <div>
-                <label class="text-xs text-gray-500 block mb-1.5 font-medium">选择班级</label>
-                <select
-                  v-model="oneClickGroupData.className"
-                  @change="oneClickGroupData.groupCount = Math.max(2, Math.ceil(getClassStudentCount(oneClickGroupData.className) / 3))"
-                  class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400 outline-none"
-                >
-                  <option value="" disabled>请选择班级</option>
-                  <option v-for="cb in classBlocks" :key="cb.className" :value="cb.className">
-                    {{ cb.className || '未分班' }}（{{ cb.students.length }}人）
-                  </option>
-                </select>
+                <label class="text-xs text-gray-500 block mb-1.5 font-medium">当前班级</label>
+                <div class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-700">
+                  {{ oneClickGroupData.className || '未分班' }}
+                </div>
               </div>
 
               <!-- 班级总人数 -->
@@ -1203,25 +1321,112 @@
         </div>
       </Teleport>
 
-      <!-- ====== 新增班级弹窗 ====== -->
+      <!-- ====== 新增班级弹窗（含一键导入班级成员） ====== -->
       <Teleport to="body">
         <div v-if="showAddClass" class="fixed inset-0 z-50 flex items-center justify-center">
           <div class="absolute inset-0 bg-black/50" @click="showAddClass = false" />
-          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-4">
               <h3 class="font-semibold text-gray-900 text-lg">新增班级</h3>
               <button @click="showAddClass = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
             </div>
-            <div class="space-y-3">
+            <div class="space-y-4">
+              <!-- 班级名称 -->
               <div>
-                <label class="text-xs text-gray-500 block mb-1">班级名称</label>
+                <label class="text-xs text-gray-500 block mb-1">班级名称 <span class="text-red-500">*</span></label>
                 <input v-model="addClassForm.className" placeholder="输入班级名称，如：软件工程一班"
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-400 outline-none" />
               </div>
+
+              <!-- 一键导入班级成员 -->
+              <div class="border-t border-gray-100 pt-4">
+                <div class="flex items-center justify-between mb-2">
+                  <label class="text-xs text-gray-500">导入班级成员（可选）</label>
+                  <div class="flex items-center gap-2">
+                    <span v-if="addClassFileName" class="text-xs text-gray-400 truncate max-w-[160px]" :title="addClassFileName">{{ addClassFileName }}</span>
+                    <button v-if="addClassMembers.length > 0" @click="clearAddClassMembers"
+                      class="text-xs text-red-500 hover:text-red-600">清空</button>
+                  </div>
+                </div>
+                <input ref="addClassExcelInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="handleAddClassExcel" />
+                <button type="button" @click="addClassExcelInput?.click()"
+                  class="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-teal-700 bg-teal-50 hover:bg-teal-100 border border-dashed border-teal-300 rounded-lg transition-colors">
+                  <Upload class="w-4 h-4" />
+                  {{ addClassMembers.length > 0 ? `已解析 ${addClassMembers.length} 名成员，点击重新选择` : '一键导入班级成员信息（Excel）' }}
+                </button>
+                <p class="text-[11px] text-gray-400 mt-1.5">支持列：学生姓名 / 学生学号；已存在的学生会自动匹配，不存在将自动新建并加入本课程</p>
+
+                <!-- 解析出的成员预览 -->
+                <div v-if="addClassMembers.length > 0" class="mt-2 max-h-48 overflow-y-auto border border-gray-100 rounded-lg">
+                  <table class="w-full">
+                    <thead class="sticky top-0 bg-gray-50">
+                      <tr class="border-b border-gray-100">
+                        <th class="text-left px-3 py-1.5 text-[11px] font-medium text-gray-500">#</th>
+                        <th class="text-left px-3 py-1.5 text-[11px] font-medium text-gray-500">学生姓名</th>
+                        <th class="text-left px-3 py-1.5 text-[11px] font-medium text-gray-500">学生学号</th>
+                        <th class="text-left px-3 py-1.5 text-[11px] font-medium text-gray-500">状态</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(m, i) in addClassMembers" :key="i" class="border-b border-gray-50">
+                        <td class="px-3 py-1.5 text-xs text-gray-400">{{ i + 1 }}</td>
+                        <td class="px-3 py-1.5 text-xs text-gray-700">{{ m.name || '-' }}</td>
+                        <td class="px-3 py-1.5 text-xs text-gray-700">{{ m.studentId || '-' }}</td>
+                        <td class="px-3 py-1.5">
+                          <span v-if="m.existing" class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">已存在</span>
+                          <span v-else class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">将新建</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <div class="flex gap-2 pt-2">
                 <button @click="showAddClass = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
                 <button @click="saveAddClass" :disabled="!addClassForm.className.trim()"
                   class="flex-1 px-4 py-2 text-sm text-white bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">保存</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- ====== 新增学生弹窗（加入本课程） ====== -->
+      <Teleport to="body">
+        <div v-if="showAddStudentModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showAddStudentModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-gray-900 text-lg">新增学生</h3>
+              <button @click="showAddStudentModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-4 h-4" /></button>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">新增单个学生并将其加入本课程（用于补录班级导入遗漏的学生）</p>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">学生姓名 <span class="text-red-500">*</span></label>
+                <input v-model="addStudentForm.name" placeholder="请输入学生姓名"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">学号</label>
+                <input v-model="addStudentForm.studentId" placeholder="可选，输入学号（留空将自动生成）"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none" />
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">所属班级</label>
+                <select v-model="addStudentForm.className"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:border-emerald-400 outline-none">
+                  <option value="">不分配班级（未分班）</option>
+                  <option v-for="cb in classBlocks.filter(c => c.className)" :key="cb.className" :value="cb.className">
+                    {{ cb.className }}
+                  </option>
+                </select>
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="showAddStudentModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="saveAddStudent" :disabled="!addStudentForm.name.trim()"
+                  class="flex-1 px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">加入课程</button>
               </div>
             </div>
           </div>
@@ -1258,7 +1463,7 @@
         <div v-if="showGroupModal" class="fixed inset-0 z-50 flex items-center justify-center">
           <div class="absolute inset-0 bg-black/50" @click="showGroupModal = false" />
           <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">新建分组</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ editingGroup ? '修改分组' : '新建分组' }}</h3>
             <div class="space-y-3">
               <div>
                 <label class="text-xs text-gray-500 block mb-1">所属班级</label>
@@ -1328,9 +1533,210 @@
           </div>
         </div>
       </Teleport>
+
+      <!-- ====== 添加学员到分组弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showAddMemberModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showAddMemberModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">添加学员到分组</h3>
+                <p class="text-xs text-gray-400 mt-0.5">分组：{{ addMemberGroupName }} · 仅显示本班级未分组学员</p>
+              </div>
+              <button @click="showAddMemberModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-5 h-5" /></button>
+            </div>
+            <div class="space-y-3">
+              <div class="relative">
+                <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input v-model="addMemberSearch" type="text" placeholder="搜索学员姓名或学号..."
+                  class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-400 outline-none" />
+              </div>
+              <div class="max-h-60 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                <div v-for="stu in candidateAddMembers" :key="stu.id"
+                  @click="toggleAddMember(stu.id)"
+                  class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+                  :class="addMemberSelected.includes(stu.id) ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-gray-50 text-gray-600'">
+                  <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                    :class="addMemberSelected.includes(stu.id) ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300'">
+                    <span v-if="addMemberSelected.includes(stu.id)" class="text-white text-[10px]">✓</span>
+                  </div>
+                  <span class="flex-1">{{ stu.name }}</span>
+                  <span class="text-xs text-gray-400">{{ stu.studentId || stu.id }}</span>
+                </div>
+                <div v-if="candidateAddMembers.length === 0" class="text-center py-6 text-xs text-gray-400">
+                  该班级没有未分组学员
+                </div>
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="showAddMemberModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="confirmAddMembersToGroup" :disabled="addMemberSelected.length === 0"
+                  class="flex-1 px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">
+                  添加（{{ addMemberSelected.length }}）
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- ====== 添加学员到班级弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showAddStudentToClassModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showAddStudentToClassModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900">添加学员到班级</h3>
+                <p class="text-xs text-gray-400 mt-0.5">目标班级：{{ addStudentToClassName }} · 仅显示已选课且不在此班级的学员</p>
+              </div>
+              <button @click="showAddStudentToClassModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-5 h-5" /></button>
+            </div>
+            <div class="space-y-3">
+              <div class="relative">
+                <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input v-model="addStudentToClassSearch" type="text" placeholder="搜索学员姓名或学号..."
+                  class="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-blue-400 outline-none" />
+              </div>
+              <div class="max-h-60 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
+                <div v-for="stu in candidateAddStudentsToClass" :key="stu.id"
+                  @click="toggleAddStudentToClass(stu.id)"
+                  class="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-sm"
+                  :class="addStudentToClassSelected.includes(stu.id) ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-gray-50 text-gray-600'">
+                  <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                    :class="addStudentToClassSelected.includes(stu.id) ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300'">
+                    <span v-if="addStudentToClassSelected.includes(stu.id)" class="text-white text-[10px]">✓</span>
+                  </div>
+                  <span class="flex-1">{{ stu.name }}</span>
+                  <span class="text-xs text-gray-400">{{ stu.studentId || stu.id }}</span>
+                  <span class="text-[10px] text-gray-400">当前：{{ stu.className || '未分班' }}</span>
+                </div>
+                <div v-if="candidateAddStudentsToClass.length === 0" class="text-center py-6 text-xs text-gray-400">
+                  没有可添加的学员
+                </div>
+              </div>
+              <div class="flex gap-2 pt-2">
+                <button @click="showAddStudentToClassModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
+                <button @click="confirmAddStudentsToClass" :disabled="addStudentToClassSelected.length === 0"
+                  class="flex-1 px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">
+                  添加（{{ addStudentToClassSelected.length }}）
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div v-if="showRemoveMemberModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showRemoveMemberModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">移除学员</h3>
+              <button @click="showRemoveMemberModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-5 h-5" /></button>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">请选择移除方式（学员：<span class="font-medium text-gray-700">{{ removeMemberStudentName }}</span>）</p>
+            <div class="space-y-3">
+              <button @click="confirmRemoveMemberFromGroup"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors">
+                <UserMinus class="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                <div>
+                  <p class="text-sm font-medium text-indigo-700">移出分组</p>
+                  <p class="text-xs text-indigo-400">仅从当前分组移除，仍保留在班级中</p>
+                </div>
+              </button>
+              <button @click="confirmRemoveMemberFromClass"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors">
+                <LogOut class="w-5 h-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p class="text-sm font-medium text-amber-700">移出班级</p>
+                  <p class="text-xs text-amber-400">设为未分班，并从所有分组中移除</p>
+                </div>
+              </button>
+              <button @click="confirmRemoveMemberFromCourse"
+                class="w-full flex items-center gap-3 px-4 py-3 text-left bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors">
+                <Trash2 class="w-5 h-5 text-red-600 flex-shrink-0" />
+                <div>
+                  <p class="text-sm font-medium text-red-700">移出本课程</p>
+                  <p class="text-xs text-red-400">删除选课记录，不可恢复</p>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+      <!-- ====== 快捷加入分组弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showQuickAddGroupModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showQuickAddGroupModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">加入分组</h3>
+              <button @click="showQuickAddGroupModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-5 h-5" /></button>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">为学员 <span class="font-medium text-gray-700">{{ quickAddGroupStudentName }}</span> 选择目标分组</p>
+            <div v-if="quickAddGroupCandidates.length === 0" class="text-center py-6 text-sm text-gray-400">
+              暂无可加入的分组（请确认该学员已分班，或所在班级下已建立分组）
+            </div>
+            <div v-else class="space-y-2 max-h-64 overflow-y-auto">
+              <button v-for="g in quickAddGroupCandidates" :key="g.id" @click="quickAddGroupSelected = g.id"
+                :class="['w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-lg border transition-colors', quickAddGroupSelected === g.id ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200 hover:bg-gray-50']">
+                <div class="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-700">
+                  {{ g.name.charAt(0) }}
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-gray-900">{{ g.name }}</p>
+                  <p class="text-[11px] text-gray-400">{{ g.memberIds.length }} 名成员</p>
+                </div>
+                <CheckCircle v-if="quickAddGroupSelected === g.id" class="w-4 h-4 text-indigo-600" />
+              </button>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+              <button @click="showQuickAddGroupModal = false" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
+              <button :disabled="!quickAddGroupSelected" @click="confirmQuickAddToGroup"
+                class="px-3 py-1.5 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors">确认加入</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+      <!-- ====== 快捷加入班级弹窗 ====== -->
+      <Teleport to="body">
+        <div v-if="showQuickAddClassModal" class="fixed inset-0 z-50 flex items-center justify-center">
+          <div class="absolute inset-0 bg-black/50" @click="showQuickAddClassModal = false" />
+          <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">加入班级</h3>
+              <button @click="showQuickAddClassModal = false" class="text-gray-400 hover:text-gray-600"><X class="w-5 h-5" /></button>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">为学员 <span class="font-medium text-gray-700">{{ quickAddClassStudentName }}</span> 选择目标班级</p>
+            <div v-if="quickAddClassCandidates.length === 0" class="text-center py-6 text-sm text-gray-400">
+              暂无可加入的班级
+            </div>
+            <div v-else class="space-y-2 max-h-64 overflow-y-auto">
+              <button v-for="cn in quickAddClassCandidates" :key="cn" @click="quickAddClassSelected = cn"
+                :class="['w-full flex items-center gap-3 px-4 py-2.5 text-left rounded-lg border transition-colors', quickAddClassSelected === cn ? 'bg-amber-50 border-amber-300' : 'bg-white border-gray-200 hover:bg-gray-50']">
+                <div class="w-7 h-7 rounded-md bg-amber-50 flex items-center justify-center text-xs font-bold text-amber-700">
+                  {{ cn.charAt(0) }}
+                </div>
+                <p class="flex-1 text-sm font-medium text-gray-900">{{ cn }}</p>
+                <CheckCircle v-if="quickAddClassSelected === cn" class="w-4 h-4 text-amber-600" />
+              </button>
+            </div>
+            <div class="mt-5 flex justify-end gap-2">
+              <button @click="showQuickAddClassModal = false" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
+              <button :disabled="!quickAddClassSelected" @click="confirmQuickAddToClass"
+                class="px-3 py-1.5 text-sm text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors">确认加入</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </div>
 
     <!-- ===== 素质评价 Tab ===== -->
+    <!-- Tab: 作业管理 -->
+    <div v-if="activeTab === 'homework'" class="space-y-6">
+      <TeacherHomework :course-id="courseId" />
+    </div>
+
     <div v-if="activeTab === 'quality-eval'" class="space-y-6">
       <div class="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-xl p-5 border border-emerald-100">
         <div class="flex items-center justify-between">
@@ -1425,7 +1831,8 @@
                   待批改
                 </span>
               </div>
-              <div v-if="!isViewOnly" class="flex items-center gap-3 flex-wrap mt-3">
+              <!-- 未批改：可编辑评分 -->
+              <div v-if="!isViewOnly && getQualityCurrentSub(qe).score === undefined" class="flex items-center gap-3 flex-wrap mt-3">
                 <label class="text-sm font-medium text-gray-700">评分 (0-100)：</label>
                 <input type="number" min="0" max="100"
                   :value="getQualityCurrentSub(qe).score !== undefined ? getQualityCurrentSub(qe).score : ''"
@@ -1434,7 +1841,16 @@
                   placeholder="分数" />
                 <span class="text-xs text-gray-400">（折算为最多 {{ gradeConfig.qualityEvalMaxBonus ?? 10 }} 分加成到总分）</span>
               </div>
-              <div v-if="!isViewOnly" class="flex items-center gap-2 mt-2">
+              <!-- 已批改：分数只读 -->
+              <div v-else-if="getQualityCurrentSub(qe).score !== undefined" class="flex items-center gap-3 flex-wrap mt-3">
+                <label class="text-sm font-medium text-gray-700">评分：</label>
+                <span class="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-sm font-bold rounded-lg border border-emerald-200">
+                  {{ getQualityCurrentSub(qe).score }} 分
+                </span>
+                <span class="text-xs text-gray-400">（已保存，不可修改）</span>
+              </div>
+              <!-- 未批改：可编辑评语 + 保存 -->
+              <div v-if="!isViewOnly && getQualityCurrentSub(qe).score === undefined" class="flex items-center gap-2 mt-2">
                 <label class="text-xs text-gray-500">评语：</label>
                 <input type="text"
                   :value="getQualityCurrentSub(qe).teacherComment || ''"
@@ -1472,13 +1888,14 @@ import { useAppStore } from '@/stores/app'
 import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
+import TeacherHomework from '@/components/Homework/TeacherHomework.vue'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
   EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
-  EvalFrequencyDescs, OverdueRuleLabels, getDefaultGradeConfig
+  EvalFrequencyDescs, getDefaultGradeConfig
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
-import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText } from 'lucide-vue-next'
+import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import * as echarts from 'echarts'
 
@@ -1491,15 +1908,21 @@ const course = computed(() => store.courses.find((c) => c.id === courseId.value)
 const isReadOnly = computed(() => course.value?.status !== 'active')
 /** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由（我的课程/详情均为导师视图） */
 const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
-/** 领导视图：学院领导身份进入课程详情（只读查看） */
-const isLeaderView = computed(() => store.currentRole === 'leader' || route.path.startsWith('/leader'))
+/** 领导以教师身份进入 /teacher 路由（教师部分视图） */
+const isLeaderTeacherRoute = computed(() => store.currentRole === 'leader' && route.path.startsWith('/teacher'))
+/** 领导视图：学院领导身份进入 /leader 路由（领导段，只读查看） */
+const isLeaderView = computed(() => store.currentRole === 'leader' && route.path.startsWith('/leader'))
 /**
- * 是否仅查看：非该课程授课教师（导师 / 领导 / 其他教师）只能查看老师录入的内容，
+ * 是否仅查看：导师 / 领导段 / 非本课程授课教师只能查看老师录入的内容，
  * 不能修改课程配置、成绩、评价方案、学生管理等。导师仍可在评价管理中提交自己的导师评价。
+ * 领导在教师段时：仅当课程为其专属授课课程时与普通教师一致（可完整管理），否则只读。
  */
 const isViewOnly = computed(() => {
   if (isMentor.value || isLeaderView.value) return true
   const c = course.value
+  if (isLeaderTeacherRoute.value) {
+    return c ? !store.isLeaderTeacherCourse(store.currentUser || '', c.id) : true
+  }
   return c ? c.teacher !== store.currentUser : false
 })
 /** 能否操作评价管理：授课教师可评教师评价，企业导师（含领导以导师身份进入）可提交自己的导师评价；领导/其他教师仅查看 */
@@ -1549,13 +1972,13 @@ onMounted(async () => {
 /** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
 function normalizeProjectShares() {
   if (!courseId.value) return
-  const apply = (projects: { name: string }[]) => {
-    const names = projects.map((p) => p.name)
-    if (names.length === 0) return
-    if (names.some((n) => store.getExamWeight(courseId.value || '', n) > 0)) return
-    const eachShare = Math.floor(100 / names.length)
-    names.forEach((n, i) =>
-      store.setExamWeight(courseId.value!, n, i === names.length - 1 ? 100 - eachShare * (names.length - 1) : eachShare))
+  const apply = (projects: { name: string; type: string }[]) => {
+    const items = projects.map((p) => ({ name: p.name, type: p.type }))
+    if (items.length === 0) return
+    if (items.some((it) => store.getExamWeight(courseId.value || '', it.name, it.type) > 0)) return
+    const eachShare = Math.floor(100 / items.length)
+    items.forEach((it, i) =>
+      store.setExamWeight(courseId.value!, it.name, i === items.length - 1 ? 100 - eachShare * (items.length - 1) : eachShare, it.type))
   }
   apply(midtermProjects.value)
   apply(finalProjects.value)
@@ -1594,12 +2017,52 @@ const completedCount = computed(() =>
 
 // ---- Tab 配置 ----
 const tabList = [
+  { key: 'students',     label: '学生管理', icon: Users },
   { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
+  { key: 'homework',     label: '作业管理', icon: BookOpen },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
   { key: 'grade-config', label: '成绩配置', icon: Settings },
   { key: 'grade-entry',  label: '成绩管理', icon: TrendingUp },
-  { key: 'students',     label: '学生管理', icon: Users },
 ]
+
+/** Tab 红点提醒：检测该 tab 下未处理的事务数量，支持红点一路溯源 */
+function tabBadgeCount(tabKey: string): number {
+  if (!courseId.value) return 0
+  const user = store.currentUser || ''
+  if (tabKey === 'comments') {
+    // 当前用户在该课程待完成的评价（教师→自己作为授课者收到的提醒，导师→自己作为导师收到的提醒）
+    const myTargetId = store.currentRole === 'student'
+      ? (store.students.find((s) => s.name === user)?.id ?? '')
+      : user
+    return store.evalReminders.filter(
+      (r) => r.courseId === courseId.value && r.studentId === myTargetId && r.status !== 'completed'
+    ).length
+  }
+  if (tabKey === 'quality-eval') {
+    // 仅授课教师/领导专属授课可批改，其余角色（导师/领导只读段/非授课教师）不提醒
+    if (isViewOnly.value) return 0
+    return store.countPendingQualitySubmissions(courseId.value)
+  }
+  if (tabKey === 'grade-config') {
+    if (isViewOnly.value || isReadOnly.value) return 0
+    return store.isCourseConfigPending(courseId.value) ? 1 : 0
+  }
+  return 0
+}
+
+/** Tab 红点 tooltip：说明具体待处理事项，点击即可前往处理 */
+function tabBadgeTitle(tabKey: string): string {
+  if (tabKey === 'comments') {
+    const n = tabBadgeCount('comments')
+    return `有 ${n} 条未完成的评价，点击前往`
+  }
+  if (tabKey === 'quality-eval') {
+    const n = tabBadgeCount('quality-eval')
+    return `有 ${n} 份素质评价待批改，点击前往`
+  }
+  if (tabKey === 'grade-config') return '成绩权重/评价方案尚未配置完成，点击前往'
+  return ''
+}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
@@ -1616,7 +2079,6 @@ const LEVEL_OPTIONS = [
 const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
 const EVAL_TEMPLATE_KEYS = Object.keys(EvalTemplateLabels) as EvalTemplate[]
 const EVAL_FREQUENCY_KEYS = Object.keys(EvalFrequencyLabels) as EvalFrequency[]
-const OVERDUE_RULE_KEYS = Object.keys(OverdueRuleLabels) as OverdueRule[]
 const ExamTypeLabels: Record<string, string> = {
   midterm_exam: '期中考试',
   midterm_project: '期中项目',
@@ -1637,7 +2099,7 @@ const isWeightLocked = computed(() => {
 // ---- 状态 ----
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
 const activeTab = ref<string>(
-  tabList.some((t) => t.key === route.query.tab) ? (route.query.tab as string) : 'comments'
+  tabList.some((t) => t.key === route.query.tab) ? (route.query.tab as string) : 'students'
 )
 const studentSearch = ref('')
 
@@ -1663,23 +2125,222 @@ const editStudentName = ref('')
 const editStudentIdField = ref('')
 const editStudentClass = ref('')
 const editStudentGroupId = ref('')
-// 新增班级
+// 新增班级（含一键导入班级成员）
 const showAddClass = ref(false)
 const addClassForm = ref({ className: '', studentIds: [] as string[] })
-function toggleAddClassStudent(studentId: string) {
-  const idx = addClassForm.value.studentIds.indexOf(studentId)
-  if (idx >= 0) {
-    addClassForm.value.studentIds.splice(idx, 1)
-  } else {
-    addClassForm.value.studentIds.push(studentId)
-  }
-}
-function saveAddClass() {
-  const className = addClassForm.value.className.trim()
-  if (!className) return
+const addClassExcelInput = ref<HTMLInputElement | null>(null)
+const addClassFileName = ref('')
+const addClassMembers = ref<{ name: string; studentId: string; existing: boolean }[]>([])
+
+/** 打开新增班级弹窗，重置表单与导入数据 */
+function openAddClassModal() {
   addClassForm.value = { className: '', studentIds: [] }
+  addClassFileName.value = ''
+  addClassMembers.value = []
+  showAddClass.value = true
+}
+
+/** 清空已解析的班级成员 */
+function clearAddClassMembers() {
+  addClassFileName.value = ''
+  addClassMembers.value = []
+  if (addClassExcelInput.value) addClassExcelInput.value.value = ''
+}
+
+/** 解析新增班级弹窗中选择的 Excel，提取成员并标记是否已存在 */
+async function handleAddClassExcel(e: Event) {
+  const target = e.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  addClassFileName.value = file.name
+  try {
+    const XLSX = await import('xlsx')
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data, { type: 'array' })
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
+    const members: { name: string; studentId: string; existing: boolean }[] = []
+    for (const row of rows) {
+      const stuName = (row['学生姓名'] || row['name'] || '').toString().trim()
+      const stuId = (row['学生学号'] || row['studentId'] || '').toString().trim()
+      if (!stuName && !stuId) continue
+      const match = store.students.find(s =>
+        (stuId && (s.studentId === stuId || s.id === stuId)) ||
+        (stuName && s.name === stuName)
+      )
+      members.push({ name: stuName, studentId: stuId, existing: !!match })
+    }
+    addClassMembers.value = members
+    if (members.length === 0) alert('未从文件中解析出有效成员，请检查表格列：学生姓名 / 学生学号')
+  } catch (err) {
+    console.error(err)
+    alert('解析文件失败，请确认上传的是有效的 Excel/CSV 文件')
+    addClassMembers.value = []
+  }
+  target.value = ''
+}
+
+/** 保存新增班级：创建班级并处理导入的成员（匹配/新建学生、分配班级、选课） */
+async function saveAddClass() {
+  const className = addClassForm.value.className.trim()
+  if (!className || !courseId.value) return
+  let assignedCount = 0
+  let createdCount = 0
+  const course = store.courses.find((c: any) => c.id === courseId.value)
+
+  for (const m of addClassMembers.value) {
+    // 查找已有学生（按学号/ID 或姓名）
+    let student = m.studentId
+      ? store.students.find(s => s.id === m.studentId || s.studentId === m.studentId || (m.name && s.name === m.name))
+      : (m.name ? store.students.find(s => s.name === m.name) : undefined)
+    if (!student) {
+      const id = m.studentId || `stu-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      store.addStudent({
+        id,
+        name: m.name || m.studentId,
+        phone: '',
+        email: '',
+        avatar: '',
+        joinDate: getNow().toISOString().split('T')[0],
+        status: 'active',
+        studentId: m.studentId || undefined,
+        className,
+      })
+      student = store.students.find(s => s.id === id)!
+      createdCount++
+    } else {
+      store.updateStudent(student.id, { className })
+      assignedCount++
+    }
+    // 选课（避免重复）
+    const enrolled = store.enrollments.some(
+      e => e.courseId === courseId.value && e.studentId === student!.id && e.status !== 'dropped'
+    )
+    if (!enrolled) {
+      const enrId = `enr-${courseId.value}-${student!.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+      store.addEnrollment({
+        id: enrId,
+        courseId: courseId.value,
+        studentId: student!.id,
+        scheduleId: '',
+        status: 'enrolled',
+        progress: 0,
+        enrollDate: getNow().toISOString().split('T')[0],
+      })
+      try {
+        await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
+        })
+      } catch {}
+    }
+    try {
+      await fetch(`http://localhost:3000/api/teaching/students/${student!.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ className }),
+      })
+    } catch {}
+  }
+
+  // 同步到课程管理：为该班级创建排课记录
+  if (course && addClassMembers.value.length > 0) {
+    try {
+      await fetch('http://localhost:3000/api/schedules/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schedules: [{
+            courseId: courseId.value,
+            title: course.title,
+            teacher: course.teacher || '',
+            className,
+            room: '待定',
+            startDate: new Date().toISOString().split('T')[0],
+            timeSlot: '09:00-11:00',
+          }],
+        }),
+      })
+    } catch {}
+  }
+
+  const total = addClassMembers.value.length
+  const msg = total > 0
+    ? `已创建班级"${className}"，共处理 ${total} 名成员（匹配已有 ${assignedCount} 人，新建 ${createdCount} 人）`
+    : `已创建班级"${className}"`
+  addClassForm.value = { className: '', studentIds: [] }
+  addClassFileName.value = ''
+  addClassMembers.value = []
   showAddClass.value = false
-  alert(`已创建班级"${className}"`)
+  alert(msg)
+}
+// 新增单个学生（加入本课程）
+const showAddStudentModal = ref(false)
+const addStudentForm = ref({ name: '', studentId: '', className: '' })
+
+function openAddStudentModal() {
+  addStudentForm.value = { name: '', studentId: '', className: '' }
+  showAddStudentModal.value = true
+}
+
+async function saveAddStudent() {
+  if (!courseId.value) return
+  const name = addStudentForm.value.name.trim()
+  if (!name) return
+  const sid = addStudentForm.value.studentId.trim()
+  const targetClass = addStudentForm.value.className.trim()
+  // 查找已有学生（按学号/ID 或姓名）
+  let student = sid
+    ? store.students.find((s) => s.id === sid || s.studentId === sid || s.name === name)
+    : store.students.find((s) => s.name === name)
+  if (!student) {
+    const id = sid || `stu-${Date.now()}`
+    store.addStudent({
+      id,
+      name,
+      phone: '',
+      email: '',
+      avatar: '',
+      joinDate: getNow().toISOString().split('T')[0],
+      status: 'active',
+      studentId: sid || undefined,
+      className: targetClass || undefined,
+    })
+    student = store.students.find((s) => s.id === id)!
+  } else if (targetClass) {
+    // 已有学生，若指定班级则更新其班级归属
+    store.updateStudent(student.id, { className: targetClass })
+  }
+  // 检查是否已选本课程
+  const exists = store.enrollments.some(
+    (e) => e.courseId === courseId.value && e.studentId === student!.id && e.status !== 'dropped'
+  )
+  if (exists) {
+    alert(`学生"${name}"已在本课程中，无需重复加入`)
+    showAddStudentModal.value = false
+    return
+  }
+  const enrId = `enr-${courseId.value}-${student!.id}-${Date.now()}`
+  store.addEnrollment({
+    id: enrId,
+    courseId: courseId.value,
+    studentId: student!.id,
+    scheduleId: '',
+    status: 'enrolled',
+    progress: 0,
+    enrollDate: getNow().toISOString().split('T')[0],
+  })
+  // 同步到 MySQL
+  try {
+    await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
+    })
+  } catch {}
+  showAddStudentModal.value = false
+  alert(`已将"${name}"加入本课程`)
 }
 // 编辑班级
 const showEditClassModal = ref(false)
@@ -1709,63 +2370,6 @@ function handleDeleteClass(className: string) {
       store.updateStudent(stu.id, { className: '' })
     }
   }
-}
-/** Excel 导入班级信息 */
-async function handleImportClassDetail() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.xlsx,.xls,.csv'
-  input.onchange = async (e: any) => {
-    const file = e.target?.files?.[0]
-    if (!file || !courseId.value) return
-    const XLSX = await import('xlsx')
-    const data = await file.arrayBuffer()
-    const workbook = XLSX.read(data, { type: 'array' })
-    const sheet = workbook.Sheets[workbook.SheetNames[0]]
-    const rows: any[] = XLSX.utils.sheet_to_json(sheet)
-    let classCount = 0, assignedCount = 0
-    const addedClasses = new Set<string>()
-    for (const row of rows) {
-      const className = (row['班级名称'] || row['className'] || '').toString().trim()
-      if (!className) continue
-      classCount++
-      const stuName = (row['学生姓名'] || row['name'] || '').toString().trim()
-      const stuId = (row['学生学号'] || row['studentId'] || '').toString().trim()
-      if (stuName || stuId) {
-        const match = store.students.find(s =>
-          (stuId && (s.studentId === stuId || s.id === stuId)) ||
-          (stuName && s.name === stuName)
-        )
-        if (match) {
-          store.updateStudent(match.id, { className })
-          try { await fetch(`http://localhost:3000/api/teaching/students/${match.id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ className }) }) } catch {}
-          assignedCount++
-        }
-      }
-      addedClasses.add(className)
-    }
-    // 同步到课程管理：为每个班级创建排课记录
-    const course = store.courses.find((c: any) => c.id === courseId.value)
-    if (course) {
-      const schedules: any[] = []
-      for (const cn of addedClasses) {
-        schedules.push({
-          courseId: courseId.value,
-          title: course.title,
-          teacher: course.teacher || '',
-          className: cn,
-          room: '待定',
-          startDate: new Date().toISOString().split('T')[0],
-          timeSlot: '09:00-11:00',
-        })
-      }
-      if (schedules.length > 0) {
-        try { await fetch('http://localhost:3000/api/schedules/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ schedules }) }) } catch {}
-      }
-    }
-    alert(`导入完成：共 ${classCount} 个班级，已分配 ${assignedCount} 名学生（已同步到课程管理）`)
-  }
-  input.click()
 }
 // 一键分组
 const showOneClickGroup = ref(false)
@@ -1822,6 +2426,8 @@ const newExamName = ref('')
 const newExamFullScore = ref(100)
 const newExamType = ref<'midterm_project' | 'final_project'>('midterm_project')
 const selectedExam = ref('')
+type ExamType = 'midterm_exam' | 'midterm_project' | 'final_exam' | 'final_project' | 'quiz' | 'assignment'
+const selectedExamType = ref<ExamType | ''>('')
 const gradeSearch = ref('')
 const gradeEntrySearch = ref('')
 const examInputs = ref<Record<string, number>>({})
@@ -1903,14 +2509,19 @@ function toggleFinalProjectLock() {
   if (courseId.value) store.setProjectWeightLock(courseId.value, 'final', finalProjectLocked.value)
 }
 
-/** 页面加载时从持久化状态恢复期中/期末项目占比锁定 */
+/** 页面加载时根据占比合计自动设置期中/期末项目占比锁定状态 */
 function syncProjectWeightLocksFromStore() {
   if (!courseId.value) return
-  midtermProjectLocked.value = store.getProjectWeightLock(courseId.value, 'midterm')
-  finalProjectLocked.value = store.getProjectWeightLock(courseId.value, 'final')
+  // 自动锁定逻辑：多项且占比合计 = 100% 时锁定，否则解锁
+  const midLock = midtermProjects.value.length > 1 && midtermProjectTotalShare.value === 100
+  const finalLock = finalProjects.value.length > 1 && finalProjectTotalShare.value === 100
+  midtermProjectLocked.value = midLock
+  finalProjectLocked.value = finalLock
+  store.setProjectWeightLock(courseId.value, 'midterm', midLock)
+  store.setProjectWeightLock(courseId.value, 'final', finalLock)
   const lockedNames = new Set<string>()
-  if (midtermProjectLocked.value) midtermProjects.value.forEach((e) => lockedNames.add(e.name))
-  if (finalProjectLocked.value) finalProjects.value.forEach((e) => lockedNames.add(e.name))
+  if (midLock) midtermProjects.value.forEach((e) => lockedNames.add(e.name))
+  if (finalLock) finalProjects.value.forEach((e) => lockedNames.add(e.name))
   lockedWeightProjects.value = lockedNames
 }
 
@@ -2090,9 +2701,9 @@ const examNames = computed(() => {
 
 /** 成绩录入 - 按类型分组的考试/项目 */
 const examsWithTypes = computed(() => {
-  if (!courseId.value) return [] as { name: string; type: string }[]
+  if (!courseId.value) return [] as { name: string; type: ExamType }[]
   const scores = store.getExamScoresForCourse(courseId.value)
-  const map = new Map<string, { name: string; type: string }>()
+  const map = new Map<string, { name: string; type: ExamType }>()
   for (const s of scores) {
     // 用 名称+类型 作为唯一键，避免跨类型同名（如期中项目/期末项目同名）被吞掉
     const key = `${s.examName}@@${s.type}`
@@ -2109,13 +2720,29 @@ const finalExams = computed(() => examsWithTypes.value.filter(e => e.type === 'f
 
 /** 期中/期末项目占比合计（各项目占比之和，便于配置校验） */
 const midtermProjectTotalShare = computed(() =>
-  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+  courseId.value ? midtermProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name, e.type), 0) : 0)
 const finalProjectTotalShare = computed(() =>
-  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name), 0) : 0)
+  courseId.value ? finalProjects.value.reduce((a, e) => a + store.getExamWeight(courseId.value || '', e.name, e.type), 0) : 0)
 
 /** 占比合计是否为 100%（不为 100% 时禁止录入项目成绩） */
 const midtermProjectShareReady = computed(() => midtermProjects.value.length === 0 || midtermProjectTotalShare.value === 100)
 const finalProjectShareReady = computed(() => finalProjects.value.length === 0 || finalProjectTotalShare.value === 100)
+
+// 自动锁定/解锁：占比合计达到 100% 时自动锁定，偏离 100% 时自动解锁
+watch(midtermProjectTotalShare, (val) => {
+  if (!courseId.value || midtermProjects.value.length <= 1) return
+  const shouldLock = val === 100
+  midtermProjectLocked.value = shouldLock
+  midtermProjects.value.forEach((e) => shouldLock ? lockProjectWeight(e.name) : unlockProjectWeight(e.name))
+  store.setProjectWeightLock(courseId.value, 'midterm', shouldLock)
+})
+watch(finalProjectTotalShare, (val) => {
+  if (!courseId.value || finalProjects.value.length <= 1) return
+  const shouldLock = val === 100
+  finalProjectLocked.value = shouldLock
+  finalProjects.value.forEach((e) => shouldLock ? lockProjectWeight(e.name) : unlockProjectWeight(e.name))
+  store.setProjectWeightLock(courseId.value, 'final', shouldLock)
+})
 
 function getTypeWeightLabel(type: string): string {
   if (!courseId.value) return '-'
@@ -2137,7 +2764,7 @@ const currentExamFullScore = computed(() => {
 
 const currentExamWeight = computed(() => {
   if (!courseId.value || !selectedExam.value) return 0
-  return store.getExamWeight(courseId.value, selectedExam.value)
+  return store.getExamWeight(courseId.value, selectedExam.value, selectedExamType.value || undefined)
 })
 
 const filteredGradeStudents = computed(() => {
@@ -2335,14 +2962,15 @@ function getStudentExamPercent(studentId: string): string {
   return `${Math.round((score.score / score.fullScore) * 100)}分`
 }
 
-function getExamWeightFromConfig(examName: string): number {
+function getExamWeightFromConfig(examName: string, type?: string): number {
   if (!courseId.value) return 0
-  return store.getExamWeight(courseId.value, examName)
+  return store.getExamWeight(courseId.value, examName, type)
 }
 
-function handleSelectExam(name: string) {
+function handleSelectExam(name: string, type: ExamType) {
   if (!courseId.value) return
   selectedExam.value = name
+  selectedExamType.value = type
 }
 
 // ---- 成绩分布图表逻辑 ----
@@ -2492,19 +3120,17 @@ function handleAddExam() {
     const sameTypeExams = store.getExamScoresForCourse(courseId.value)
       .filter((s) => s.type === type)
     const uniqueNames = Array.from(new Set(sameTypeExams.map((s) => s.examName)))
-    const isLocked = type === 'midterm_project' ? midtermProjectLocked.value : finalProjectLocked.value
 
-    // 分区未锁定时：新添加项目后所有项目占比重新均分 100%（末项取余数保证合计）
-    // 分区已锁定时：保持原有占比不变，新项目占比默认 0，需解锁后才能调整
-    if (!isLocked) {
-      const eachShare = Math.floor(100 / uniqueNames.length)
-      uniqueNames.forEach((examName, i) =>
-        store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare))
-    }
+    // 添加项目后该类项目占比始终刷新为均分 100%（末项取余数保证合计）；
+    // 占比合计变为 100% 后由 watcher 自动上锁
+    const eachShare = Math.floor(100 / uniqueNames.length)
+    uniqueNames.forEach((examName, i) =>
+      store.setExamWeight(courseId.value!, examName, i === uniqueNames.length - 1 ? 100 - eachShare * (uniqueNames.length - 1) : eachShare, type))
   }
 
   showNewExamModal.value = false
   selectedExam.value = name
+  selectedExamType.value = type
   newExamName.value = ''
 
 }
@@ -2570,10 +3196,10 @@ function ensureWrittenExams() {
 function handleSaveExamScores() {
   if (!courseId.value || !selectedExam.value) return
   const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
-  const examType = existingScores.length > 0
-    ? existingScores[0].type
-    : 'midterm_exam'
-  const examWeight = store.getExamWeight(courseId.value, selectedExam.value)
+  // 优先使用选中时记录的类型，避免跨类型同名时 existingScores[0].type 取到错误类型
+  const examType = selectedExamType.value
+    || (existingScores.length > 0 ? existingScores[0].type : 'midterm_exam')
+  const examWeight = store.getExamWeight(courseId.value, selectedExam.value, examType)
   // 弹窗打开时只保存当前班级的输入
   let inputsToSave = Object.entries(examInputs.value)
   if (selectedGradeClass.value) {
@@ -2632,7 +3258,7 @@ function getStudentTotalScore(studentId: string): string | number {
   let totalWeight = 0
   const typeGroups = new Map<string, { count: number; sumPercent: number }>()
   for (const s of scores) {
-    const w = store.getExamWeight(courseId.value, s.examName)
+    const w = store.getExamWeight(courseId.value, s.examName, s.type)
     const percent = (s.score / s.fullScore) * 100
     if (w > 0) {
       weightedSum += percent * w
@@ -2687,9 +3313,9 @@ function getStudentScoreForExam(studentId: string, examName: string): string | n
 async function handleExcelImport(event: Event) {
   if (!courseId.value || !selectedExam.value) return
   const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
-  const examType = existingScores.length > 0
-    ? existingScores[0].type
-    : 'midterm_exam'
+  // 优先使用选中时记录的类型，避免跨类型同名时 existingScores[0].type 取到错误类型
+  const examType = selectedExamType.value
+    || (existingScores.length > 0 ? existingScores[0].type : 'midterm_exam')
   const input = event.target as HTMLInputElement
   if (!input.files?.length) return
   const file = input.files[0]
@@ -2896,6 +3522,44 @@ const classBlocks = computed(() => {
       students: items.map(i => i.student!).filter(Boolean),
     }))
     .sort((a, b) => a.className.localeCompare(b.className, 'zh-CN'))
+})
+
+/** 已分班的班级板块（排除"未分班"） */
+const classedBlocks = computed(() => classBlocks.value.filter((cb) => cb.className !== ''))
+
+/** 未分班学员列表 */
+const unclassedStudents = computed(() => {
+  const block = classBlocks.value.find((cb) => cb.className === '')
+  return block ? block.students : []
+})
+
+// ====== 学员搜索（班级管理顶部） ======
+const studentManageSearch = ref('')
+
+/** 获取学员所在分组名称 */
+function getStudentGroupName(studentId: string): string {
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value && g.memberIds.includes(studentId)) return g.name
+  }
+  return ''
+}
+
+/** 搜索结果列表：包含学员、所在班级、所在分组 */
+const searchedStudentList = computed(() => {
+  if (!courseId.value || !studentManageSearch.value.trim()) return []
+  const search = studentManageSearch.value.trim().toLowerCase()
+  return enrolledStudents.value
+    .filter((item) => {
+      if (!item.student) return false
+      const s = item.student
+      return s.name.toLowerCase().includes(search) ||
+             (s.studentId || '').toLowerCase().includes(search) ||
+             s.id.toLowerCase().includes(search)
+    })
+    .map((item) => ({
+      student: item.student!,
+      groupName: getStudentGroupName(item.student!.id),
+    }))
 })
 
 /** 获取某班级的分组（检查组内所有学生 className 是否匹配） */
@@ -3610,7 +4274,293 @@ function handleSaveGroup() {
 function handleDeleteGroup(groupId: string) {
   if (!confirm('确定删除该分组？')) return
   store.deleteStudentGroup(groupId)
+}
 
+// ====== 分组内添加/移除学员 ======
+const showAddMemberModal = ref(false)
+const addMemberGroupId = ref('')
+const addMemberGroupName = ref('')
+const addMemberClassName = ref('')
+const addMemberSearch = ref('')
+const addMemberSelected = ref<string[]>([])
+
+/** 候选添加到分组的学员：本班级内未分组成员 */
+const candidateAddMembers = computed(() => {
+  if (!addMemberClassName.value) return []
+  const classStudents = getClassStudents(addMemberClassName.value)
+  // 找出本班级中已在任何分组的学员ID
+  const groupedStudentIds = new Set<string>()
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value) {
+      for (const sid of g.memberIds) {
+        groupedStudentIds.add(sid)
+      }
+    }
+  }
+  const search = addMemberSearch.value.trim().toLowerCase()
+  return classStudents.filter((s) => {
+    if (groupedStudentIds.has(s.id)) return false
+    if (search) {
+      return s.name.toLowerCase().includes(search) || (s.studentId || s.id).toLowerCase().includes(search)
+    }
+    return true
+  })
+})
+
+function openAddMemberToGroup(group: import('@/types').StudentGroup) {
+  addMemberGroupId.value = group.id
+  addMemberGroupName.value = group.name
+  if (group.memberIds.length > 0) {
+    const firstMember = store.students.find((s) => s.id === group.memberIds[0])
+    addMemberClassName.value = firstMember?.className || ''
+  } else {
+    addMemberClassName.value = ''
+  }
+  addMemberSearch.value = ''
+  addMemberSelected.value = []
+  showAddMemberModal.value = true
+}
+
+function toggleAddMember(studentId: string) {
+  const idx = addMemberSelected.value.indexOf(studentId)
+  if (idx >= 0) {
+    addMemberSelected.value.splice(idx, 1)
+  } else {
+    addMemberSelected.value.push(studentId)
+  }
+}
+
+function confirmAddMembersToGroup() {
+  const group = store.studentGroups.find((g) => g.id === addMemberGroupId.value)
+  if (!group) return
+  store.updateStudentGroup(group.id, {
+    memberIds: [...group.memberIds, ...addMemberSelected.value],
+  })
+  showAddMemberModal.value = false
+  addMemberSelected.value = []
+}
+
+/** 从分组中移除单个学员（不改变其班级归属） */
+function handleRemoveMemberFromGroup(groupId: string, studentId: string) {
+  const group = store.studentGroups.find((g) => g.id === groupId)
+  if (!group) return
+  store.updateStudentGroup(groupId, {
+    memberIds: group.memberIds.filter((id) => id !== studentId),
+  })
+}
+
+// ====== 分组内移除学员选择弹窗 ======
+const showRemoveMemberModal = ref(false)
+const removeMemberGroupId = ref('')
+const removeMemberStudentId = ref('')
+
+const removeMemberStudentName = computed(() => {
+  return getStudentName(removeMemberStudentId.value) || '未知学员'
+})
+
+function openRemoveMemberModal(groupId: string, studentId: string) {
+  removeMemberGroupId.value = groupId
+  removeMemberStudentId.value = studentId
+  showRemoveMemberModal.value = true
+}
+
+/** 确认移出分组：仅从当前分组移除，保留班级归属 */
+function confirmRemoveMemberFromGroup() {
+  handleRemoveMemberFromGroup(removeMemberGroupId.value, removeMemberStudentId.value)
+  showRemoveMemberModal.value = false
+}
+
+/** 确认移出班级：设为未分班，并从所有分组中移除 */
+function confirmRemoveMemberFromClass() {
+  const studentId = removeMemberStudentId.value
+  store.updateStudent(studentId, { className: '' })
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value && g.memberIds.includes(studentId)) {
+      store.updateStudentGroup(g.id, {
+        memberIds: g.memberIds.filter((id) => id !== studentId),
+      })
+    }
+  }
+  showRemoveMemberModal.value = false
+}
+
+/** 确认移出本课程：删除选课记录，并从所有分组中移除 */
+function confirmRemoveMemberFromCourse() {
+  const studentId = removeMemberStudentId.value
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value && g.memberIds.includes(studentId)) {
+      store.updateStudentGroup(g.id, {
+        memberIds: g.memberIds.filter((id) => id !== studentId),
+      })
+    }
+  }
+  const enrollment = store.enrollments.find(
+    (e) => e.courseId === courseId.value && e.studentId === studentId && e.status !== 'dropped'
+  )
+  if (enrollment) {
+    store.deleteEnrollment(enrollment.id)
+  }
+  showRemoveMemberModal.value = false
+}
+
+// ====== 搜索结果：快捷移出分组 / 加入分组 / 加入班级 ======
+/** 搜索结果：快捷移出当前分组（保留班级归属） */
+function quickRemoveFromGroup(studentId: string) {
+  const groupId = getStudentGroupId(studentId)
+  if (!groupId) return
+  if (!confirm('确定将该学员移出当前分组？（仍保留在班级中）')) return
+  handleRemoveMemberFromGroup(groupId, studentId)
+}
+
+// -- 快捷加入分组 --
+const showQuickAddGroupModal = ref(false)
+const quickAddGroupStudentId = ref('')
+const quickAddGroupSelected = ref('')
+
+const quickAddGroupStudentName = computed(() => getStudentName(quickAddGroupStudentId.value) || '未知学员')
+
+/** 可加入的分组：与该学员同班级的分组（含空分组），排除学员已所在的分组 */
+const quickAddGroupCandidates = computed(() => {
+  if (!courseId.value || !quickAddGroupStudentId.value) return []
+  const student = store.students.find((s) => s.id === quickAddGroupStudentId.value)
+  if (!student) return []
+  const studentClass = student.className || ''
+  if (!studentClass) return [] // 未分班不能加入分组
+  return store.studentGroups
+    .filter((g) => g.courseId === courseId.value)
+    .filter((g) => {
+      if (g.memberIds.length === 0) return true // 空分组允许
+      // 组内成员是否都属于该班级
+      return g.memberIds.every((sid) => {
+        const m = store.students.find((s) => s.id === sid)
+        return m && (m.className || '') === studentClass
+      })
+    })
+    .filter((g) => !g.memberIds.includes(quickAddGroupStudentId.value))
+})
+
+function openQuickAddToGroup(studentId: string) {
+  quickAddGroupStudentId.value = studentId
+  quickAddGroupSelected.value = ''
+  showQuickAddGroupModal.value = true
+}
+
+function confirmQuickAddToGroup() {
+  if (!quickAddGroupSelected.value) return
+  const group = store.studentGroups.find((g) => g.id === quickAddGroupSelected.value)
+  if (!group) return
+  if (!group.memberIds.includes(quickAddGroupStudentId.value)) {
+    store.updateStudentGroup(group.id, {
+      memberIds: [...group.memberIds, quickAddGroupStudentId.value],
+    })
+  }
+  showQuickAddGroupModal.value = false
+}
+
+// -- 快捷加入班级 --
+const showQuickAddClassModal = ref(false)
+const quickAddClassStudentId = ref('')
+const quickAddClassSelected = ref('')
+
+const quickAddClassStudentName = computed(() => getStudentName(quickAddClassStudentId.value) || '未知学员')
+
+/** 可加入的班级：当前课程已有班级（排除学员当前班级） */
+const quickAddClassCandidates = computed(() => {
+  if (!courseId.value || !quickAddClassStudentId.value) return []
+  const student = store.students.find((s) => s.id === quickAddClassStudentId.value)
+  if (!student) return []
+  const currentClass = student.className || ''
+  const classes = new Set<string>()
+  for (const item of enrolledStudents.value) {
+    if (item.student && item.student.className && item.student.className !== currentClass) {
+      classes.add(item.student.className)
+    }
+  }
+  return Array.from(classes).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+
+function openQuickAddToClass(studentId: string) {
+  quickAddClassStudentId.value = studentId
+  quickAddClassSelected.value = ''
+  showQuickAddClassModal.value = true
+}
+
+/** 确认加入班级：变更班级后从原分组移除（原分组不再适用） */
+function confirmQuickAddToClass() {
+  if (!quickAddClassSelected.value) return
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value && g.memberIds.includes(quickAddClassStudentId.value)) {
+      store.updateStudentGroup(g.id, {
+        memberIds: g.memberIds.filter((id) => id !== quickAddClassStudentId.value),
+      })
+    }
+  }
+  store.updateStudent(quickAddClassStudentId.value, { className: quickAddClassSelected.value })
+  showQuickAddClassModal.value = false
+}
+
+// ====== 班级内添加/移除学员 ======
+const showAddStudentToClassModal = ref(false)
+const addStudentToClassName = ref('')
+const addStudentToClassSearch = ref('')
+const addStudentToClassSelected = ref<string[]>([])
+
+/** 候选添加到班级的学员：已选课但不在该班级的学员 */
+const candidateAddStudentsToClass = computed(() => {
+  if (!courseId.value || !addStudentToClassName.value) return []
+  const enrolledIds = store.enrollments
+    .filter((e) => e.courseId === courseId.value && e.status !== 'dropped')
+    .map((e) => e.studentId)
+  const search = addStudentToClassSearch.value.trim().toLowerCase()
+  return store.students
+    .filter((s) =>
+      enrolledIds.includes(s.id) &&
+      (s.className || '') !== addStudentToClassName.value
+    )
+    .filter((s) => {
+      if (search) {
+        return s.name.toLowerCase().includes(search) || (s.studentId || s.id).toLowerCase().includes(search)
+      }
+      return true
+    })
+})
+
+function openAddStudentToClass(className: string) {
+  addStudentToClassName.value = className
+  addStudentToClassSearch.value = ''
+  addStudentToClassSelected.value = []
+  showAddStudentToClassModal.value = true
+}
+
+function toggleAddStudentToClass(studentId: string) {
+  const idx = addStudentToClassSelected.value.indexOf(studentId)
+  if (idx >= 0) {
+    addStudentToClassSelected.value.splice(idx, 1)
+  } else {
+    addStudentToClassSelected.value.push(studentId)
+  }
+}
+
+function confirmAddStudentsToClass() {
+  for (const sid of addStudentToClassSelected.value) {
+    store.updateStudent(sid, { className: addStudentToClassName.value })
+  }
+  showAddStudentToClassModal.value = false
+  addStudentToClassSelected.value = []
+}
+
+/** 从班级移除学员（将其设为未分班，同时从所有分组中移除） */
+function handleRemoveStudentFromClass(studentId: string) {
+  if (!confirm('确定将该学员移出当前班级？（该学员将变为未分班状态，并从所有分组中移除）')) return
+  store.updateStudent(studentId, { className: '' })
+  // 从所有分组中移除
+  for (const g of store.studentGroups) {
+    if (g.courseId === courseId.value && g.memberIds.includes(studentId)) {
+      store.updateStudentGroup(g.id, {
+        memberIds: g.memberIds.filter((id) => id !== studentId),
+      })
+    }
+  }
 }
 
 async function handleImportGroupsExcel(event: Event) {
@@ -3720,6 +4670,13 @@ function onQualityCommentChange(submissionId: string, comment: string) {
 }
 
 function saveQualityEval(qeId: string, submissionId: string) {
+  // 保护：已批改的评分不可再修改
+  const qe = store.qualityEvaluations.find((q) => q.id === qeId)
+  const sub = qe?.submissions.find((s) => s.id === submissionId)
+  if (sub && sub.score !== undefined) {
+    alert('该次提交已批改，分数不可修改')
+    return
+  }
   const score = qualityScoreDrafts.value[submissionId]
   if (score === undefined || score === null || Number.isNaN(score)) {
     alert('请输入有效分数（0-100）')
@@ -3734,6 +4691,6 @@ function saveQualityEval(qeId: string, submissionId: string) {
   // 清除草稿
   delete qualityScoreDrafts.value[submissionId]
   delete qualityCommentDrafts.value[submissionId]
-  alert('批改已保存，该次素质评价分数将自动加成到学生总成绩中')
+  alert('批改已保存，该次素质评价分数将自动加成到学生总成绩中。保存后不可修改。')
 }
 </script>
