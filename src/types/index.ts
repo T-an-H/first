@@ -159,6 +159,10 @@ export interface GradeWeightConfig {
   regularWeight: number;
   midtermWeight: number;
   finalWeight: number;
+  /** 素质评价在总成绩中的占比（0-100，默认 0） */
+  qualityEvalWeight: number;
+  /** 素质评价加成上限（兼容远端前端配置，默认 10） */
+  qualityEvalMaxBonus?: number;
   selfEvalWeight: number;
   peerReviewWeight: number;
   interGroupEvalWeight: number;
@@ -168,8 +172,6 @@ export interface GradeWeightConfig {
   midtermProjectWeight: number;
   finalExamWeight: number;
   finalProjectWeight: number;
-  /** 素质评价加成上限（教师评分0-100，最终折算最多该分数加成到总成绩，默认10） */
-  qualityEvalMaxBonus: number;
 }
 
 export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
@@ -178,6 +180,8 @@ export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
     regularWeight: 40,
     midtermWeight: 0,
     finalWeight: 60,
+    qualityEvalWeight: 0,
+    qualityEvalMaxBonus: 10,
     selfEvalWeight: 10,
     peerReviewWeight: 20,
     interGroupEvalWeight: 10,
@@ -187,7 +191,6 @@ export function getDefaultGradeConfig(courseId: string): GradeWeightConfig {
     midtermProjectWeight: 50,
     finalExamWeight: 50,
     finalProjectWeight: 50,
-    qualityEvalMaxBonus: 10,
   };
 }
 
@@ -233,9 +236,8 @@ export interface CloudFile {
   dataUrl: string;
   uploadedAt: string;
   uploadedBy: string;
-  /** 关联课程（旧字段，单课程） */
   courseId?: string;
-  /** 可见课程列表（新字段，可多选课程） */
+  /** 可见课程列表（兼容新前端多课程可见范围） */
   courseIds?: string[];
   /** 文件可见范围 */
   visibilityScope?: 'private' | 'students';
@@ -432,7 +434,7 @@ export interface EvalAnomaly {
   warning: string;
 }
 
-/** 素质评价提交（学生上传图片/文档，教师打分直接加进总成绩） */
+/** 素质评价提交（学生上传图片/文档，教师打分后按课程权重计入总成绩） */
 export interface QualityEvalFile {
   fileName: string;
   fileType: string;

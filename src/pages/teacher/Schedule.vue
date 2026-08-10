@@ -10,7 +10,7 @@
           <span>第 {{ weekNumber }} 周</span>
         </p>
       </div>
-      <div class="flex items-center gap-1 bg-white rounded-lg border border-brand-400/30 shadow-sm p-0.5">
+      <div ref="scheduleNavRef" class="relative flex items-center gap-1 bg-white rounded-lg border border-brand-400/30 shadow-sm p-0.5">
         <!-- 学期选择：只列出有排课数据的学期 -->
         <select
           v-if="semesterOptions.length > 0"
@@ -24,10 +24,51 @@
         <button @click="prevWeek" class="p-2 rounded-md hover:bg-brand-400/10 transition-colors" title="上一周">
           <ChevronLeft class="w-4 h-4 text-gray-400" />
         </button>
-        <button @click="goToday" class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-brand-400/10 rounded-md transition-colors">今天</button>
+        <button
+          @click="toggleCalendar"
+          class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-brand-400/10 rounded-md transition-colors"
+          :title="showCalendar ? '关闭日历' : '打开日历'"
+        >
+          今天
+        </button>
         <button @click="nextWeek" class="p-2 rounded-md hover:bg-brand-400/10 transition-colors" title="下一周">
           <ChevronRight class="w-4 h-4 text-gray-400" />
         </button>
+
+        <div
+          v-if="showCalendar"
+          class="absolute right-0 top-full mt-2 z-30 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-xl"
+          @click.stop
+        >
+          <div class="mb-3 flex items-center justify-between">
+            <button @click="prevCalendarMonth" class="rounded-md p-1.5 hover:bg-gray-100 transition-colors" title="上个月">
+              <ChevronLeft class="w-4 h-4 text-gray-400" />
+            </button>
+            <span class="text-sm font-semibold text-gray-800">{{ calendarYear }}年{{ calendarMonthLabel }}月</span>
+            <button @click="nextCalendarMonth" class="rounded-md p-1.5 hover:bg-gray-100 transition-colors" title="下个月">
+              <ChevronRight class="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+
+          <div class="mb-1 grid grid-cols-7 gap-1 text-center text-[11px] text-gray-400">
+            <div v-for="label in calendarWeekLabels" :key="label">{{ label }}</div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1">
+            <div v-for="(cell, index) in calendarCells" :key="index" class="h-8">
+              <button
+                v-if="cell"
+                @click="goToDate(cell)"
+                class="h-8 w-full rounded-lg text-xs transition-colors"
+                :class="isCurrentDay(cell)
+                  ? 'bg-brand-600 text-white font-semibold'
+                  : 'text-gray-600 hover:bg-brand-400/10'"
+              >
+                {{ cell.getDate() }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -113,11 +154,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-vue-next'
-import { getNow, isVirtualToday, getVirtualMonday, getSemesterOf } from '@/lib/date'
+import { getNow, getTodayStart, isVirtualToday, getVirtualMonday, getSemesterOf } from '@/lib/date'
 import { fetchSchedules } from '@/api'
 
 const store = useAppStore()
@@ -137,6 +178,9 @@ onMounted(async () => {
 
 // ---- 周导航 ----
 const weekStart = ref(getVirtualMonday())
+const showCalendar = ref(false)
+const calendarMonth = ref(getTodayStart())
+const scheduleNavRef = ref<HTMLElement | null>(null)
 
 function getMonday(d: Date): Date {
   const date = new Date(d)
@@ -157,6 +201,69 @@ function isToday(d: Date): boolean {
 function prevWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() - 7); weekStart.value = d }
 function nextWeek() { const d = new Date(weekStart.value); d.setDate(d.getDate() + 7); weekStart.value = d }
 function goToday() { weekStart.value = getVirtualMonday() }
+
+function toggleCalendar() {
+  if (showCalendar.value) {
+    showCalendar.value = false
+    weekStart.value = getVirtualMonday()
+    return
+  }
+  calendarMonth.value = getTodayStart()
+  showCalendar.value = true
+}
+
+function goToDate(date: Date) {
+  weekStart.value = getMonday(date)
+  showCalendar.value = false
+}
+
+function prevCalendarMonth() {
+  const d = new Date(calendarMonth.value)
+  d.setMonth(d.getMonth() - 1)
+  calendarMonth.value = d
+}
+
+function nextCalendarMonth() {
+  const d = new Date(calendarMonth.value)
+  d.setMonth(d.getMonth() + 1)
+  calendarMonth.value = d
+}
+
+const calendarYear = computed(() => calendarMonth.value.getFullYear())
+const calendarMonthLabel = computed(() => String(calendarMonth.value.getMonth() + 1))
+const calendarWeekLabels = ['日', '一', '二', '三', '四', '五', '六']
+const calendarCells = computed<(Date | null)[]>(() => {
+  const y = calendarMonth.value.getFullYear()
+  const m = calendarMonth.value.getMonth()
+  const firstDay = new Date(y, m, 1)
+  const daysInMonth = new Date(y, m + 1, 0).getDate()
+  const cells: (Date | null)[] = []
+  for (let i = 0; i < firstDay.getDay(); i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(y, m, d))
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+})
+
+function isCurrentDay(date: Date) {
+  return isVirtualToday(date)
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!showCalendar.value) return
+  const target = event.target as Node | null
+  if (!target) return
+  if (scheduleNavRef.value && !scheduleNavRef.value.contains(target)) {
+    showCalendar.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
+})
 
 const weekDays = computed(() => {
   const labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']

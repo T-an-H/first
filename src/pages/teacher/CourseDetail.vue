@@ -1463,7 +1463,7 @@
         <div v-if="showGroupModal" class="fixed inset-0 z-50 flex items-center justify-center">
           <div class="absolute inset-0 bg-black/50" @click="showGroupModal = false" />
           <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">新建分组</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{ editingGroup ? '修改分组' : '新建分组' }}</h3>
             <div class="space-y-3">
               <div>
                 <label class="text-xs text-gray-500 block mb-1">所属班级</label>

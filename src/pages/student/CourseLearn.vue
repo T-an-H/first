@@ -321,10 +321,17 @@
                   <Circle v-else class="w-5 h-5 text-gray-400/60" />
                   <div>
                     <p class="text-sm font-medium text-gray-900">{{ task.title }}</p>
+                    <p v-if="task.chapterTitle" class="text-xs text-gray-400">{{ task.chapterTitle }}</p>
                     <p v-if="task.dueDate" class="text-xs text-gray-400">截止：{{ task.dueDate }}</p>
                   </div>
                 </div>
-                <span v-if="task.score !== undefined" class="text-sm font-bold text-blue-600">{{ task.score }}分</span>
+                <button
+                  class="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-100"
+                  @click="goToHomeworkTab()"
+                >
+                  <ArrowRight class="h-3.5 w-3.5" />
+                  去完成
+                </button>
               </div>
               <div v-if="courseTasks.length === 0" class="text-center py-8 text-gray-400">暂无任务</div>
             </div>
@@ -795,7 +802,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
-  CheckCircle, Circle, Layers, GitBranch, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
+  CheckCircle, Circle, Layers, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
   Download, Upload, TrendingUp, X, Calendar, BarChart3, PieChart
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
@@ -811,16 +818,17 @@ const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
-const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const VALID_TABS = ['ai_tier', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
 const activeTab = ref<string>(
   VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
 )
 const selectedFiles = ref<Record<string, File>>({})
 
-onMounted(() => {
+onMounted(async () => {
   store.pushNearDeadlineEvalReminders()
   if (myStudent.value) {
     store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
+    await store.syncStudentHomeworkTodos(courseId, myStudent.value.id)
   }
 })
 
@@ -833,7 +841,6 @@ watch(() => route.query.tab, (val) => {
 
 const tabs = [
   { id: 'ai_tier', label: 'AI分层', icon: Layers },
-  { id: 'knowledge_graph', label: '知识图谱', icon: GitBranch },
   { id: 'tasks', label: '任务', icon: Edit3 },
   { id: 'resources', label: '资源', icon: FileText },
   { id: 'homework', label: '作业', icon: BookOpen },
@@ -850,31 +857,8 @@ const myGrade = computed(() =>
   store.grades.find((g) => g.courseId === courseId && g.studentId === myStudent.value?.id)
 )
 
-// ===== 任务（按层级区分） =====
-const courseTasks = computed(() => {
-  const tier = tierFinalized.value ? myTier.value : 'basic'
-  const basicTasks = [
-    { id: '1', title: '完成第1章基础概念学习', dueDate: '2025-03-15', completed: true, score: 85 },
-    { id: '2', title: '完成第2章基础知识练习', dueDate: '2025-03-22', completed: true, score: 78 },
-    { id: '3', title: '完成第3章基础巩固任务', dueDate: '2025-03-29', completed: false },
-    { id: '4', title: '完成第4章基础应用练习', dueDate: '2025-04-05', completed: false },
-  ]
-  const advancedTasks = [
-    { id: '1', title: '完成第1章核心概念深入学习', dueDate: '2025-03-15', completed: true, score: 92 },
-    { id: '2', title: '完成第2章进阶实践项目', dueDate: '2025-03-22', completed: true, score: 88 },
-    { id: '3', title: '完成第3章拓展分析任务', dueDate: '2025-03-29', completed: false },
-    { id: '4', title: '完成第4章综合应用项目', dueDate: '2025-04-05', completed: false },
-  ]
-  const excellentTasks = [
-    { id: '1', title: '完成第1章高阶理论探究', dueDate: '2025-03-15', completed: true, score: 97 },
-    { id: '2', title: '完成第2章创新实践项目', dueDate: '2025-03-22', completed: true, score: 95 },
-    { id: '3', title: '完成第3章跨章节整合任务', dueDate: '2025-03-29', completed: false },
-    { id: '4', title: '完成开源项目贡献任务', dueDate: '2025-04-05', completed: false },
-  ]
-  if (tier === 'excellent') return excellentTasks
-  if (tier === 'advanced') return advancedTasks
-  return basicTasks
-})
+// ===== 任务：显示当前课程未完成的真实作业 =====
+const courseTasks = computed(() => store.getPendingStudentHomeworkTasks(courseId))
 
 // ===== 资源（从store获取课程关联资源） =====
 const courseResources = computed(() => store.getCourseCloudFiles(courseId))
@@ -1644,6 +1628,16 @@ function getFileTypeName(type: string): string {
 
 function downloadFile(file: CloudFile) {
   alert(`开始下载：${file.name}`)
+}
+
+function goToHomeworkTab() {
+  activeTab.value = 'homework'
+  void router.replace({
+    query: {
+      ...route.query,
+      tab: 'homework',
+    },
+  })
 }
 
 function isHomeworkSubmitted(homeworkId: string): boolean {

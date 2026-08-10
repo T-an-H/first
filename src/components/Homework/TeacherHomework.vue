@@ -27,8 +27,8 @@
         @click="selectedChapterId = ch.id"
         :class="`text-xs px-3 py-1.5 rounded-lg transition-colors ${selectedChapterId === ch.id ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`">
         {{ ch.title }}
-        <span @click.stop="deleteChapter(ch.id, ch.title)"
-          class="ml-1 p-0.5 rounded hover:bg-red-100 hover:text-red-500 text-gray-400 cursor-pointer" title="删除章节">✕</span>
+        <button @click.stop="deleteChapter(ch.id, ch.title)"
+          class="ml-1 p-0.5 rounded hover:bg-red-100 hover:text-red-500 text-gray-400" title="删除章节">✕</button>
       </button>
       <button @click="showAddChapter = true"
         class="text-xs px-3 py-1.5 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 hover:bg-gray-50">

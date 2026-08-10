@@ -63,7 +63,7 @@
           <h1 class="text-2xl font-bold text-gray-900">{{ selectedClass }}</h1>
           <p class="text-gray-500 mt-1">{{ filteredStudents.length }} 名学生</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div v-if="false" class="flex items-center gap-2">
           <button @click="resetStudentForm(); showStudentModal = true" class="px-4 py-2.5 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors flex items-center gap-2">
             <Plus class="w-4 h-4" />
             新增学生
@@ -98,7 +98,6 @@
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">学号</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">电话</th>
               <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">状态</th>
-              <th class="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -118,19 +117,9 @@
                   {{ s.status === 'active' ? '正常' : '禁用' }}
                 </span>
               </td>
-              <td class="px-4 py-3">
-                <div class="flex items-center justify-center gap-2">
-                  <button @click="openEditStudent(s)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="编辑">
-                    <Pencil class="w-4 h-4" />
-                  </button>
-                  <button @click="handleDeleteStudent(s)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="删除">
-                    <Trash2 class="w-4 h-4" />
-                  </button>
-                </div>
-              </td>
             </tr>
             <tr v-if="filteredStudents.length === 0">
-              <td colspan="5" class="px-4 py-12 text-center text-gray-400">{{ studentSearch ? '没有匹配的学生' : '该班级暂无学生' }}</td>
+              <td colspan="4" class="px-4 py-12 text-center text-gray-400">{{ studentSearch ? '没有匹配的学生' : '该班级暂无学生' }}</td>
             </tr>
           </tbody>
         </table>

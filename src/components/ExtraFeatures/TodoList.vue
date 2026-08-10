@@ -1,14 +1,5 @@
 <template>
   <div class="space-y-4">
-    <!-- 手动添加待办 -->
-    <div class="flex items-center gap-3">
-      <input type="text" v-model="title" @keydown.enter="handleAdd" placeholder="添加待办事项..." class="flex-1 px-4 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 focus:ring-2 focus:ring-brand-600/20 outline-none text-sm" />
-      <input type="date" v-model="dueDate" class="px-3 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm" />
-      <button @click="handleAdd" class="flex items-center gap-1.5 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition-colors text-sm font-medium">
-        <Plus class="w-4 h-4" /> 添加
-      </button>
-    </div>
-
     <div v-if="activeTodos.length > 0" class="space-y-1.5">
       <p class="text-xs font-medium text-gray-400 uppercase tracking-wider">待完成</p>
       <div v-for="t in activeTodos" :key="t.id" class="flex items-center gap-3 p-3 bg-white rounded-lg border border-brand-400/20 shadow-sm group">
@@ -52,23 +43,23 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Circle, CheckCircle, X, ArrowRight } from 'lucide-vue-next'
+import { Circle, CheckCircle, X, ArrowRight } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
-import { getNow } from '@/lib/date'
 import { EvalTypeLabels } from '@/types'
 
 const store = useAppStore()
 const router = useRouter()
-const title = ref('')
-const dueDate = ref('')
 
 const myTodos = computed(() => store.todos.filter((t) => t.createdBy === store.currentUser))
 const activeTodos = computed(() => myTodos.value.filter((t) => !t.completed))
 const doneTodos = computed(() => myTodos.value.filter((t) => t.completed))
 
-onMounted(() => {
+onMounted(async () => {
+  if (store.currentRole === 'student') {
+    await store.syncStudentHomeworkTodos()
+  }
   store.generateAutoTodos()
 })
 
@@ -125,20 +116,6 @@ const evalReminderGroups = computed(() => {
   }))
 })
 
-const handleAdd = () => {
-  if (!title.value.trim()) return
-  store.addTodo({
-    id: Date.now().toString(),
-    title: title.value.trim(),
-    completed: false,
-    createdAt: getNow().toISOString(),
-    dueDate: dueDate.value || undefined,
-    createdBy: store.currentUser || '未知',
-  })
-  title.value = ''
-  dueDate.value = ''
-}
-
 // ===== 待办溯源：自动生成的待办可跳转到提醒来源 =====
 
 interface TodoTrace {
@@ -184,7 +161,7 @@ function getTodoTrace(t: { id: string; title: string }): TodoTrace | null {
   // [作业] auto-homework-{homeworkId}-{studentId}
   if (t.id.startsWith('auto-homework-') && currentStudentId) {
     const hwId = t.id.replace('auto-homework-', '').slice(0, -currentStudentId.length - 1)
-    const hw = store.homework.find((h) => h.id === hwId)
+    const hw = store.findStudentHomeworkSummary(hwId) || store.homework.find((h) => h.id === hwId)
     if (!hw) return null
     return { path: `/student/courses/${hw.courseId}?tab=homework`, label: '去完成' }
   }
