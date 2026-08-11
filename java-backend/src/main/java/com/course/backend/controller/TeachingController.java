@@ -224,4 +224,35 @@ public class TeachingController {
         qw.orderByAsc("session_number");
         return Result.ok(evaluationService.list(qw));
     }
+
+    /**
+     * POST /api/teaching/evaluations  新增评价记录（教师打分/学生自评等）
+     */
+    @PostMapping("/evaluations")
+    public Result<Evaluation> addEvaluation(@RequestBody Evaluation evaluation) {
+        if (!StringUtils.hasText(evaluation.getId())) {
+            evaluation.setId("ev-" + System.currentTimeMillis());
+        }
+        evaluationService.save(evaluation);
+        return Result.ok(evaluation);
+    }
+
+    /**
+     * PUT /api/teaching/evaluations/{id}  修改评价记录（改分/改评语）
+     */
+    @PutMapping("/evaluations/{id}")
+    public Result<Evaluation> updateEvaluation(@PathVariable String id, @RequestBody Evaluation evaluation) {
+        evaluation.setId(id);
+        evaluationService.updateById(evaluation);
+        return Result.ok(evaluationService.getById(id));
+    }
+
+    /**
+     * DELETE /api/teaching/evaluations/{id}  删除评价记录
+     */
+    @DeleteMapping("/evaluations/{id}")
+    public Result<Void> deleteEvaluation(@PathVariable String id) {
+        evaluationService.removeById(id);
+        return Result.ok();
+    }
 }
