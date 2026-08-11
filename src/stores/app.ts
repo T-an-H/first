@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
 import { saveEvaluation as apiSaveEval, deleteEvaluation as apiDeleteEval, submitTeacherEval as apiSubmitEval, saveEvalConfig as apiSaveConfig, saveEvalReminders as apiSaveReminders, updateEvalReminder as apiUpdateReminder } from '@/api'
+import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig } from '@/api'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
@@ -437,16 +438,19 @@ export const useAppStore = defineStore('app', () => {
   function addEnrollment(enrollment: Enrollment) {
     enrollments.value = [...enrollments.value, enrollment]
     saveToStorage('enrollments', enrollments.value)
+    javaAddEnrollment(enrollment).catch(() => {})
   }
 
   function updateEnrollment(id: string, data: Partial<Enrollment>) {
     enrollments.value = enrollments.value.map((e) => (e.id === id ? { ...e, ...data } : e))
     saveToStorage('enrollments', enrollments.value)
+    javaUpdateEnrollment(id, data).catch(() => {})
   }
 
   function deleteEnrollment(id: string) {
     enrollments.value = enrollments.value.filter((e) => e.id !== id)
     saveToStorage('enrollments', enrollments.value)
+    javaDeleteEnrollment(id).catch(() => {})
   }
 
   function addGrade(grade: Grade) {
@@ -480,6 +484,7 @@ export const useAppStore = defineStore('app', () => {
   function addCloudFile(file: CloudFile) {
     cloudFiles.value = [...cloudFiles.value, normalizeCloudFile(file)]
     saveToStorage('cloudFiles', cloudFiles.value)
+    javaAddFile(file).catch(() => {})
   }
 
   /** 更新云盘文件（用于编辑可见课程/班级范围） */
@@ -493,6 +498,7 @@ export const useAppStore = defineStore('app', () => {
   function deleteCloudFile(id: string) {
     cloudFiles.value = cloudFiles.value.filter((f) => f.id !== id)
     saveToStorage('cloudFiles', cloudFiles.value)
+    javaDeleteFile(id).catch(() => {})
   }
 
   function addTodo(todo: TodoItem) {
@@ -640,6 +646,7 @@ export const useAppStore = defineStore('app', () => {
   function addStudentGroup(group: StudentGroup) {
     studentGroups.value = [...studentGroups.value, group]
     saveToStorage('studentGroups', studentGroups.value)
+    javaAddGroup(group).catch(() => {})
   }
 
   function addStudent(student: Student) {
@@ -660,11 +667,13 @@ export const useAppStore = defineStore('app', () => {
   function updateStudentGroup(id: string, data: Partial<StudentGroup>) {
     studentGroups.value = studentGroups.value.map((g) => (g.id === id ? { ...g, ...data } : g))
     saveToStorage('studentGroups', studentGroups.value)
+    javaUpdateGroup(id, data).catch(() => {})
   }
 
   function deleteStudentGroup(id: string) {
     studentGroups.value = studentGroups.value.filter((g) => g.id !== id)
     saveToStorage('studentGroups', studentGroups.value)
+    javaDeleteGroup(id).catch(() => {})
   }
 
   /** 获取某课程的分组列表 */
@@ -1470,6 +1479,7 @@ export const useAppStore = defineStore('app', () => {
   function saveGradeConfig(config: GradeWeightConfig) {
     gradeConfigs.value = { ...gradeConfigs.value, [config.courseId]: config }
     saveToStorage('gradeConfigs', gradeConfigs.value)
+    javaSaveGradeConfig(config).catch(() => {})
   }
 
   function getGradeConfig(courseId: string): GradeWeightConfig {

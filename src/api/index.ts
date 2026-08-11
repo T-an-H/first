@@ -5,6 +5,10 @@ const API_HOST = window.location.hostname || '127.0.0.1'
 const API_PORT = (import.meta.env.VITE_API_PORT as string | undefined) ?? '3000'
 export const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? `${API_PROTOCOL}//${API_HOST}:${API_PORT}/api`
 
+// Java 后端（教师端联调模块，端口 8080），可通过 VITE_JAVA_API_PORT / VITE_JAVA_API_BASE 覆盖
+const JAVA_API_PORT = (import.meta.env.VITE_JAVA_API_PORT as string | undefined) ?? '8080'
+export const JAVA_API_BASE = (import.meta.env.VITE_JAVA_API_BASE as string | undefined) ?? `${API_PROTOCOL}//${API_HOST}:${JAVA_API_PORT}/api`
+
 type RequestOptions = RequestInit & {
   timeoutMs?: number
 }
@@ -40,6 +44,34 @@ async function request(url: string, options: RequestOptions = {}) {
     }
 
     return data
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
+}
+
+/**
+ * Java 后端请求：响应格式统一为 { code, msg, data }，成功(code=200)时返回业务数据 data
+ * 联调期 Java 后端未启动时静默失败，不影响前端本地功能
+ */
+async function javaRequest(url: string, options: RequestOptions = {}) {
+  const { timeoutMs = 5000, ...fetchOptions } = options
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  const config: RequestInit = {
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal,
+    ...fetchOptions,
+  }
+
+  try {
+    const response = await fetch(`${JAVA_API_BASE}${url}`, config)
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok || data.code !== 200) {
+      throw new Error(data.msg || `请求失败 (${response.status})`)
+    }
+    return data.data
   } finally {
     window.clearTimeout(timeoutId)
   }
@@ -236,4 +268,87 @@ export async function invokeAssistant(payload: AssistantAgentRequest): Promise<A
     body: JSON.stringify(payload),
     timeoutMs: 30000,
   })
+}
+
+// ============================================================
+// Java 后端接口（教师端联调：选课 / 分组 / 课程资源 / 成绩配置 / 评价 / 统计）
+// 路径与 Java 后端完全一致，响应格式 { code, msg, data }
+// ============================================================
+
+export async function javaListEnrollments(courseId?: string) {
+  return javaRequest(`/teaching/enrollments${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`)
+}
+
+export async function javaAddEnrollment(enrollment: any) {
+  return javaRequest('/teaching/enrollments', {
+    method: 'POST',
+    body: JSON.stringify(enrollment),
+  })
+}
+
+export async function javaUpdateEnrollment(id: string, data: any) {
+  return javaRequest(`/teaching/enrollments/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function javaDeleteEnrollment(id: string) {
+  return javaRequest(`/teaching/enrollments/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function javaListGroups(courseId?: string) {
+  return javaRequest(`/teaching/groups${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`)
+}
+
+export async function javaAddGroup(group: any) {
+  return javaRequest('/teaching/groups', {
+    method: 'POST',
+    body: JSON.stringify(group),
+  })
+}
+
+export async function javaUpdateGroup(id: string, data: any) {
+  return javaRequest(`/teaching/groups/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function javaDeleteGroup(id: string) {
+  return javaRequest(`/teaching/groups/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function javaListFiles(courseId?: string) {
+  return javaRequest(`/teaching/files${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`)
+}
+
+export async function javaAddFile(file: any) {
+  return javaRequest('/teaching/files', {
+    method: 'POST',
+    body: JSON.stringify(file),
+  })
+}
+
+export async function javaDeleteFile(id: string) {
+  return javaRequest(`/teaching/files/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function javaGetGradeConfig(courseId: string) {
+  return javaRequest(`/teaching/grade-config?courseId=${encodeURIComponent(courseId)}`)
+}
+
+export async function javaSaveGradeConfig(config: any) {
+  return javaRequest('/teaching/grade-config', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  })
+}
+
+export async function javaListEvaluations(courseId?: string) {
+  return javaRequest(`/teaching/evaluations${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`)
+}
+
+export async function javaCourseStats(courseId: string) {
+  return javaRequest(`/courses/${encodeURIComponent(courseId)}/stats`)
 }
