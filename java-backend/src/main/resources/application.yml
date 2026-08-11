@@ -1,0 +1,28 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: course-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 数据库连接（按需修改：course_db / root / 070808）
+    url: jdbc:mysql://127.0.0.1:3306/course_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+    username: root
+    password: 070808
+
+mybatis-plus:
+  configuration:
+    # 下划线转驼峰：student_id -> studentId
+    map-underscore-to-camel-case: true
+    # 打印 SQL 日志，方便联调排查；上线可去掉
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+    db-config:
+      # 主键由前端/业务生成（如 enr-xxx / grp-xxx），数据库层不自动填充
+      id-type: input
+
+logging:
+  level:
+    com.course.backend.mapper: debug
