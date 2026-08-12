@@ -113,27 +113,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { ChevronLeft, ChevronRight, CalendarDays } from 'lucide-vue-next'
 import { getNow, isVirtualToday, getVirtualMonday, getSemesterOf } from '@/lib/date'
-import { fetchSchedules } from '@/api'
 
 const store = useAppStore()
 const route = useRoute()
 
-// 从数据库加载排课
-const dbSchedules = ref<any[]>([])
-onMounted(async () => {
-  try {
-    const res = await fetchSchedules()
-    if (res.success) {
-      dbSchedules.value = res.schedules
-      store.schedules = res.schedules
-    }
-  } catch { /* ignore */ }
-})
+// 排课数据由 store.initFromDatabase() 从数据库(course_db)拉取，此处直接使用 store.schedules
 
 // ---- 周导航 ----
 const weekStart = ref(getVirtualMonday())

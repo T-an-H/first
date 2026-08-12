@@ -352,3 +352,95 @@ export async function javaListEvaluations(courseId?: string) {
 export async function javaCourseStats(courseId: string) {
   return javaRequest(`/courses/${encodeURIComponent(courseId)}/stats`)
 }
+
+// ============================================================
+// Java 后端全量拉取接口（教师端数据库启用，不带参数拉取整表数据）
+// ============================================================
+
+export async function javaListCourses() {
+  return javaRequest('/courses')
+}
+
+export async function javaListStudents() {
+  return javaRequest('/students')
+}
+
+export async function javaListSchedules() {
+  return javaRequest('/schedules')
+}
+
+export async function javaListGrades() {
+  return javaRequest('/teaching/grades')
+}
+
+export async function javaListExamScores() {
+  return javaRequest('/teaching/exam-scores')
+}
+
+export async function javaListEvalConfigs() {
+  return javaRequest('/teaching/eval-configs')
+}
+
+export async function javaListEvalReminders() {
+  return javaRequest('/teaching/eval-reminders')
+}
+
+export async function javaListDetailedGrades() {
+  return javaRequest('/teaching/detailed-grades')
+}
+
+export async function javaListQualityEvaluations() {
+  return javaRequest('/teaching/quality-evaluations')
+}
+
+export async function javaListHomework() {
+  return javaRequest('/teaching/homeworks')
+}
+
+export async function javaListHomeworkSubmissions() {
+  return javaRequest('/teaching/homework-submissions')
+}
+
+export async function javaListTodos() {
+  return javaRequest('/teaching/todos')
+}
+
+export async function javaListNotes() {
+  return javaRequest('/teaching/notes')
+}
+
+export async function javaListOnlineDocs() {
+  return javaRequest('/teaching/online-docs')
+}
+
+export async function javaListStudentTiers() {
+  return javaRequest('/teaching/student-tiers')
+}
+
+// ============================================================
+// Java 后端基础数据接口（分类/学院/班级/教师/导师/领导，course_db）
+// ============================================================
+
+export async function javaListCategories() {
+  return javaRequest('/base-data/categories')
+}
+
+export async function javaListDepartments() {
+  return javaRequest('/base-data/departments')
+}
+
+export async function javaListDepartmentClasses() {
+  return javaRequest('/base-data/department-classes')
+}
+
+export async function javaListTeachers() {
+  return javaRequest('/base-data/teachers')
+}
+
+export async function javaListMentors() {
+  return javaRequest('/base-data/mentors')
+}
+
+export async function javaListLeaders() {
+  return javaRequest('/base-data/leaders')
+}

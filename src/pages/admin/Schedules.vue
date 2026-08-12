@@ -469,7 +469,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { Plus, Search, CalendarX, AlertTriangle, Upload, RefreshCw, BookOpen, ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
 import type { Schedule, Course, Department } from '@/types'
-import { bulkImportSchedules, fetchSchedules, updateCourse as apiUpdateCourse, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
+import { bulkImportSchedules, updateCourse as apiUpdateCourse, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
@@ -664,16 +664,7 @@ onMounted(async () => {
 })
 
 async function loadSchedules() {
-  try {
-    const res = await fetchSchedules()
-    if (res.success && res.schedules?.length > 0) {
-      dbSchedules.value = res.schedules
-      return
-    }
-  } catch (e) {
-    console.error('加载排课失败:', e)
-  }
-  // 后端无数据时使用本地 store（含管理端演示排课）
+  // 排课数据由 store.initFromDatabase() 从数据库(course_db)拉取，此处直接使用 store
   dbSchedules.value = store.schedules
 }
 

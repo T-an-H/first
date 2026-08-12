@@ -164,7 +164,8 @@ const handleLogin = async () => {
     if (leaderData?.asMentor) isMentorFromDb = true
   }
 
-  store.login(mock.name, role as any, isTeacherFromDb, isMentorFromDb)
+  // 登录账号存 currentUser（与数据库 course_db 的 teacher/createdBy 等 owner 字段一致），显示名单独存
+  store.login(account.value.trim(), role as any, isTeacherFromDb, isMentorFromDb, mock.name)
   router.push(mockPortal(mock.role, mock.sub_role))
 
   // 后台静默尝试连接后端（不阻塞登录）

@@ -350,7 +350,7 @@ let exportToastTimer: ReturnType<typeof setTimeout> | null = null
 
 // ====== Computed ======
 const isMentor = computed(() => store.currentRole === 'mentor')
-const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
+const isLeaderWithTeaching = computed(() => store.leaders.some((l) => (l.name === store.currentUser || l.name === store.currentDisplayName) && l.asTeacher))
 
 const myCourses = computed(() => {
   if (isLeaderWithTeaching.value) {
@@ -702,26 +702,36 @@ async function handleExportGrades() {
 
 /**
  * 【导出成绩功能业务逻辑说明】
- * 点击按钮后向后端发起请求，后端将课程学生成绩数据整理，提供文件下载；
+ * 点击按钮后基于数据库(course_db)成绩数据生成 CSV 文件下载；
  * 后续支持对接学校教务系统接口，可将成绩数据推送同步至第三方教务平台。
  */
 async function handleExportGradesToSystem() {
   if (isExporting.value) return
   isExporting.value = true
 
-  // 模拟接口请求延迟 1s
-  await new Promise((resolve) => setTimeout(resolve, 1000))
+  try {
+    // 从数据库数据（store.grades / store.students / store.courses）生成真实成绩 CSV
+    const rows = filteredEnrollments.value.map((e) => {
+      const g = store.grades.find((gr) => gr.studentId === e.studentId && gr.courseId === e.courseId)
+      return [e.studentId, getStudentName(e.studentId), getCourseTitle(e.courseId), g ? g.score : '']
+    })
+    const csv = '\uFEFF' + ['学号,姓名,课程,成绩']
+      .concat(rows.map((r) => r.join(',')))
+      .join('\n')
 
-  // 模拟下载效果
-  const blob = new Blob(['模拟成绩导出文件'], { type: 'text/plain' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `成绩导出-${selectedCourseTitle.value}-${getNow().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-
-  isExporting.value = false
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `成绩导出-${selectedCourseTitle.value}-${getNow().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('导出失败:', err)
+    alert('导出失败')
+  } finally {
+    isExporting.value = false
+  }
 
   // 显示成功通知
   showExportToast.value = true
