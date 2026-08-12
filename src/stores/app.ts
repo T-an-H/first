@@ -3,6 +3,14 @@ import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
 import { saveEvaluation as apiSaveEval, deleteEvaluation as apiDeleteEval, submitTeacherEval as apiSubmitEval, saveEvalConfig as apiSaveConfig, saveEvalReminders as apiSaveReminders, updateEvalReminder as apiUpdateReminder } from '@/api'
 import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig } from '@/api'
+import {
+  javaListEnrollments, javaListGroups, javaListFiles, javaListEvaluations, javaGetGradeConfig,
+  javaListCourses, javaListStudents, javaListSchedules, javaListGrades, javaListExamScores,
+  javaListEvalConfigs, javaListEvalReminders, javaListDetailedGrades, javaListQualityEvaluations,
+  javaListHomework, javaListHomeworkSubmissions, javaListTodos, javaListNotes, javaListOnlineDocs,
+  javaListStudentTiers, javaListCategories, javaListDepartments, javaListDepartmentClasses,
+  javaListTeachers, javaListMentors, javaListLeaders,
+} from '@/api'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
@@ -12,31 +20,6 @@ import type {
 } from '@/types'
 import { getDefaultGradeConfig, TEMPLATE_EVAL_TYPES } from '@/types'
 import {
-  courses as mockCourses,
-  categories as mockCategories,
-  students as mockStudents,
-  schedules as mockSchedules,
-  enrollments as mockEnrollments,
-  teachers as mockTeachers,
-  grades as mockGrades,
-  evaluationConfigs as mockEvalConfigs,
-  evaluations as mockEvaluations,
-  studentGroups as mockStudentGroups,
-  detailedGrades as mockDetailedGrades,
-  mentors as mockMentors,
-  leaders as mockLeaders,
-  onlineDocs as mockOnlineDocs,
-  notes as mockNotes,
-  todoItems as mockTodos,
-  cloudFiles as mockCloudFiles,
-  homework as mockHomework,
-  homeworkSubmissions as mockHomeworkSubmissions,
-  examScores as mockExamScores,
-  studentTiers as mockStudentTiers,
-  supplementaryGrades as mockSupplementaryGrades,
-  supplementaryAll,
-  departments as mockDepartments,
-  departmentClasses as mockDepartmentClasses,
   MOCK_VERSION,
 } from '@/data/mockData'
 
@@ -85,6 +68,8 @@ try {
       'gradeConfigs', 'detailedGrades', 'homework', 'homeworkSubmissions',
       'examScores', 'examWeights', 'teacherSubmittedEvals', 'lockedSessions',
       'studentTiers', 'qualityEvaluations', 'projectWeightLocks',
+      'mentors',
+      'isLoggedIn', 'currentUser', 'currentDisplayName', 'currentRole', 'secondaryRoles',
     ]
     resetKeys.forEach((k) => localStorage.removeItem(k))
     localStorage.setItem(MOCK_VERSION_KEY, MOCK_VERSION)
@@ -93,23 +78,24 @@ try {
 
 export const useAppStore = defineStore('app', () => {
   // ====== State ======
-  const courses = ref<Course[]>(loadFromStorage('courses', mockCourses))
-  const categories = ref<Category[]>(loadFromStorage('categories', mockCategories))
-  const students = ref<Student[]>(loadFromStorage('students', mockStudents))
-  const schedules = ref<Schedule[]>(loadFromStorage('schedules', [...mockSchedules, ...supplementaryAll.supplementarySchedules, ...supplementaryAll.adminDemoSchedules]))
-  const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', [...mockEnrollments, ...supplementaryAll.supplementaryEnrollments]))
-  const teachers = ref<Teacher[]>(loadFromStorage('teachers', mockTeachers))
-  const grades = ref<Grade[]>(loadFromStorage('grades', [...mockGrades, ...mockSupplementaryGrades]))
-  const loadedCloudFiles = loadFromStorage<CloudFile[]>('cloudFiles', [...mockCloudFiles, ...supplementaryAll.supplementaryCloudFiles])
+  // 业务数据初始为空数组，启动后由 initFromDatabase() 从数据库(course_db)拉取
+  const courses = ref<Course[]>(loadFromStorage('courses', []))
+  const categories = ref<Category[]>(loadFromStorage('categories', []))
+  const students = ref<Student[]>(loadFromStorage('students', []))
+  const schedules = ref<Schedule[]>(loadFromStorage('schedules', []))
+  const enrollments = ref<Enrollment[]>(loadFromStorage('enrollments', []))
+  const teachers = ref<Teacher[]>(loadFromStorage('teachers', []))
+  const grades = ref<Grade[]>(loadFromStorage('grades', []))
+  const loadedCloudFiles = loadFromStorage<CloudFile[]>('cloudFiles', [])
   const hasLegacyCloudFiles = loadedCloudFiles.some((file) => !file.visibilityScope)
   const cloudFiles = ref<CloudFile[]>(loadedCloudFiles.map(normalizeCloudFile))
-  const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', [...mockTodos, ...supplementaryAll.supplementaryTodos]))
-  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', [...mockOnlineDocs, ...supplementaryAll.supplementaryOnlineDocs]))
-  const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', [...mockNotes, ...supplementaryAll.supplementaryNotes]))
-  const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', [...mockEvaluations, ...supplementaryAll.supplementaryEvaluations]))
-  const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', mockEvalConfigs))
-  const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', [...mockStudentGroups, ...supplementaryAll.supplementaryStudentGroups]))
-  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', supplementaryAll.supplementaryEvalReminders))
+  const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', []))
+  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', []))
+  const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', []))
+  const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', []))
+  const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', []))
+  const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', []))
+  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', []))
 
   // 素质评价提交（学生上传文件，教师打分）
   const qualityEvaluations = ref<import('@/types').QualityEvaluation[]>(
@@ -142,25 +128,28 @@ export const useAppStore = defineStore('app', () => {
       ]),
     ),
   )
-  const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', [...mockDetailedGrades, ...supplementaryAll.supplementaryDetailedGrades]))
-  const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', [...mockHomework, ...supplementaryAll.supplementaryHomework]))
-  const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', [...mockHomeworkSubmissions, ...supplementaryAll.supplementaryHomeworkSubmissions]))
+  const detailedGrades = ref<DetailedGrade[]>(loadFromStorage<DetailedGrade[]>('detailedGrades', []))
+  const homework = ref<Homework[]>(loadFromStorage<Homework[]>('homework', []))
+  const homeworkSubmissions = ref<HomeworkSubmission[]>(loadFromStorage<HomeworkSubmission[]>('homeworkSubmissions', []))
   const isLoggedIn = ref<boolean>(loadFromStorage<boolean>('isLoggedIn', false))
+  // currentUser 存登录账号（与数据库 course_db 的 owner 字段一致，如 teacher-wang / S2024001）
   const currentUser = ref<string | null>(loadFromStorage<string | null>('currentUser', null))
+  // 显示名（如 王老师 / 张明），用于界面展示与基础数据匹配
+  const currentDisplayName = ref<string | null>(loadFromStorage<string | null>('currentDisplayName', null))
   const currentRole = ref<UserRole>(loadFromStorage<UserRole>('currentRole', null))
   const hasEvalReminders = ref<boolean>(false)
 
   // 企业导师数据
-  const mentors = ref<Mentor[]>(loadFromStorage<Mentor[]>('mentors', mockMentors))
-  // 学院领导数据（只读演示数据，不从 localStorage 缓存，确保新数据及时生效）
-  const leaders = ref<Leader[]>([...mockLeaders])
+  const mentors = ref<Mentor[]>(loadFromStorage<Mentor[]>('mentors', []))
+  // 学院领导数据（启动后由 initFromDatabase() 从数据库拉取）
+  const leaders = ref<Leader[]>([])
   // 次要角色（用于 leader+teacher/mentor 双重身份）
   const secondaryRoles = ref<UserRole[]>(loadFromStorage<UserRole[]>('secondaryRoles', []))
 
   // ====== 学院系统 ======
-  const departments = ref<Department[]>(loadFromStorage<Department[]>('departments', mockDepartments))
+  const departments = ref<Department[]>(loadFromStorage<Department[]>('departments', []))
   const departmentClasses = ref<Record<string, string[]>>(
-    loadFromStorage<Record<string, string[]>>('departmentClasses', mockDepartmentClasses)
+    loadFromStorage<Record<string, string[]>>('departmentClasses', {})
   )
   const selectedDepartmentId = ref<string | null>(
     loadFromStorage<string | null>('selectedDepartmentId', null)
@@ -173,7 +162,7 @@ export const useAppStore = defineStore('app', () => {
 
   // 考试/项目成绩
   const examScores = ref<import('@/types').ExamScore[]>(
-    loadFromStorage<import('@/types').ExamScore[]>('examScores', mockExamScores)
+    loadFromStorage<import('@/types').ExamScore[]>('examScores', [])
   )
 
   // 考试/项目权重配置 (courseId → examName → weight)
@@ -203,17 +192,109 @@ export const useAppStore = defineStore('app', () => {
 
   // AI 分层记录（key: `${courseId}||${studentId}`）
   const studentTiers = ref<Record<string, StudentTierRecord>>(
-    loadFromStorage<Record<string, StudentTierRecord>>('studentTiers', mockStudentTiers)
+    loadFromStorage<Record<string, StudentTierRecord>>('studentTiers', {})
   )
 
   // ====== Actions ======
 
-  function login(username: string, role: UserRole, isTeacherFromDb?: boolean, isMentorFromDb?: boolean) {
+  // ====== 数据库初始化：从 Java 后端(course_db, 8080)拉取教师端全量业务数据 ======
+  async function initFromDatabase() {
+    try {
+      const [
+        dbCourses, dbStudents, dbSchedules, dbEnrollments, dbGrades, dbExamScores,
+        dbEvaluations, dbEvalConfigs, dbEvalReminders, dbGroups, dbFiles, dbDetailedGrades,
+        dbQualityEvals, dbHomework, dbHomeworkSubmissions, dbTodos, dbNotes, dbOnlineDocs,
+        dbStudentTiers, dbCategories, dbDepartments, dbDepartmentClasses, dbTeachers,
+        dbMentors, dbLeaders,
+      ] = await Promise.all([
+        javaListCourses(), javaListStudents(), javaListSchedules(), javaListEnrollments(),
+        javaListGrades(), javaListExamScores(), javaListEvaluations(), javaListEvalConfigs(),
+        javaListEvalReminders(), javaListGroups(), javaListFiles(), javaListDetailedGrades(),
+        javaListQualityEvaluations(), javaListHomework(), javaListHomeworkSubmissions(),
+        javaListTodos(), javaListNotes(), javaListOnlineDocs(), javaListStudentTiers(),
+        javaListCategories(), javaListDepartments(), javaListDepartmentClasses(),
+        javaListTeachers(), javaListMentors(), javaListLeaders(),
+      ])
+
+      if (Array.isArray(dbCourses)) { courses.value = dbCourses; saveToStorage('courses', dbCourses) }
+      if (Array.isArray(dbStudents)) { students.value = dbStudents; saveToStorage('students', dbStudents) }
+      if (Array.isArray(dbSchedules)) { schedules.value = dbSchedules; saveToStorage('schedules', dbSchedules) }
+      if (Array.isArray(dbEnrollments)) { enrollments.value = dbEnrollments; saveToStorage('enrollments', dbEnrollments) }
+      if (Array.isArray(dbGrades)) { grades.value = dbGrades; saveToStorage('grades', dbGrades) }
+      if (Array.isArray(dbExamScores)) { examScores.value = dbExamScores; saveToStorage('examScores', dbExamScores) }
+      if (Array.isArray(dbEvaluations)) { evaluations.value = dbEvaluations; saveToStorage('evaluations', dbEvaluations) }
+      if (Array.isArray(dbEvalConfigs)) { evalConfigs.value = dbEvalConfigs; saveToStorage('evalConfigs', dbEvalConfigs) }
+      if (Array.isArray(dbEvalReminders)) { evalReminders.value = dbEvalReminders; saveToStorage('evalReminders', dbEvalReminders) }
+      if (Array.isArray(dbGroups)) { studentGroups.value = dbGroups; saveToStorage('studentGroups', dbGroups) }
+      if (Array.isArray(dbFiles)) { cloudFiles.value = dbFiles.map(normalizeCloudFile); saveToStorage('cloudFiles', cloudFiles.value) }
+      if (Array.isArray(dbDetailedGrades)) { detailedGrades.value = dbDetailedGrades; saveToStorage('detailedGrades', dbDetailedGrades) }
+      if (Array.isArray(dbQualityEvals)) { qualityEvaluations.value = dbQualityEvals; saveToStorage('qualityEvaluations', dbQualityEvals) }
+      if (Array.isArray(dbHomework)) { homework.value = dbHomework; saveToStorage('homework', dbHomework) }
+      if (Array.isArray(dbHomeworkSubmissions)) { homeworkSubmissions.value = dbHomeworkSubmissions; saveToStorage('homeworkSubmissions', dbHomeworkSubmissions) }
+      if (Array.isArray(dbTodos)) { todos.value = dbTodos; saveToStorage('todos', dbTodos) }
+      if (Array.isArray(dbNotes)) { notes.value = dbNotes; saveToStorage('notes', dbNotes) }
+      if (Array.isArray(dbOnlineDocs)) { onlineDocs.value = dbOnlineDocs; saveToStorage('onlineDocs', dbOnlineDocs) }
+      if (Array.isArray(dbStudentTiers)) {
+        const tierMap: Record<string, StudentTierRecord> = {}
+        dbStudentTiers.forEach((t: any) => {
+          tierMap[`${t.courseId}||${t.studentId}`] = {
+            courseId: t.courseId,
+            studentId: t.studentId,
+            tier: t.tier,
+            score: Number(t.score) || 0,
+            createdAt: t.createdAt || '',
+          }
+        })
+        studentTiers.value = tierMap
+        saveToStorage('studentTiers', tierMap)
+      }
+
+      // 基础数据（分类/学院/班级/教师/导师/领导）全部来自 course_db，不再使用 mock
+      if (Array.isArray(dbCategories)) { categories.value = dbCategories; saveToStorage('categories', dbCategories) }
+      if (Array.isArray(dbDepartments)) { departments.value = dbDepartments; saveToStorage('departments', dbDepartments) }
+      if (Array.isArray(dbTeachers)) { teachers.value = dbTeachers; saveToStorage('teachers', dbTeachers) }
+      if (Array.isArray(dbMentors)) { mentors.value = dbMentors; saveToStorage('mentors', dbMentors) }
+      if (Array.isArray(dbLeaders)) { leaders.value = dbLeaders }
+      if (Array.isArray(dbDepartmentClasses)) {
+        const classMap: Record<string, string[]> = {}
+        dbDepartmentClasses.forEach((dc: any) => {
+          if (!dc.departmentId || !dc.className) return
+          if (!classMap[dc.departmentId]) classMap[dc.departmentId] = []
+          if (!classMap[dc.departmentId].includes(dc.className)) classMap[dc.departmentId].push(dc.className)
+        })
+        departmentClasses.value = classMap
+        saveToStorage('departmentClasses', classMap)
+      }
+
+      // 成绩权重配置：按课程逐个拉取（grade-config 需 courseId 参数），失败则保留默认值
+      if (courses.value.length > 0) {
+        const configs: Record<string, GradeWeightConfig> = { ...gradeConfigs.value }
+        await Promise.all(courses.value.map(async (c) => {
+          try {
+            const cfg = await javaGetGradeConfig(c.id)
+            if (cfg?.courseId) configs[c.id] = { ...getDefaultGradeConfig(c.id), ...cfg }
+          } catch { /* 单课程配置拉取失败则跳过 */ }
+        }))
+        gradeConfigs.value = configs
+        saveToStorage('gradeConfigs', configs)
+      }
+
+      // 数据库数据就绪后刷新自动待办
+      generateAutoTodos()
+    } catch (e) {
+      // Java 后端未启动时静默失败，保留 localStorage 已有缓存
+      console.warn('[store] 数据库数据拉取失败（Java 后端未启动？）:', e)
+    }
+  }
+
+  function login(username: string, role: UserRole, isTeacherFromDb?: boolean, isMentorFromDb?: boolean, displayName?: string | null) {
     localStorage.setItem('isLoggedIn', JSON.stringify(true))
     localStorage.setItem('currentUser', JSON.stringify(username))
+    localStorage.setItem('currentDisplayName', JSON.stringify(displayName ?? username))
     localStorage.setItem('currentRole', JSON.stringify(role))
     isLoggedIn.value = true
     currentUser.value = username
+    currentDisplayName.value = displayName ?? username
     currentRole.value = role
 
     // 检测双重身份：如果以 mentor/leader 登录，检测是否同时有其他角色
@@ -237,10 +318,12 @@ export const useAppStore = defineStore('app', () => {
   function logout() {
     localStorage.setItem('isLoggedIn', JSON.stringify(false))
     localStorage.setItem('currentUser', JSON.stringify(null))
+    localStorage.setItem('currentDisplayName', JSON.stringify(null))
     localStorage.setItem('currentRole', JSON.stringify(null))
     localStorage.setItem('secondaryRoles', JSON.stringify([]))
     isLoggedIn.value = false
     currentUser.value = null
+    currentDisplayName.value = null
     currentRole.value = null
     secondaryRoles.value = []
   }
@@ -570,7 +653,7 @@ export const useAppStore = defineStore('app', () => {
 
   function getCourseCloudFiles(courseId: string): CloudFile[] {
     // 当前学生身份（仅学生端调用，需结合班级可见性过滤）
-    const student = students.value.find((s) => s.name === currentUser.value)
+    const student = students.value.find((s) => s.name === currentDisplayName.value)
     const myClassName = student?.className
 
     return cloudFiles.value.filter((f) => {
@@ -1305,7 +1388,7 @@ export const useAppStore = defineStore('app', () => {
         return deadline >= now && deadline <= oneWeekLater
       }
       if (isStudent) {
-        const student = students.value.find((s) => s.name === currentUser.value)
+        const student = students.value.find((s) => s.name === currentDisplayName.value)
         if (student && r.studentId === student.id) {
           const deadline = new Date(r.deadline)
           return deadline >= now && deadline <= oneWeekLater
@@ -1685,7 +1768,7 @@ export const useAppStore = defineStore('app', () => {
 
   /** 获取当前用户的授课课程（普通教师=自己教的课；领导 asTeacher=专属授课课程，与教师端"我的课程"一致） */
   function getTeacherCoursesForUser(user: string): Course[] {
-    const leader = leaders.value.find((l) => l.name === user)
+    const leader = leaders.value.find((l) => l.name === user || l.name === currentDisplayName.value)
     if (leader?.asTeacher) {
       return courses.value.filter((c) => leader.teacherCourseIds?.includes(c.id) || c.teacher === user)
     }
@@ -1751,13 +1834,13 @@ export const useAppStore = defineStore('app', () => {
 
   /** 获取某导师负责的所有课程ID */
   function getMentorCourseIds(mentorName: string): string[] {
-    const mentor = mentors.value.find((m) => m.name === mentorName)
+    const mentor = mentors.value.find((m) => m.name === mentorName || m.name === currentDisplayName.value)
     if (mentor) return mentor.courseIds
     // 也检查课程 mentor 字段
     const byMentorField = courses.value.filter((c) => c.mentor === mentorName).map((c) => c.id)
     if (byMentorField.length > 0) return byMentorField
     // 领导以 asMentor 身份访问：优先用其专属导师课程（与普通导师一致），未配置时退回按管辖分类
-    const leader = leaders.value.find((l) => l.name === mentorName)
+    const leader = leaders.value.find((l) => l.name === mentorName || l.name === currentDisplayName.value)
     if (leader?.asMentor) {
       if (leader.mentorCourseIds?.length) return leader.mentorCourseIds
       return courses.value.filter((c) => leader.categoryIds.includes(c.categoryId)).map((c) => c.id)
@@ -1769,14 +1852,14 @@ export const useAppStore = defineStore('app', () => {
 
   /** 获取某领导管辖的所有课程 */
   function getLeaderCourses(leaderName: string): Course[] {
-    const leader = leaders.value.find((l) => l.name === leaderName)
+    const leader = leaders.value.find((l) => l.name === leaderName || l.name === currentDisplayName.value)
     if (!leader) return []
     return courses.value.filter((c) => leader.categoryIds.includes(c.categoryId))
   }
 
   /** 获取某领导作为教师授课的专属课程（与教师端"我的课程"逻辑一致） */
   function getLeaderTeacherCourses(leaderName: string): Course[] {
-    const leader = leaders.value.find((l) => l.name === leaderName)
+    const leader = leaders.value.find((l) => l.name === leaderName || l.name === currentDisplayName.value)
     if (!leader?.asTeacher) return []
     return courses.value.filter(
       (c) => leader.teacherCourseIds?.includes(c.id) || c.teacher === leaderName
@@ -1795,7 +1878,7 @@ export const useAppStore = defineStore('app', () => {
     const user = currentUser.value
     if (!user) return false
     const myTargetId = currentRole.value === 'student'
-      ? (students.value.find((s) => s.name === user)?.id ?? '')
+      ? (students.value.find((s) => s.name === user || s.name === currentDisplayName.value)?.id ?? '')
       : user
     return evalReminders.value.some(
       (r) => r.courseId === courseId && r.studentId === myTargetId && r.status !== 'completed'
@@ -1832,7 +1915,7 @@ export const useAppStore = defineStore('app', () => {
         if (hasPending) result.add(courseId)
       }
     } else if (scope === 'student') {
-      const student = students.value.find((s) => s.name === user)
+      const student = students.value.find((s) => s.name === user || s.name === currentDisplayName.value)
       if (student) {
         const enrolled = enrollments.value.filter((e) => e.studentId === student.id && e.status !== 'dropped')
         const aiTierPending = new Set(getPendingAITierTests(student.id).map((t) => t.courseId))
@@ -1862,7 +1945,7 @@ export const useAppStore = defineStore('app', () => {
 
   /** 获取某领导管辖的所有学生（去重） */
   function getLeaderStudents(leaderName: string): Student[] {
-    const leader = leaders.value.find((l) => l.name === leaderName)
+    const leader = leaders.value.find((l) => l.name === leaderName || l.name === currentDisplayName.value)
     if (!leader) return []
     const courseIds = courses.value
       .filter((c) => leader.categoryIds.includes(c.categoryId))
@@ -1918,7 +2001,7 @@ export const useAppStore = defineStore('app', () => {
     const now = getNow()
     const currentStudentId = (() => {
       if (currentRole.value !== 'student' || !currentUser.value) return null
-      return students.value.find((s) => s.name === currentUser.value)?.id ?? null
+      return students.value.find((s) => s.name === currentDisplayName.value)?.id ?? null
     })()
     // 当前用户在评价提醒中的目标 id：学生用学生 id，其余角色用姓名（领导教师/导师的提醒直接指向其姓名）
     const myTargetId = currentStudentId || currentUser.value || ''
@@ -2125,7 +2208,7 @@ export const useAppStore = defineStore('app', () => {
     evaluations, evalConfigs, studentGroups, evalReminders,
     gradeConfigs, detailedGrades,
     homework, homeworkSubmissions,
-    isLoggedIn, currentUser, currentRole,
+    isLoggedIn, currentUser, currentDisplayName, currentRole,
     hasEvalReminders,
     mentors, leaders, secondaryRoles,
     departments, departmentClasses, selectedDepartmentId,
@@ -2133,6 +2216,7 @@ export const useAppStore = defineStore('app', () => {
     examWeights,
     lockedSessions,
     studentTiers,
+    initFromDatabase,
     // actions
     login, logout,
     addCourse, updateCourse, deleteCourse, assignMentorToCourse,

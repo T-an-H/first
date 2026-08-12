@@ -510,7 +510,6 @@ import {
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule, EvaluationConfig, Course } from '@/types'
 import { getNow } from '@/lib/date'
-import { fetchTeacherCourses } from '@/api'
 
 
 const router = useRouter()
@@ -519,13 +518,13 @@ const store = useAppStore()
 
 /** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由 */
 const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
-const isLeaderWithTeaching = computed(() => store.leaders.some((l) => l.name === store.currentUser && l.asTeacher))
+const isLeaderWithTeaching = computed(() => store.leaders.some((l) => (l.name === store.currentUser || l.name === store.currentDisplayName) && l.asTeacher))
 
 const searchQuery = ref('')
 const dbCourses = ref<any[]>([])
 const loading = ref(true)
 
-onMounted(async () => {
+onMounted(() => {
   // 清理可能被覆盖的 localStorage 课程缓存
   const stored = localStorage.getItem('courses')
   if (stored) {
@@ -537,22 +536,8 @@ onMounted(async () => {
       }
     } catch { /* ignore */ }
   }
-  try {
-    const res = await fetchTeacherCourses(store.currentUser || '')
-    if (res.success) {
-      dbCourses.value = res.courses
-      // 更新 store（即使为空也覆盖）
-      store.courses = res.courses
-      // 保存一份到 localStorage 用于离线展示
-      if (res.courses.length > 0) {
-        localStorage.setItem('courses', JSON.stringify(res.courses))
-      }
-    }
-  } catch (e) {
-    console.error('加载课程失败:', e)
-  } finally {
-    loading.value = false
-  }
+  // 课程数据由 store.initFromDatabase() 从数据库(course_db)拉取，此处直接使用 store
+  loading.value = false
 })
 
 const sortedAndFilteredCourses = computed(() => {
@@ -1018,7 +1003,7 @@ async function handleBatchEval(type: string, levelLabel: string) {
         type: type as EvalType,
         score,
         evaluatorId: store.currentUser || '',
-        evaluatorName: store.currentUser || '',
+        evaluatorName: store.currentDisplayName || store.currentUser || '',
         comment: `批量评价：${levelLabel}`,
         createdAt: getNow().toISOString(),
       })

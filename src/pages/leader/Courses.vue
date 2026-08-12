@@ -4,11 +4,11 @@
     <div class="flex items-center justify-between">
       <div>
         <h1 class="text-2xl font-bold text-gray-900">课程总览</h1>
-        <p class="text-gray-400 mt-1">查看本学院的所有课程信息{{ usingMockData ? '（演示模式）' : '（数据来源：MySQL）' }}</p>
+        <p class="text-gray-400 mt-1">查看本学院的所有课程信息（数据来源：MySQL）</p>
       </div>
-      <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-amber-500' : usingMockData ? 'text-blue-500' : 'text-green-500'">
-        <span class="w-2 h-2 rounded-full" :class="loading ? 'bg-amber-500 animate-pulse' : usingMockData ? 'bg-blue-500' : 'bg-green-500'"></span>
-        {{ loading ? '加载中...' : usingMockData ? `演示数据 · ${courses.length} 门课程` : `已连接 · ${courses.length} 门课程` }}
+      <div class="flex items-center gap-2 text-xs" :class="loading ? 'text-amber-500' : 'text-green-500'">
+        <span class="w-2 h-2 rounded-full" :class="loading ? 'bg-amber-500 animate-pulse' : 'bg-green-500'"></span>
+        {{ loading ? '加载中...' : `已连接 · ${courses.length} 门课程` }}
       </div>
     </div>
 
@@ -93,7 +93,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, BookOpen, Play, CheckCircle, LoaderCircle } from 'lucide-vue-next'
-import { fetchDepartmentCourses } from '@/api'
 import { useAppStore } from '@/stores/app'
 
 const store = useAppStore()
@@ -102,7 +101,6 @@ const router = useRouter()
 const courses = ref<any[]>([])
 const loading = ref(true)
 const searchText = ref('')
-const usingMockData = ref(false)
 
 const activeCount = computed(() => filteredCourses.value.filter((c: any) => c.status === 'active').length)
 const inactiveCount = computed(() => filteredCourses.value.filter((c: any) => c.status !== 'active').length)
@@ -127,26 +125,14 @@ function goDetail(courseId: string) {
 
 async function loadCourses() {
   loading.value = true
-  usingMockData.value = false
-  try {
-    const res = await fetchDepartmentCourses('计算机学院')
-    if (res.success && res.courses && res.courses.length > 0) {
-      courses.value = res.courses
-    } else {
-      throw new Error('No data from API')
-    }
-  } catch (e) {
-    console.warn('API加载课程失败，使用本地模拟数据:', e)
-    usingMockData.value = true
-    const leaderName = store.currentUser
-    if (leaderName) {
-      courses.value = store.getLeaderCourses(leaderName)
-    } else {
-      courses.value = store.courses
-    }
-  } finally {
-    loading.value = false
+  // 课程数据由 store.initFromDatabase() 从数据库(course_db)拉取，此处直接使用 store
+  const leaderName = store.currentUser || store.currentDisplayName || ''
+  if (leaderName) {
+    courses.value = store.getLeaderCourses(leaderName)
+  } else {
+    courses.value = store.courses
   }
+  loading.value = false
 }
 
 onMounted(() => {

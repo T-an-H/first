@@ -400,3 +400,95 @@ CREATE TABLE student_tier (
     UNIQUE KEY uk_course_student (course_id, student_id),
     KEY idx_student (student_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = 'AI分层记录';
+
+-- ------------------------------------------------------------
+-- 21. 课程分类 category（基础数据）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS category;
+CREATE TABLE category (
+    id            VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 cat-xxx）',
+    name          VARCHAR(128) NOT NULL COMMENT '分类名称',
+    color         VARCHAR(32)  DEFAULT '#3b82f6' COMMENT '分类颜色',
+    course_count  INT          NOT NULL DEFAULT 0 COMMENT '课程数（展示用）',
+    department_id VARCHAR(64)  DEFAULT '' COMMENT '所属学院ID',
+    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '课程分类';
+
+-- ------------------------------------------------------------
+-- 22. 学院 department（基础数据）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS department;
+CREATE TABLE department (
+    id         VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 dept-xxx）',
+    name       VARCHAR(128) NOT NULL COMMENT '学院名称',
+    color      VARCHAR(32)  DEFAULT '#3b82f6' COMMENT '学院颜色',
+    created_at DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '学院';
+
+-- ------------------------------------------------------------
+-- 23. 学院班级映射 department_class（基础数据）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS department_class;
+CREATE TABLE department_class (
+    id            VARCHAR(64)  NOT NULL COMMENT '主键（前端生成）',
+    department_id VARCHAR(64)  NOT NULL COMMENT '学院ID',
+    class_name    VARCHAR(128) NOT NULL COMMENT '班级名称',
+    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_department (department_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '学院班级映射';
+
+-- ------------------------------------------------------------
+-- 24. 教师 teacher（基础数据）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS teacher;
+CREATE TABLE teacher (
+    id         VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 t-xxx）',
+    name       VARCHAR(64)  NOT NULL COMMENT '姓名（显示名，登录账号见 courses.teacher/账号体系）',
+    phone      VARCHAR(32)  DEFAULT '' COMMENT '电话',
+    email      VARCHAR(128) DEFAULT '' COMMENT '邮箱',
+    avatar     VARCHAR(500) DEFAULT '' COMMENT '头像URL',
+    course_ids TEXT         NULL COMMENT '授课课程ID列表（JSON数组）',
+    created_at DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '教师';
+
+-- ------------------------------------------------------------
+-- 25. 企业导师 mentor（基础数据）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS mentor;
+CREATE TABLE mentor (
+    id         VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 m-xxx）',
+    name       VARCHAR(64)  NOT NULL COMMENT '姓名（显示名）',
+    phone      VARCHAR(32)  DEFAULT '' COMMENT '电话',
+    email      VARCHAR(128) DEFAULT '' COMMENT '邮箱',
+    avatar     VARCHAR(500) DEFAULT '' COMMENT '头像URL',
+    course_ids TEXT         NULL COMMENT '负责课程ID列表（JSON数组）',
+    created_at DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '企业导师';
+
+-- ------------------------------------------------------------
+-- 26. 学院领导 leader（基础数据）
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS leader;
+CREATE TABLE leader (
+    id                 VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 l-xxx）',
+    name               VARCHAR(64)  NOT NULL COMMENT '姓名（显示名）',
+    phone              VARCHAR(32)  DEFAULT '' COMMENT '电话',
+    email              VARCHAR(128) DEFAULT '' COMMENT '邮箱',
+    category_ids       TEXT         NULL COMMENT '管辖分类ID列表（JSON数组）',
+    as_teacher         TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否兼任授课教师 0/1',
+    teacher_course_ids TEXT         NULL COMMENT '作为教师授课的课程ID列表（JSON数组）',
+    as_mentor          TINYINT(1)   NOT NULL DEFAULT 0 COMMENT '是否兼任企业导师 0/1',
+    mentor_course_ids  TEXT         NULL COMMENT '作为导师负责的课程ID列表（JSON数组）',
+    created_at         DATETIME     DEFAULT CURRENT_TIMESTAMP,
+    updated_at         DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '学院领导';
