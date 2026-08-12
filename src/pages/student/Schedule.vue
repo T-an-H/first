@@ -27,7 +27,7 @@ async function loadMySchedules() {
   let remoteSchedules: any[] | null = null
   try {
     // 1. 找当前学生的班级
-    const studentName = store.currentUser
+    const studentName = store.currentDisplayName || store.currentUser
     if (!studentName) return
 
     // 从 students API 查询学生信息
@@ -46,7 +46,7 @@ async function loadMySchedules() {
     if (remoteSchedules && remoteSchedules.length > 0) {
       dbSchedules.value = remoteSchedules
     } else {
-      const myStudent = store.students.find((s) => s.name === store.currentUser)
+      const myStudent = store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName)
       const myCourseIds = new Set(
         store.enrollments.filter((e) => e.studentId === myStudent?.id).map((e) => e.courseId)
       )

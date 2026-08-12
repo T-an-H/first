@@ -13,7 +13,7 @@ import type { Enrollment } from '@/types'
 const router = useRouter()
 const store = useAppStore()
 
-const student = computed(() => store.students.find((s) => s.name === store.currentUser))
+const student = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
 
 const enrolledCourses = computed(() => {
   if (!student.value) return []

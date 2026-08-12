@@ -1,30 +1,26 @@
 /**
- * 虚拟时间工具 - 使整个前端以 2026-07-27 为"今天"
- * 所有获取"当前时间"的地方都应使用此工具函数
+ * 时间工具 - 所有获取"当前时间"的地方都应使用此工具函数
+ * 使用系统真实时间，保证各页面日期与"今天"一致
  */
-export const VIRTUAL_DATE_STR = '2026-07-27'
 
-/** 虚拟"现在"时间戳 (2026-07-27 08:00 CST) */
-const VIRTUAL_NOW = new Date('2026-07-27T08:00:00+08:00')
-
-/** 获取虚拟的"当前时间" */
+/** 获取"当前时间" */
 export function getNow(): Date {
-  return new Date(VIRTUAL_NOW.getTime())
+  return new Date()
 }
 
-/** 获取虚拟的"今天 00:00:00" */
+/** 获取"今天 00:00:00" */
 export function getTodayStart(): Date {
   const d = getNow()
   d.setHours(0, 0, 0, 0)
   return d
 }
 
-/** 获取虚拟的"当前时间戳" */
+/** 获取"当前时间戳" */
 export function getNowTimestamp(): number {
-  return VIRTUAL_NOW.getTime()
+  return Date.now()
 }
 
-/** 判断一个日期是否等于虚拟的"今天" */
+/** 判断一个日期是否等于"今天" */
 export function isVirtualToday(date: Date): boolean {
   const t = getTodayStart()
   return date.getFullYear() === t.getFullYear()
@@ -32,7 +28,7 @@ export function isVirtualToday(date: Date): boolean {
     && date.getDate() === t.getDate()
 }
 
-/** 获取虚拟本周的周一 */
+/** 获取本周的周一 */
 export function getVirtualMonday(): Date {
   const d = getTodayStart()
   const day = d.getDay() // 0=周日, 1=周一 ...

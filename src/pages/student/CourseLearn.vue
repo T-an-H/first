@@ -383,7 +383,7 @@
               <p class="text-xs mt-1">如需查看评价记录，请在"综合评价"中查看</p>
             </div>
             <StudentEvaluation v-else :course-id="courseId" :student-id="myStudent?.id || ''"
-              :student-name="myStudent?.name || store.currentUser || ''" />
+              :student-name="myStudent?.name || store.currentDisplayName || store.currentUser || ''" />
             </div>
 
             <!-- ===== 素质评价板块 ===== -->
@@ -808,7 +808,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
 const courseId = route.params.id as string
-const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
+const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
 const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']

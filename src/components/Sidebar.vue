@@ -153,7 +153,7 @@ function renderSidebar() {
   if (store.currentRole === 'leader') {
     // 以 leader 身份登入：先加 teacher/mentor 菜单，最后加 leader 菜单
     fullItems = []
-    const leader = store.leaders.find((l) => l.name === store.currentUser)
+    const leader = store.leaders.find((l) => l.name === store.currentUser || l.name === store.currentDisplayName)
     if (leader?.asTeacher) {
       fullItems.push({ separator: true, label: '教学管理' } as any)
       teacherNavItems.forEach((item) => fullItems.push(item))

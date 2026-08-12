@@ -302,7 +302,7 @@ const fileList = computed(() => {
   if (!currentUser) return []
 
   if (store.currentRole === 'student') {
-    const student = store.students.find((item) => item.name === currentUser)
+    const student = store.students.find((item) => item.name === currentUser || item.name === store.currentDisplayName)
 
     return store.cloudFiles.filter((file) => {
       if (file.uploadedBy === currentUser) return true

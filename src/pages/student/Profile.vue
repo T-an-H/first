@@ -10,7 +10,7 @@ import { renderIcon } from '@/utils/d3-renderer'
 import { getNow } from '@/lib/date'
 
 const store = useAppStore()
-const student = computed(() => store.students.find((s) => s.name === store.currentUser))
+const student = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
 const myEnrollments = computed(() => (student.value ? store.enrollments.filter((e) => e.studentId === student.value!.id) : []))
 const myGrades = computed(() => (student.value ? store.grades.filter((g) => g.studentId === student.value!.id) : []))
 
@@ -81,7 +81,7 @@ function getScheduleDay(sch: any): string {
 
 async function loadMySchedules() {
   try {
-    const studentName = store.currentUser
+    const studentName = store.currentDisplayName || store.currentUser
     if (!studentName) return
     // 1. 查询学生信息获取班级
     const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
@@ -453,7 +453,7 @@ function renderProfile(root: HTMLElement) {
 
   // 信息
   const infoContent = infoRow.append('div').attr('class', 'flex-1')
-  infoContent.append('h2').attr('class', 'text-xl font-bold text-gray-900').text(s?.name || store.currentUser || '未知用户')
+  infoContent.append('h2').attr('class', 'text-xl font-bold text-gray-900').text(s?.name || store.currentDisplayName || store.currentUser || '未知用户')
   const infoGrid = infoContent.append('div').attr('class', 'grid grid-cols-2 gap-x-8 gap-y-2 mt-3')
 
   const infoItems = [
