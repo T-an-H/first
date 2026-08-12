@@ -13,6 +13,7 @@ import categoryRoutes from './routes/categories.js';
 import courseRoutes from './routes/courses.js';
 import teachingRoutes from './routes/teaching.js';
 import evalRoutes from './routes/eval.js';
+import extraRoutes from './routes/extra.js';
 
 const app = express();
 const PORT = 3000;
@@ -58,6 +59,9 @@ app.use('/api/teaching', teachingRoutes);
 
 // 评价管理路由
 app.use('/api/eval', evalRoutes);
+
+// 教师端扩展数据路由（待办/笔记/在线文档/AI分层）
+app.use('/api/teaching', extraRoutes);
 
 // ====== 启动服务器 ======
 app.listen(PORT, () => {
