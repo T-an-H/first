@@ -1,8 +1,9 @@
 -- ============================================================
--- 课程管理平台 · 教师端后端模块 建表脚本
--- 数据库: course_db  (MySQL 8)
--- 执行方式: mysql -uroot -p070808 < schema.sql
---           或在 Navicat/Workbench 中打开本文件整段执行
+-- 课程管理平台 · 教师端后端模块 完整建表脚本（20 张表）
+-- 数据库: course_db  (MySQL 8, utf8mb4)
+-- 执行方式: 在 Navicat / MySQL Workbench 中打开本文件整段执行，
+--           或命令行: mysql -uroot -p070808 < course_db_full_schema.sql
+-- 说明: 每张表先 DROP TABLE IF EXISTS 再重建，可重复执行
 -- ============================================================
 
 CREATE DATABASE IF NOT EXISTS course_db
