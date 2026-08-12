@@ -192,7 +192,7 @@ const studentId = computed(() => {
     // ignore
   }
 
-  const student = store.students.find((item) => item.name === store.currentUser)
+  const student = store.students.find((item) => item.name === store.currentUser || item.name === store.currentDisplayName)
   return student?.id || ''
 })
 

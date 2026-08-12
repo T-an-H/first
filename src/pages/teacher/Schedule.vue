@@ -248,11 +248,16 @@ interface CoursePattern {
 }
 
 const coursePatterns = computed(() => {
+  const dayMap: Record<string, number> = { '周一': 0, '周二': 1, '周三': 2, '周四': 3, '周五': 4, '周六': 5, '周日': 6 }
   const map = new Map<string, CoursePattern[]>()
   filteredSchedules.value.forEach((s) => {
-    const sd = new Date(s.startDate)
-    const day = sd.getDay()
-    const dow = day === 0 ? 6 : day - 1
+    // 优先使用排课表的 day 字段（周一~周五），缺失时退回 startDate 推导
+    let dow = s.day ? dayMap[s.day] : undefined
+    if (dow === undefined) {
+      const sd = new Date(s.startDate)
+      const day = sd.getDay()
+      dow = day === 0 ? 6 : day - 1
+    }
     if (!map.has(s.courseId)) map.set(s.courseId, [])
     const list = map.get(s.courseId)!
     if (!list.some(p => p.dayOfWeek === dow && p.timeSlot === s.timeSlot)) {

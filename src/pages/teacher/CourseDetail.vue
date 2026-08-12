@@ -2032,7 +2032,7 @@ function tabBadgeCount(tabKey: string): number {
   if (tabKey === 'comments') {
     // 当前用户在该课程待完成的评价（教师→自己作为授课者收到的提醒，导师→自己作为导师收到的提醒）
     const myTargetId = store.currentRole === 'student'
-      ? (store.students.find((s) => s.name === user)?.id ?? '')
+      ? (store.students.find((s) => s.name === user || s.name === store.currentDisplayName)?.id ?? '')
       : user
     return store.evalReminders.filter(
       (r) => r.courseId === courseId.value && r.studentId === myTargetId && r.status !== 'completed'
@@ -3797,7 +3797,7 @@ const handleBatchEval = (level: string) => {
       type,
       score,
       evaluatorId: store.currentUser || '',
-      evaluatorName: store.currentUser || (isMentor.value ? '企业导师' : '教师'),
+      evaluatorName: store.currentDisplayName || store.currentUser || (isMentor.value ? '企业导师' : '教师'),
       comment: level,
       createdAt: getNow().toISOString().split('T')[0],
     }
@@ -3832,7 +3832,7 @@ function handleSaveEvalScores() {
       type,
       score: clampedScore,
       evaluatorId: store.currentUser || '',
-      evaluatorName: store.currentUser || (isMentor.value ? '企业导师' : '教师'),
+      evaluatorName: store.currentDisplayName || store.currentUser || (isMentor.value ? '企业导师' : '教师'),
       createdAt: getNow().toISOString().split('T')[0],
     }
     if (existing) {

@@ -299,7 +299,7 @@ const batchSession = ref(1)
 const overdueMsg = ref('')
 
 const myCourses = computed(() => {
-  if (store.leaders.some((l) => l.name === store.currentUser && l.asTeacher)) {
+  if (store.leaders.some((l) => (l.name === store.currentUser || l.name === store.currentDisplayName) && l.asTeacher)) {
     return store.getLeaderCourses(store.currentUser || '')
   }
   return store.courses.filter((c) => c.teacher === store.currentUser)
@@ -379,7 +379,7 @@ const handleBatchEval = (type: EvalType, level: string) => {
       type,
       score,
       evaluatorId: store.currentUser || 'teacher',
-      evaluatorName: store.currentUser || '教师',
+      evaluatorName: store.currentDisplayName || store.currentUser || '教师',
       comment: level,
       createdAt: getNow().toISOString().split('T')[0],
     }

@@ -8,7 +8,7 @@ import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
 
 const store = useAppStore()
-const student = computed(() => store.students.find((s) => s.name === store.currentUser))
+const student = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
 const myEnrollments = computed(() => store.enrollments.filter((e) => e.studentId === student.value?.id))
 
 const getCourseName = (id: string) => store.courses.find((c) => c.id === id)?.title || '未知'

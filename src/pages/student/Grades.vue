@@ -249,7 +249,7 @@ onMounted(async () => {
     if (data.success) store.courses = data.courses
   } catch { /* ignore */ }
 
-  const s = store.students.find((x) => x.name === store.currentUser)
+  const s = store.students.find((x) => x.name === store.currentUser || x.name === store.currentDisplayName)
   if (s?.id) {
     try {
       const res = await fetchStudentScores(s.id)
@@ -303,7 +303,7 @@ function closeModal() {
   modalEntry.value = null
 }
 
-const student = computed(() => store.students.find((s) => s.name === store.currentUser) ?? store.students[0])
+const student = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName) ?? store.students[0])
 
 const myGrades = computed(() => store.grades.filter((g) => g.studentId === student.value?.id))
 const semesters = computed(() => [...new Set(store.grades.map((g) => g.semester))])

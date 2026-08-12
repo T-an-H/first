@@ -315,7 +315,7 @@ const roleLabel = computed(() => {
 
 const currentStudent = computed(() => {
   if (pageContext.value !== 'student') return null
-  return store.students.find((student) => student.name === store.currentUser) ?? null
+  return store.students.find((student) => student.name === store.currentUser || student.name === store.currentDisplayName) ?? null
 })
 
 const studentCourses = computed<Course[]>(() => {
@@ -336,7 +336,7 @@ const currentStudentCourse = computed(() => {
 
 const currentTeacherRecord = computed(() => {
   if (pageContext.value !== 'teacher') return null
-  return store.teachers.find((teacher) => teacher.name === store.currentUser) ?? null
+  return store.teachers.find((teacher) => teacher.name === store.currentUser || teacher.name === store.currentDisplayName) ?? null
 })
 
 const teacherCourses = computed<Course[]>(() => {
@@ -1485,7 +1485,7 @@ async function requestAgentIntent(
       role: pageContext.value,
       roleLabel: roleLabel.value,
       currentPath: route.fullPath,
-      currentUser: store.currentUser ?? null,
+      currentUser: store.currentDisplayName || store.currentUser || null,
       selectedDepartmentId: store.selectedDepartmentId ?? null,
       selectedDepartmentName: selectedDepartmentName.value,
       recentMessages,
@@ -1714,7 +1714,7 @@ watch(isOpen, (open) => {
   nextTick(() => inputRef.value?.focus())
 
   if (messages.value.length === 0) {
-    const username = store.currentUser || '同学'
+    const username = store.currentDisplayName || store.currentUser || '同学'
     const greeting = `你好，${username}。我是小智。\n\n你直接告诉我你想做什么，我会尽量带你跳到对应页面；如果信息还不够，我会先问清楚。`
     messages.value.push({ text: greeting, isUser: false })
   }
