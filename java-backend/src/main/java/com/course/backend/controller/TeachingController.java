@@ -255,6 +255,17 @@ public class TeachingController {
         return Result.ok();
     }
 
+    /**
+     * PUT /api/teaching/files/{id}  更新课程资源（重命名/改可见范围等）
+     * body 只需传要修改的字段，如 { name: "新文件名" }
+     */
+    @PutMapping("/files/{id}")
+    public Result<CourseFile> updateFile(@PathVariable String id, @RequestBody CourseFile file) {
+        file.setId(id);
+        courseFileService.updateById(file);
+        return Result.ok(courseFileService.getById(id));
+    }
+
     // ==================== 成绩权重配置 ====================
 
     /**
