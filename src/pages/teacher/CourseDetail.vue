@@ -1202,18 +1202,6 @@
                 </td>
                 <td v-if="!isViewOnly" class="px-3 py-2.5">
                   <div class="flex flex-col gap-1.5 items-end">
-                    <!-- 分组操作 -->
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-[10px] text-gray-400 w-7 text-right">分组</span>
-                      <button v-if="getStudentGroupName(stu.id)" @click="quickRemoveFromGroup(stu.id)"
-                        class="px-2 py-0.5 text-[11px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors" title="移出当前分组">
-                        移出分组
-                      </button>
-                      <button v-else @click="openQuickAddToGroup(stu.id)"
-                        class="px-2 py-0.5 text-[11px] text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors" title="加入分组">
-                        加入分组
-                      </button>
-                    </div>
                     <!-- 班级操作 -->
                     <div class="flex items-center gap-1.5">
                       <span class="text-[10px] text-gray-400 w-7 text-right">班级</span>
@@ -1420,6 +1408,16 @@
                   <option value="">不分配班级（未分班）</option>
                   <option v-for="cb in classBlocks.filter(c => c.className)" :key="cb.className" :value="cb.className">
                     {{ cb.className }}
+                  </option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 block mb-1">所属分组（选填，可不选）</label>
+                <select v-model="addStudentForm.groupId"
+                  class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:border-indigo-400 outline-none">
+                  <option value="">不分配分组（未分组）</option>
+                  <option v-for="g in addStudentGroupCandidates" :key="g.id" :value="g.id">
+                    {{ g.name }}（{{ g.memberIds.length }} 人）
                   </option>
                 </select>
               </div>
@@ -1720,6 +1718,26 @@
                 <p class="flex-1 text-sm font-medium text-gray-900">{{ cn }}</p>
                 <CheckCircle v-if="quickAddClassSelected === cn" class="w-4 h-4 text-amber-600" />
               </button>
+            </div>
+            <!-- 分组选择（选填，可不选） -->
+            <div v-if="quickAddClassSelected" class="mt-4 pt-4 border-t border-gray-100">
+              <p class="text-xs text-gray-500 mb-2">选择分组（选填，可不选）</p>
+              <div v-if="quickAddClassGroupCandidates.length === 0" class="text-xs text-gray-400 py-2">
+                该班级暂无可用分组，加入后将保持未分组
+              </div>
+              <div v-else class="space-y-2 max-h-40 overflow-y-auto">
+                <button v-for="g in quickAddClassGroupCandidates" :key="g.id" @click="quickAddClassGroupSelected = g.id"
+                  :class="['w-full flex items-center gap-3 px-4 py-2 text-left rounded-lg border transition-colors', quickAddClassGroupSelected === g.id ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-gray-200 hover:bg-gray-50']">
+                  <div class="w-7 h-7 rounded-md bg-indigo-50 flex items-center justify-center text-xs font-bold text-indigo-700">
+                    {{ g.name.charAt(0) }}
+                  </div>
+                  <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900">{{ g.name }}</p>
+                    <p class="text-[11px] text-gray-400">{{ g.memberIds.length }} 名成员</p>
+                  </div>
+                  <CheckCircle v-if="quickAddClassGroupSelected === g.id" class="w-4 h-4 text-indigo-600" />
+                </button>
+              </div>
             </div>
             <div class="mt-5 flex justify-end gap-2">
               <button @click="showQuickAddClassModal = false" class="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">取消</button>
@@ -2277,12 +2295,26 @@ async function saveAddClass() {
 }
 // 新增单个学生（加入本课程）
 const showAddStudentModal = ref(false)
-const addStudentForm = ref({ name: '', studentId: '', className: '' })
+const addStudentForm = ref({ name: '', studentId: '', className: '', groupId: '' })
 
 function openAddStudentModal() {
-  addStudentForm.value = { name: '', studentId: '', className: '' }
+  addStudentForm.value = { name: '', studentId: '', className: '', groupId: '' }
   showAddStudentModal.value = true
 }
+
+/** 新增学生时可选加入的分组：仅显示与所选班级匹配的分组（保持"同组同班"规则），未选班级则不提供分组 */
+const addStudentGroupCandidates = computed(() => {
+  if (!courseId.value) return []
+  const targetClass = addStudentForm.value.className.trim()
+  if (!targetClass) return [] // 未分班学生不能加入分组
+  return store.getCourseGroups(courseId.value).filter((g) => {
+    if (g.memberIds.length === 0) return true // 空分组允许
+    return g.memberIds.every((sid) => {
+      const m = store.students.find((s) => s.id === sid)
+      return m && (m.className || '') === targetClass
+    })
+  })
+})
 
 async function saveAddStudent() {
   if (!courseId.value) return
@@ -2339,8 +2371,18 @@ async function saveAddStudent() {
       body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
     })
   } catch {}
+  // 若选择了分组，将学生加入该分组（不选分组则保持未分组）
+  const targetGroupId = addStudentForm.value.groupId
+  let joinedGroupName = ''
+  if (targetGroupId) {
+    const group = store.studentGroups.find((g) => g.id === targetGroupId)
+    if (group && !group.memberIds.includes(student!.id)) {
+      store.updateStudentGroup(group.id, { memberIds: [...group.memberIds, student!.id] })
+      joinedGroupName = group.name
+    }
+  }
   showAddStudentModal.value = false
-  alert(`已将"${name}"加入本课程`)
+  alert(`已将"${name}"加入本课程${joinedGroupName ? `，并加入分组「${joinedGroupName}」` : ''}`)
 }
 // 编辑班级
 const showEditClassModal = ref(false)
@@ -4457,10 +4499,11 @@ function confirmQuickAddToGroup() {
   showQuickAddGroupModal.value = false
 }
 
-// -- 快捷加入班级 --
+// -- 快捷加入班级（含可选分组） --
 const showQuickAddClassModal = ref(false)
 const quickAddClassStudentId = ref('')
 const quickAddClassSelected = ref('')
+const quickAddClassGroupSelected = ref('')
 
 const quickAddClassStudentName = computed(() => getStudentName(quickAddClassStudentId.value) || '未知学员')
 
@@ -4479,13 +4522,29 @@ const quickAddClassCandidates = computed(() => {
   return Array.from(classes).sort((a, b) => a.localeCompare(b, 'zh-CN'))
 })
 
+/** 加入班级时可选加入的分组：与所选班级匹配的分组（含空分组），排除学员已所在的分组 */
+const quickAddClassGroupCandidates = computed(() => {
+  if (!courseId.value || !quickAddClassSelected.value) return []
+  const targetClass = quickAddClassSelected.value
+  return store.getCourseGroups(courseId.value)
+    .filter((g) => {
+      if (g.memberIds.length === 0) return true // 空分组允许
+      return g.memberIds.every((sid) => {
+        const m = store.students.find((s) => s.id === sid)
+        return m && (m.className || '') === targetClass
+      })
+    })
+    .filter((g) => !g.memberIds.includes(quickAddClassStudentId.value))
+})
+
 function openQuickAddToClass(studentId: string) {
   quickAddClassStudentId.value = studentId
   quickAddClassSelected.value = ''
+  quickAddClassGroupSelected.value = ''
   showQuickAddClassModal.value = true
 }
 
-/** 确认加入班级：变更班级后从原分组移除（原分组不再适用） */
+/** 确认加入班级：变更班级后从原分组移除（原分组不再适用），再按所选分组加入 */
 function confirmQuickAddToClass() {
   if (!quickAddClassSelected.value) return
   for (const g of store.studentGroups) {
@@ -4496,6 +4555,13 @@ function confirmQuickAddToClass() {
     }
   }
   store.updateStudent(quickAddClassStudentId.value, { className: quickAddClassSelected.value })
+  // 若选择了分组则加入该分组（不选分组则保持未分组）
+  if (quickAddClassGroupSelected.value) {
+    const group = store.studentGroups.find((g) => g.id === quickAddClassGroupSelected.value)
+    if (group && !group.memberIds.includes(quickAddClassStudentId.value)) {
+      store.updateStudentGroup(group.id, { memberIds: [...group.memberIds, quickAddClassStudentId.value] })
+    }
+  }
   showQuickAddClassModal.value = false
 }
 
