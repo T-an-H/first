@@ -16,6 +16,7 @@ const router = useRouter()
 const adminNavItems = [
   { to: '/admin/categories', icon: 'calendar' as const, label: '课程管理' },
   { to: '/admin/students', icon: 'users' as const, label: '班级管理' },
+  { to: '/admin/teachers', icon: 'userCheck' as const, label: '教师管理' },
 ]
 
 const teacherNavItems = [
@@ -87,6 +88,9 @@ let rootEl: HTMLElement | null = null
 
 function isActive(item: { to: string }) {
   const path = route.path
+  if (item.to === '/admin/categories' && path.startsWith('/admin/schedules')) {
+    return true
+  }
   return path.startsWith(item.to)
 }
 
@@ -136,7 +140,7 @@ function renderSidebar() {
     .attr('class', 'w-6 h-6')
 
   const headerText = headerFlex.append('div')
-  headerText.append('h1').attr('class', 'font-bold text-lg').text('人类高光时刻')
+  headerText.append('h1').attr('class', 'font-bold text-lg').text('课程平台')
   headerText.append('p').attr('class', 'text-xs text-white/50').text(cfg.label)
 
   const nav = aside.append('nav')

@@ -1,25 +1,46 @@
 <template>
   <div class="space-y-6">
-    <div id="student-grades-root"></div>
+    <section class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-6">
+      <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">成绩管理</h1>
+          <p class="text-sm text-gray-500 mt-1">查看数据库中的课程成绩与考试明细</p>
+        </div>
 
-    <div v-if="sortedGradeEntries.length > 0" class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5">
+        <div class="flex items-center gap-3">
+          <select
+            v-model="semester"
+            class="px-3 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm bg-white"
+          >
+            <option value="">全部学期</option>
+            <option v-for="item in semesters" :key="item" :value="item">{{ item }}</option>
+          </select>
+          <div v-if="loading" class="text-sm text-gray-400">正在同步...</div>
+        </div>
+      </div>
+    </section>
+
+    <section
+      v-if="sortedGradeEntries.length > 0"
+      class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5"
+    >
       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-sm font-semibold text-gray-800">成绩分布</h3>
+        <h2 class="text-sm font-semibold text-gray-800">成绩分布</h2>
         <div class="flex items-center gap-4 text-xs text-gray-500 flex-wrap">
           <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 rounded-sm" style="background:#10b981"></span>
+            <span class="w-3 h-3 rounded-sm bg-emerald-500"></span>
             <span>≥90 优秀</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 rounded-sm" style="background:#3b82f6"></span>
+            <span class="w-3 h-3 rounded-sm bg-blue-500"></span>
             <span>≥80 良好</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 rounded-sm" style="background:#60a5fa"></span>
+            <span class="w-3 h-3 rounded-sm bg-sky-400"></span>
             <span>≥60 及格</span>
           </div>
           <div class="flex items-center gap-1.5">
-            <span class="w-3 h-3 rounded-sm" style="background:#ef4444"></span>
+            <span class="w-3 h-3 rounded-sm bg-red-500"></span>
             <span>&lt;60 不及格</span>
           </div>
           <div class="flex items-center gap-1.5 ml-2">
@@ -28,94 +49,126 @@
           </div>
         </div>
       </div>
+
       <div ref="chartRef" style="width:100%;height:320px"></div>
-    </div>
+    </section>
 
-    <!-- 统计卡片 (保留子组件) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard :icon="Award" label="平均成绩" :value="avgScore" :color="avgScore >= 60 ? 'bg-brand-400/10' : 'bg-brand-600'" />
-      <StatCard :icon="TrendingUp" label="最高分" :value="maxScore" color="bg-brand-600" />
-      <StatCard :icon="TrendingDown" label="最低分" :value="minScore" color="bg-brand-600" />
-      <StatCard :icon="BookOpen" label="已评课程" :value="gradedCourses" color="bg-brand-600" />
-    </div>
+    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div
+        v-for="item in stats"
+        :key="item.label"
+        class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-5"
+      >
+        <div class="text-sm text-gray-400">{{ item.label }}</div>
+        <div class="mt-2 text-3xl font-bold" :class="item.color">{{ item.value }}</div>
+        <div v-if="item.tip" class="mt-2 text-xs text-gray-400">{{ item.tip }}</div>
+      </div>
+    </section>
 
-    <!-- 成绩明细弹窗 (保留子组件) -->
-    <Modal :isOpen="modalOpen" :onClose="closeModal" :title="modalTitle" maxWidth="max-w-xl">
-      <div v-if="modalEntry" class="space-y-4">
-        <div v-if="!modalEntry.detail" class="text-center py-6 text-gray-400 text-sm">
-          暂无该课程的详细成绩明细数据
-        </div>
+    <section class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-900">课程成绩</h2>
+        <span class="text-sm text-gray-400">{{ gradeEntries.length }} 门</span>
+      </div>
 
-        <div v-if="modalEntry.detail" class="space-y-3">
-          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <component :is="ClipboardList" class="w-3.5 h-3.5" /> 平时成绩构成
-          </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div v-for="item in regularItems(modalEntry)" :key="item.label"
-              class="flex items-center gap-2 p-2.5 rounded-lg bg-white border" :class="item.border">
-              <component :is="item.icon" class="w-4 h-4" :class="item.iconColor" />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center justify-between">
-                  <span class="text-xs font-medium text-gray-800">{{ item.label }}</span>
-                  <span class="text-xs font-bold" :class="item.color">{{ item.score }}<span class="font-normal text-gray-400">/100</span></span>
-                </div>
-                <div class="flex items-center gap-2 mt-1">
-                  <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full" :class="item.bar" :style="{ width: item.score + '%' }" />
-                  </div>
-                  <span class="text-[10px] text-gray-400">权重{{ item.weight }}%</span>
-                </div>
+      <div v-if="gradeEntries.length === 0" class="text-center py-12 text-gray-400">
+        暂无成绩数据
+      </div>
+
+      <div v-else class="mt-5 space-y-3">
+        <button
+          v-for="entry in gradeEntries"
+          :key="entry.courseId"
+          class="w-full text-left bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-100 px-5 py-4 transition-colors"
+          @click="openModal(entry)"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <div class="text-base font-semibold text-gray-900 truncate">{{ entry.courseName }}</div>
+              <div class="mt-1 text-sm text-gray-500">
+                {{ entry.teacher || '未设置教师' }} · {{ entry.semester }}
               </div>
+            </div>
+
+            <div class="text-right flex-shrink-0">
+              <div class="text-2xl font-bold" :class="getGradeColor(entry.totalScore)">
+                {{ entry.totalScore }}
+              </div>
+              <div class="mt-1">
+                <span class="px-2 py-0.5 rounded text-xs" :class="getGradeBadge(entry.totalScore)">
+                  {{ getGradeLevel(entry.totalScore) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <Modal :isOpen="modalOpen" :onClose="closeModal" :title="modalTitle" maxWidth="max-w-2xl">
+      <div v-if="modalEntry" class="space-y-5">
+        <div class="rounded-xl border border-brand-400/20 bg-brand-400/5 p-4">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <div class="text-base font-semibold text-gray-900">{{ modalEntry.courseName }}</div>
+              <div class="mt-1 text-sm text-gray-500">
+                {{ modalEntry.teacher || '未设置教师' }} · {{ modalEntry.semester }}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-3xl font-bold" :class="getGradeColor(modalEntry.totalScore)">
+                {{ modalEntry.totalScore }}
+              </div>
+              <div class="mt-1 text-xs text-gray-400">总评成绩</div>
             </div>
           </div>
         </div>
 
-        <div v-if="modalEntry.detail" class="space-y-3">
-          <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <component :is="BarChart3" class="w-3.5 h-3.5" /> 大考成绩
-          </h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <template v-for="item in examItems(modalEntry)" :key="item.label">
-              <div v-if="item.score !== undefined" class="flex items-center justify-between p-2.5 rounded-lg bg-white border border-brand-400/20">
-                <div class="flex items-center gap-2">
-                  <component :is="FileText" class="w-4 h-4 text-gray-400" />
-                  <span class="text-xs text-gray-800">{{ item.label }}</span>
-                  <span class="text-[10px] text-gray-400">（权重{{ item.weight }}%）</span>
-                </div>
-                <span class="text-sm font-bold" :class="getGradeColor(item.score)">{{ item.score }}</span>
+        <div v-if="regularItems(modalEntry).length > 0" class="space-y-3">
+          <h3 class="text-sm font-semibold text-gray-800">平时成绩构成</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div
+              v-for="item in regularItems(modalEntry)"
+              :key="item.label"
+              class="rounded-lg border border-gray-100 bg-gray-50 p-3"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm text-gray-700">{{ item.label }}</span>
+                <span class="text-sm font-semibold text-gray-900">{{ item.score }}/100</span>
               </div>
-            </template>
+              <div class="mt-2 h-2 rounded-full bg-gray-200 overflow-hidden">
+                <div class="h-full rounded-full bg-brand-700" :style="{ width: `${item.score}%` }" />
+              </div>
+              <div class="mt-2 text-xs text-gray-400">权重 {{ item.weight }}%</div>
+            </div>
           </div>
         </div>
 
-        <div class="bg-blue-50/80 border border-brand-400 rounded-lg p-3 space-y-2">
-          <h4 class="text-xs font-semibold text-gray-800 flex items-center gap-1.5">
-            <component :is="Calculator" class="w-3.5 h-3.5" /> 最终成绩计算
-          </h4>
-          <p class="text-xs text-brand-600 leading-relaxed">
-            <span class="font-medium">总成绩</span> =
-            平时成绩(×<span class="font-medium">{{ cfgMap[modalEntry.grade.courseId]?.regularWeight ?? 40 }}%</span>)
-            <template v-if="(cfgMap[modalEntry.grade.courseId]?.midtermWeight ?? 0) > 0">
-              + 期中成绩(×<span class="font-medium">{{ cfgMap[modalEntry.grade.courseId]?.midtermWeight }}%</span>)
-            </template>
-            + 期末成绩(×<span class="font-medium">{{ cfgMap[modalEntry.grade.courseId]?.finalWeight ?? 60 }}%</span>)
-          </p>
-          <p v-if="modalEntry.detail" class="text-xs text-brand-600 leading-relaxed">
-            <span class="font-medium">平时成绩</span> =
-            <template v-for="(item, idx) in regularItems(modalEntry)" :key="item.label">
-              {{ item.score }}×{{ item.weight }}%{{ idx < regularItems(modalEntry).length - 1 ? ' + ' : '' }}
-            </template>
-            = <span class="font-bold">{{ calcRegular(modalEntry) }}</span>
-          </p>
-          <div class="flex items-center gap-2 pt-1 border-t border-brand-400">
-            <span class="text-xs font-bold text-gray-800">最终得分：</span>
-            <span class="text-base font-bold" :class="getGradeColor(modalEntry.totalScore)">{{ modalEntry.totalScore }}</span>
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-gray-800">考试与作业明细</h3>
+          <div v-if="examItems(modalEntry).length === 0" class="text-sm text-gray-400">
+            暂无明细
           </div>
-        </div>
-
-        <div v-if="modalEntry.grade.comment" class="flex items-start gap-2 text-xs text-gray-500">
-          <component :is="MessageSquare" class="w-3.5 h-3.5 mt-0.5 text-gray-400 flex-shrink-0" />
-          <span class="italic">"{{ modalEntry.grade.comment }}"</span>
+          <div v-else class="space-y-2">
+            <div
+              v-for="item in examItems(modalEntry)"
+              :key="`${item.type}-${item.examName}`"
+              class="rounded-lg border border-gray-100 bg-gray-50 p-3"
+            >
+              <div class="flex items-center justify-between gap-4">
+                <div>
+                  <div class="text-sm font-medium text-gray-900">{{ item.label }}</div>
+                  <div class="mt-1 text-xs text-gray-400">
+                    权重 {{ item.weight }}% · {{ item.statusText }}
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-lg font-bold" :class="getGradeColor(item.score)">{{ item.score }}</div>
+                  <div class="mt-1 text-xs text-gray-400">满分 {{ item.fullScore }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </Modal>
@@ -123,60 +176,205 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, h, nextTick } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAppStore } from '@/stores/app'
-import type { DetailedGrade, Grade } from '@/types'
-import { getDefaultGradeConfig } from '@/types'
-import { Icons, renderIcon } from '@/utils/d3-renderer'
-import * as d3 from 'd3'
 import * as echarts from 'echarts'
-import StatCard from '@/components/StatCard.vue'
 import Modal from '@/components/Modal.vue'
-import { fetchStudentScores } from '@/api'
+import { fetchCourses, fetchStudentScores, fetchStudents } from '@/api'
+import { getStoredStudentSession, getStudentLookupKeyword, matchStudentFromSession } from '@/lib/studentSession'
+import { useAppStore } from '@/stores/app'
+import type { Course, DetailedGrade, Grade, Student } from '@/types'
+import { getDefaultGradeConfig } from '@/types'
 
-// 使用 Icons 映射创建 Vue 组件，替代 lucide-vue-next
-function iconView(name: keyof typeof Icons) {
-  const svgHtml = Icons[name]
-  if (!svgHtml) return undefined as any
-  return { render() { return h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', innerHTML: svgHtml }) } }
+type StudentScore = {
+  id: string
+  courseId: string
+  courseTitle?: string
+  studentId: string
+  examName: string
+  score: number
+  fullScore: number
+  weight: number
+  type: string
+  status: string
+  gradedAt: string
 }
 
-const Award = iconView('award')
-const TrendingUp = iconView('trendingUp')
-const TrendingDown = iconView('trendingDown')
-const BookOpen = iconView('bookOpen')
-const ChevronRight = iconView('chevronRight')
-const ClipboardList = iconView('clipboardList')
-const BarChart3 = iconView('barChart3')
-const Calculator = iconView('calculator')
-const MessageSquare = iconView('messageSquare')
-const FileText = iconView('fileText')
-const User = iconView('user')
-const Users = iconView('users')
-const Building2 = iconView('building2')
-const GraduationCap = iconView('graduationCap')
-const Briefcase = iconView('briefcase')
+type GradeEntry = {
+  courseId: string
+  courseName: string
+  teacher: string
+  semester: string
+  totalScore: number
+  detail?: DetailedGrade
+}
 
 const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
+
+const loading = ref(false)
 const semester = ref('')
 const chartRef = ref<HTMLElement | null>(null)
+const remoteStudent = ref<Student | null>(null)
+const remoteScores = ref<StudentScore[]>([])
+const modalOpen = ref(false)
+const modalEntry = ref<GradeEntry | null>(null)
+
 let chartInstance: echarts.ECharts | null = null
 
-function getBarColor(score: number): string {
+const student = computed(() => remoteStudent.value ?? matchStudentFromSession(store.students, store.currentUser) ?? null)
+const myGrades = computed(() => (student.value ? store.grades.filter((item) => item.studentId === student.value!.id) : []))
+
+const semesters = computed(() =>
+  Array.from(
+    new Set(
+      myGrades.value
+        .map((item) => String(item.semester || '').trim())
+        .filter(Boolean),
+    ),
+  ),
+)
+
+const filteredGrades = computed(() => {
+  if (!semester.value) return myGrades.value
+  return myGrades.value.filter((item) => item.semester === semester.value)
+})
+
+const modalTitle = computed(() => (modalEntry.value ? `${modalEntry.value.courseName} - 成绩明细` : '成绩明细'))
+
+function mergeStudentIntoStore(nextStudent: Student | null) {
+  if (!nextStudent?.id) return
+  const nextMap = new Map(store.students.map((item) => [item.id, item]))
+  nextMap.set(nextStudent.id, nextStudent)
+  store.students = Array.from(nextMap.values())
+}
+
+function mergeCoursesIntoStore(nextCourses: Course[]) {
+  if (nextCourses.length === 0) return
+  const nextMap = new Map(store.courses.map((item) => [item.id, item]))
+  nextCourses.forEach((course) => nextMap.set(course.id, course))
+  store.courses = Array.from(nextMap.values())
+}
+
+function createSessionStudent() {
+  const session = getStoredStudentSession()
+  if (!session.id && !session.studentId && !session.name) return null
+
+  return {
+    id: session.id || session.studentId || '',
+    name: session.name || store.currentUser || '当前学生',
+    phone: '',
+    email: '',
+    avatar: '',
+    joinDate: '',
+    status: 'active' as const,
+    studentId: session.studentId,
+    className: session.className,
+  }
+}
+
+function replaceStudentGrades(studentId: string, scores: StudentScore[]) {
+  const grouped = new Map<string, StudentScore[]>()
+  scores.forEach((score) => {
+    const courseId = String(score.courseId || '').trim()
+    if (!courseId) return
+    if (!grouped.has(courseId)) grouped.set(courseId, [])
+    grouped.get(courseId)!.push(score)
+  })
+
+  const grades: Grade[] = Array.from(grouped.entries()).map(([courseId, items]) => {
+    const totalWeight = items.reduce((sum, item) => sum + Number(item.weight || 0), 0)
+    const totalScore = totalWeight > 0
+      ? items.reduce((sum, item) => sum + Number(item.score || 0) * Number(item.weight || 0), 0) / totalWeight
+      : items.reduce((sum, item) => sum + Number(item.score || 0), 0) / Math.max(items.length, 1)
+    const latest = [...items].sort((left, right) => String(right.gradedAt).localeCompare(String(left.gradedAt)))[0]
+
+    return {
+      id: `db-grade-${studentId}-${courseId}`,
+      studentId,
+      courseId,
+      score: Math.round(totalScore),
+      semester: '',
+      comment: '',
+      gradedAt: latest?.gradedAt || '',
+      totalScore: Math.round(totalScore),
+    }
+  })
+
+  store.grades = [
+    ...store.grades.filter((item) => item.studentId !== studentId),
+    ...grades,
+  ]
+}
+
+function getCourse(courseId: string) {
+  return store.courses.find((item) => item.id === courseId)
+}
+
+function getDetail(courseId: string) {
+  if (!student.value) return undefined
+  return store.detailedGrades.find(
+    (item) => item.studentId === student.value!.id && item.courseId === courseId,
+  )
+}
+
+function getSemesterLabel(grade: Grade, course?: Course) {
+  const explicit = String(grade.semester || '').trim()
+  if (explicit) return explicit
+  const seed = course?.createdAt || grade.gradedAt || ''
+  if (!seed) return '未分学期'
+  return `${String(seed).slice(0, 4)}年`
+}
+
+const gradeEntries = computed<GradeEntry[]>(() =>
+  filteredGrades.value.map((grade) => {
+    const course = getCourse(grade.courseId)
+    const detail = getDetail(grade.courseId)
+    const totalScore = detail
+      ? store.calcTotalScore(grade.courseId, detail)
+      : Math.round(Number(grade.totalScore ?? grade.score ?? 0))
+
+    return {
+      courseId: grade.courseId,
+      courseName:
+        course?.title ||
+        remoteScores.value.find((item) => item.courseId === grade.courseId)?.courseTitle ||
+        '未知课程',
+      teacher: course?.teacher || '',
+      semester: getSemesterLabel(grade, course),
+      totalScore,
+      detail,
+    }
+  }),
+)
+
+const sortedGradeEntries = computed(() => [...gradeEntries.value].sort((left, right) => right.totalScore - left.totalScore))
+const avgScore = computed(() => {
+  if (gradeEntries.value.length === 0) return 0
+  return Math.round(gradeEntries.value.reduce((sum, item) => sum + item.totalScore, 0) / gradeEntries.value.length)
+})
+const maxScore = computed(() => (gradeEntries.value.length > 0 ? Math.max(...gradeEntries.value.map((item) => item.totalScore)) : 0))
+const minScore = computed(() => (gradeEntries.value.length > 0 ? Math.min(...gradeEntries.value.map((item) => item.totalScore)) : 0))
+const gradedCourses = computed(() => gradeEntries.value.length)
+
+const stats = computed(() => [
+  { label: '平均成绩', value: `${avgScore.value}`, color: avgScore.value >= 60 ? 'text-brand-700' : 'text-red-500', tip: '按数据库考试成绩汇总' },
+  { label: '最高分', value: `${maxScore.value}`, color: 'text-emerald-600', tip: '' },
+  { label: '最低分', value: `${minScore.value}`, color: 'text-blue-600', tip: '' },
+  { label: '已评课程', value: `${gradedCourses.value}`, color: 'text-gray-900', tip: student.value ? `学生 ${student.value.name}` : '未识别学生' },
+])
+
+function getBarColor(score: number) {
   if (score >= 90) return '#10b981'
   if (score >= 80) return '#3b82f6'
-  if (score >= 60) return '#60a5fa'
+  if (score >= 60) return '#38bdf8'
   return '#ef4444'
 }
 
 function initChart() {
   if (!chartRef.value) return
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
+  if (chartInstance) chartInstance.dispose()
   chartInstance = echarts.init(chartRef.value)
   updateChart()
 }
@@ -188,20 +386,15 @@ function updateChart() {
     return
   }
 
-  const data = sortedGradeEntries.value.map((item) => ({
-    value: item.totalScore,
-    itemStyle: { color: getBarColor(item.totalScore) },
-  }))
-
-  const option: echarts.EChartsOption = {
+  chartInstance.setOption({
     grid: { left: 50, right: 20, top: 30, bottom: 70 },
     tooltip: {
       trigger: 'axis',
       formatter: (params: any) => {
-        const point = params[0]
-        const score = point.value
-        const level = score >= 90 ? '优秀' : score >= 80 ? '良好' : score >= 60 ? '及格' : '不及格'
-        return `${point.name}<br/>分数：<b>${score}</b> 分<br/>等级：<b>${level}</b>`
+        const point = params?.[0]
+        if (!point) return ''
+        const score = Number(point.value || 0)
+        return `${point.name}<br/>分数：<b>${score}</b> 分<br/>等级：<b>${getGradeLevel(score)}</b>`
       },
     },
     xAxis: {
@@ -226,97 +419,87 @@ function updateChart() {
     },
     series: [{
       type: 'bar',
-      data,
       barWidth: '45%',
-      itemStyle: {
-        borderRadius: [4, 4, 0, 0],
-      },
+      data: sortedGradeEntries.value.map((item) => ({
+        value: item.totalScore,
+        itemStyle: { color: getBarColor(item.totalScore) },
+      })),
+      itemStyle: { borderRadius: [4, 4, 0, 0] },
       label: {
         show: true,
         position: 'top',
         fontSize: 11,
         fontWeight: 'bold',
         color: '#374151',
-        formatter: '{c}',
       },
-      markLine: avgScore.value > 0 ? {
-        silent: true,
-        symbol: 'none',
-        lineStyle: { color: '#ef4444', type: 'dashed', width: 2 },
-        data: [{ yAxis: avgScore.value, label: { show: false } }],
-      } : undefined,
-      markPoint: avgScore.value > 0 ? {
-        silent: true,
-        symbol: 'circle',
-        symbolSize: 8,
-        itemStyle: { color: '#ef4444' },
-        data: [{ name: '平均分', coord: [sortedGradeEntries.value.length - 1, avgScore.value] }],
-      } : undefined,
+      markLine: avgScore.value > 0
+        ? {
+            silent: true,
+            symbol: 'none',
+            lineStyle: { color: '#ef4444', type: 'dashed', width: 2 },
+            data: [{ yAxis: avgScore.value, label: { show: false } }],
+          }
+        : undefined,
     }],
-  }
-
-  chartInstance.setOption(option)
+  })
 }
 
-// 从数据库加载成绩
-onMounted(async () => {
-  // 先确保课程数据已加载（让课程名称可以正确显示）
-  try {
-    const res = await fetch('http://localhost:3000/api/courses')
-    const data = await res.json()
-    if (data.success) store.courses = data.courses
-  } catch { /* ignore */ }
+function regularItems(entry: GradeEntry) {
+  const detail = entry.detail
+  const cfg = getDefaultGradeConfig(entry.courseId)
+  if (!detail) return []
 
-  const s = store.students.find((x) => x.name === store.currentUser)
-  if (s?.id) {
-    try {
-      const res = await fetchStudentScores(s.id)
-      if (res.success && res.scores.length > 0) {
-        // 清除该学生的旧 mock 成绩
-        store.grades = store.grades.filter((g) => g.studentId !== s.id)
+  return [
+    { label: '自评', score: detail.selfEvalScore, weight: cfg.selfEvalWeight },
+    { label: '组内互评', score: detail.peerReviewScore, weight: cfg.peerReviewWeight },
+    { label: '组间互评', score: detail.interGroupScore, weight: cfg.interGroupEvalWeight },
+    { label: '教师评价', score: detail.teacherScore, weight: cfg.teacherScoreWeight },
+    { label: '导师评价', score: detail.mentorScore, weight: cfg.mentorScoreWeight },
+  ].filter((item) => item.score != null) as { label: string; score: number; weight: number }[]
+}
 
-        // 将数据库成绩转换为 Grade 格式
-        const byCourse = new Map<string, { scores: any[]; totalScore: number }>()
-        for (const sc of res.scores) {
-          if (!byCourse.has(sc.courseId)) byCourse.set(sc.courseId, { scores: [], totalScore: 0 })
-          byCourse.get(sc.courseId)!.scores.push(sc)
-        }
-        for (const [courseId, data] of byCourse) {
-          const avg = data.scores.reduce((a: number, s: any) => a + Number(s.score), 0) / data.scores.length
-          store.grades.push({
-            id: `db-grade-${courseId}-${s.id}`,
-            studentId: s.id,
-            courseId,
-            score: Math.round(avg),
-            semester: '',
-            comment: '',
-            gradedAt: data.scores[0].gradedAt || '',
-            totalScore: Math.round(avg),
-          })
-        }
-      }
-    } catch { /* ignore */ }
+function normalizeExamLabel(item: StudentScore) {
+  const map: Record<string, string> = {
+    midterm_exam: '期中笔试',
+    midterm_project: '期中项目',
+    final_exam: '期末笔试',
+    final_project: '期末项目',
+    quiz: '小测',
+    assignment: '作业',
   }
+  return map[item.type] || item.examName || '成绩项'
+}
 
-  await nextTick()
-  initChart()
+function examItems(entry: GradeEntry) {
+  return remoteScores.value
+    .filter((item) => item.courseId === entry.courseId)
+    .map((item) => ({
+      ...item,
+      label: normalizeExamLabel(item),
+      statusText: item.status === 'submitted' ? '已提交' : '草稿',
+    }))
+}
 
-  const el = document.getElementById('student-grades-root')
-  if (el) renderGrades(el)
-  nextTick(openCourseFromQuery)
-})
+function getGradeColor(score: number) {
+  if (score >= 90) return 'text-emerald-600'
+  if (score >= 80) return 'text-blue-600'
+  if (score >= 60) return 'text-brand-700'
+  return 'text-red-500'
+}
 
-onBeforeUnmount(() => {
-  if (chartInstance) {
-    chartInstance.dispose()
-    chartInstance = null
-  }
-})
+function getGradeLevel(score: number) {
+  if (score >= 90) return '优秀'
+  if (score >= 80) return '良好'
+  if (score >= 60) return '及格'
+  return '不及格'
+}
 
-// 弹窗状态
-const modalOpen = ref(false)
-const modalEntry = ref<GradeEntry | null>(null)
-const modalTitle = computed(() => modalEntry.value ? `${modalEntry.value.courseName} - 成绩明细` : '成绩明细')
+function getGradeBadge(score: number) {
+  if (score >= 90) return 'bg-emerald-50 text-emerald-600'
+  if (score >= 80) return 'bg-blue-50 text-blue-600'
+  if (score >= 60) return 'bg-brand-50 text-brand-700'
+  return 'bg-red-50 text-red-500'
+}
 
 function openModal(entry: GradeEntry) {
   modalEntry.value = entry
@@ -336,252 +519,83 @@ function closeModal() {
   clearCourseQuery()
 }
 
-const student = computed(() => store.students.find((s) => s.name === store.currentUser) ?? store.students[0])
-
-const myGrades = computed(() => store.grades.filter((g) => g.studentId === student.value?.id))
-const semesters = computed(() => [...new Set(store.grades.map((g) => g.semester))])
-
-const filteredGrades = computed(() => {
-  if (!semester.value) return myGrades.value
-  return myGrades.value.filter((g) => g.semester === semester.value)
-})
-
-const cfgMap = computed(() => store.gradeConfigs)
-
-interface GradeEntry {
-  grade: Grade & { semester?: string; totalScore?: number }
-  courseName: string
-  teacher: string
-  semester: string
-  totalScore: number
-  gradient: string
-  detail?: DetailedGrade
-}
-
-function getDetail(courseId: string): DetailedGrade | undefined {
-  if (!student.value) return undefined
-  return store.detailedGrades.find((d) => d.studentId === student.value!.id && d.courseId === courseId)
-}
-
-function calcRegular(entry: GradeEntry): number {
-  if (!entry.detail) return 0
-  const d = entry.detail
-  const cfg = cfgMap.value[entry.grade.courseId] || getDefaultGradeConfig(entry.grade.courseId)
-  return Math.round(
-    (d.selfEvalScore ?? 0) * cfg.selfEvalWeight / 100 +
-    (d.peerReviewScore ?? 0) * cfg.peerReviewWeight / 100 +
-    (d.interGroupScore ?? 0) * cfg.interGroupEvalWeight / 100 +
-    (d.teacherScore ?? 0) * cfg.teacherScoreWeight / 100 +
-    (d.mentorScore ?? 0) * cfg.mentorScoreWeight / 100
-  )
-}
-
-const gradeEntries = computed<GradeEntry[]>(() => {
-  const gradients = ['from-emerald-500 to-teal-600', 'from-blue-500 to-indigo-600', 'from-brand-600 to-brand-700', 'from-rose-500 to-red-600', 'from-purple-500 to-violet-600', 'from-cyan-500 to-blue-600']
-  return filteredGrades.value.map((g, i) => {
-    const course = store.courses.find((c) => c.id === g.courseId)
-    const d = getDetail(g.courseId)
-    let total = g.totalScore ?? g.score ?? 0
-    if (d) {
-      total = store.calcTotalScore(g.courseId, d)
-    } else {
-      total = Math.min(100, total + store.getStudentQualityScore(g.courseId, g.studentId))
-    }
-    const sem = g.semester ?? (course?.createdAt ? `${course.createdAt.slice(0, 4)}年` : '2026年')
-    return {
-      grade: { ...g, semester: sem, totalScore: total },
-      courseName: course?.title || '未知课程',
-      teacher: course?.teacher || '未知',
-      semester: sem,
-      totalScore: total,
-      gradient: gradients[i % gradients.length],
-      detail: d,
-    }
-  })
-})
-
-// 平时成绩子项
-const regularItems = (entry: GradeEntry) => {
-  const d = entry.detail
-  const cfg = cfgMap.value[entry.grade.courseId] || getDefaultGradeConfig(entry.grade.courseId)
-  const items: { label: string; score: number; weight: number; icon: any; iconColor: string; bar: string; border: string; color: string }[] = []
-
-  if (d?.selfEvalScore !== undefined) {
-    items.push({
-      label: '自评', score: d.selfEvalScore, weight: cfg.selfEvalWeight,
-      icon: User, iconColor: 'text-brand-600', bar: 'bg-brand-600', border: 'border-brand-400', color: 'text-brand-600',
-    })
-  }
-  if (d?.peerReviewScore !== undefined) {
-    items.push({
-      label: '互评', score: d.peerReviewScore, weight: cfg.peerReviewWeight,
-      icon: Users, iconColor: 'text-brand-600', bar: 'bg-brand-400/10', border: 'border-emerald-100', color: 'text-brand-600',
-    })
-  }
-  if (d?.interGroupScore !== undefined) {
-    items.push({
-      label: '组间评', score: d.interGroupScore, weight: cfg.interGroupEvalWeight,
-      icon: Building2, iconColor: 'text-brand-600', bar: 'bg-brand-600', border: 'border-brand-400/20', color: 'text-brand-600',
-    })
-  }
-  if (d?.teacherScore !== undefined) {
-    items.push({
-      label: '教师评', score: d.teacherScore, weight: cfg.teacherScoreWeight,
-      icon: GraduationCap, iconColor: 'text-brand-600', bar: 'bg-brand-600', border: 'border-brand-50', color: 'text-brand-600',
-    })
-  }
-  if (d?.mentorScore !== undefined) {
-    items.push({
-      label: '导师评', score: d.mentorScore, weight: cfg.mentorScoreWeight,
-      icon: Briefcase, iconColor: 'text-rose-500', bar: 'bg-rose-500', border: 'border-rose-100', color: 'text-rose-600',
-    })
-  }
-  return items
-}
-
-// 大考成绩子项
-const examItems = (entry: GradeEntry) => {
-  const d = entry.detail
-  const cfg = cfgMap.value[entry.grade.courseId] || getDefaultGradeConfig(entry.grade.courseId)
-  const items: { label: string; score?: number; weight: number }[] = [
-    { label: '期中笔试', score: d?.midtermExamScore, weight: cfg.midtermExamWeight },
-    { label: '期中项目', score: d?.midtermProjectScore, weight: cfg.midtermProjectWeight },
-    { label: '期末笔试', score: d?.finalExamScore, weight: cfg.finalExamWeight },
-    { label: '期末项目', score: d?.finalProjectScore, weight: cfg.finalProjectWeight },
-  ]
-  return items.filter((i) => i.score !== undefined)
-}
-
-const getGradeColor = (score: number) => {
-  if (score >= 90) return 'text-emerald-600'
-  if (score >= 80) return 'text-blue-600'
-  if (score >= 70) return 'text-brand-700'
-  if (score >= 60) return 'text-brand-700'
-  return 'text-red-500'
-}
-
-const getGradeLevel = (score: number) => {
-  if (score >= 90) return '优秀'
-  if (score >= 80) return '良好'
-  if (score >= 70) return '中等'
-  if (score >= 60) return '及格'
-  return '不及格'
-}
-
-const getGradeBadge = (score: number) => {
-  if (score >= 90) return 'bg-emerald-50 text-emerald-600'
-  if (score >= 80) return 'bg-blue-50 text-blue-600'
-  if (score >= 70) return 'bg-brand-50 text-brand-700'
-  if (score >= 60) return 'bg-brand-50 text-brand-700'
-  return 'bg-red-50 text-red-500'
-}
-
-const avgScore = computed(() => {
-  if (gradeEntries.value.length === 0) return 0
-  return Math.round(gradeEntries.value.reduce((s, g) => s + g.totalScore, 0) / gradeEntries.value.length)
-})
-
-const maxScore = computed(() => {
-  if (gradeEntries.value.length === 0) return 0
-  return Math.max(...gradeEntries.value.map((g) => g.totalScore))
-})
-
-const minScore = computed(() => {
-  if (gradeEntries.value.length === 0) return 0
-  return Math.min(...gradeEntries.value.map((g) => g.totalScore))
-})
-
-const sortedGradeEntries = computed(() => [...gradeEntries.value].sort((a, b) => b.totalScore - a.totalScore))
-const gradedCourses = computed(() => gradeEntries.value.length)
-
 function openCourseFromQuery() {
   const courseId = typeof route.query.courseId === 'string' ? route.query.courseId : ''
   if (!courseId) return
-  const entry = gradeEntries.value.find((item) => item.grade.courseId === courseId)
-  if (entry) {
-    openModal(entry)
-  }
+  const entry = gradeEntries.value.find((item) => item.courseId === courseId)
+  if (entry) openModal(entry)
 }
 
-function renderGrades(root: HTMLElement) {
-  const container = d3.select(root)
-  container.selectAll('*').remove()
+async function loadRemoteGrades() {
+  loading.value = true
 
-  // 头部：标题 + 学期筛选
-  const headerDiv = container.append('div').attr('class', 'flex items-center justify-between')
-  const titleDiv = headerDiv.append('div')
-  titleDiv.append('h1').attr('class', 'text-2xl font-bold text-gray-900').text('成绩管理')
-  titleDiv.append('p').attr('class', 'text-gray-500 mt-1').text('查看各课程成绩明细及最终成绩构成')
+  try {
+    const session = getStoredStudentSession()
+    const search = getStudentLookupKeyword(store.currentUser, session)
+    let resolvedStudent = matchStudentFromSession(store.students, store.currentUser, session) ?? createSessionStudent()
 
-  const select = headerDiv.append('select')
-    .attr('class', 'px-3 py-2.5 rounded-lg border border-brand-400/30 focus:border-brand-600 outline-none text-sm')
-    .on('change', (event) => {
-      semester.value = (event.target as HTMLSelectElement).value
-    })
-  select.append('option').attr('value', '').text('全部学期')
-  semesters.value.forEach((s) => {
-    select.append('option').attr('value', s).text(s)
-  })
-  select.property('value', semester.value)
+    if (search) {
+      try {
+        const studentRes = await fetchStudents({ search, pageSize: 10 })
+        resolvedStudent =
+          matchStudentFromSession(studentRes.students ?? [], store.currentUser, session) ??
+          resolvedStudent
+      } catch (error) {
+        console.warn('加载学生信息失败，继续使用本地学生信息', error)
+      }
+    }
 
-  // 课程成绩列表
-  const listDiv = container.append('div').attr('class', 'space-y-3')
+    remoteStudent.value = resolvedStudent
+    mergeStudentIntoStore(resolvedStudent)
 
-  if (gradeEntries.value.length === 0) {
-    listDiv.append('div')
-      .attr('class', 'text-center py-12 text-gray-400 bg-white rounded-xl border border-brand-400/20')
-      .text('暂无成绩数据')
-    return
+    try {
+      const courseRes = await fetchCourses()
+      mergeCoursesIntoStore(courseRes.courses ?? [])
+    } catch (error) {
+      console.warn('加载课程数据失败，继续使用已存在课程数据', error)
+    }
+
+    const studentId = resolvedStudent?.id || session.id || ''
+    if (studentId) {
+      try {
+        const scoreRes = await fetchStudentScores(studentId)
+        remoteScores.value = scoreRes.scores ?? []
+        replaceStudentGrades(studentId, remoteScores.value)
+      } catch (error) {
+        console.warn('加载学生成绩失败', error)
+      }
+    }
+  } finally {
+    loading.value = false
   }
-
-  gradeEntries.value.forEach((entry) => {
-    const card = listDiv.append('div')
-      .attr('class', 'bg-white rounded-xl border border-brand-400/20 shadow-sm overflow-hidden')
-
-    const btn = card.append('button')
-      .attr('class', 'w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors')
-      .on('click', () => openModal(entry))
-
-    const leftDiv = btn.append('div').attr('class', 'flex items-center gap-3 min-w-0')
-    const iconWrap = leftDiv.append('div')
-      .attr('class', `w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center ${entry.gradient}`)
-    renderIcon(iconWrap, 'bookOpen').attr('class', 'w-5 h-5 text-white')
-
-    const textDiv = leftDiv.append('div').attr('class', 'text-left min-w-0')
-    textDiv.append('p').attr('class', 'text-sm font-semibold text-gray-900 truncate').text(entry.courseName)
-    textDiv.append('p').attr('class', 'text-xs text-gray-400').text(`${entry.teacher} · ${entry.semester}`)
-
-    const rightDiv = btn.append('div').attr('class', 'flex items-center gap-3 flex-shrink-0')
-    const scoreWrap = rightDiv.append('div').attr('class', 'text-right')
-    const scoreSpan = scoreWrap.append('span')
-      .attr('class', `text-lg font-bold ${getGradeColor(entry.totalScore)}`)
-      .text(String(entry.totalScore))
-    scoreWrap.append('span').attr('class', 'text-xs text-gray-400').text('分')
-    const badgeP = scoreWrap.append('p').attr('class', 'text-[10px]')
-    badgeP.append('span')
-      .attr('class', `px-1.5 py-0.5 rounded ${getGradeBadge(entry.totalScore)}`)
-      .text(getGradeLevel(entry.totalScore))
-
-    renderIcon(rightDiv, 'chevronRight').attr('class', 'w-4 h-4 text-gray-400')
-  })
 }
 
 watch(gradeEntries, async () => {
   await nextTick()
   updateChart()
-  const el = document.getElementById('student-grades-root')
-  if (el) renderGrades(el)
-  nextTick(openCourseFromQuery)
+  openCourseFromQuery()
 }, { deep: true })
 
 watch(semester, async () => {
   await nextTick()
   updateChart()
-  const el = document.getElementById('student-grades-root')
-  if (el) renderGrades(el)
 })
 
 watch(() => route.query.courseId, () => {
-  nextTick(openCourseFromQuery)
+  void nextTick(openCourseFromQuery)
+})
+
+onMounted(async () => {
+  await loadRemoteGrades()
+  await nextTick()
+  initChart()
+  openCourseFromQuery()
+})
+
+onBeforeUnmount(() => {
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 </script>

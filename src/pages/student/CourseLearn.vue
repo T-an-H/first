@@ -366,7 +366,7 @@
           <div v-if="activeTab === 'homework'" class="space-y-4">
             <StudentHomework
               :course-id="courseId"
-              :student-id="myStudent?.id || ''"
+              :student-id="homeworkStudentId"
               :tier="tierFinalized ? myTier : undefined"
             />
           </div>
@@ -807,15 +807,39 @@ import {
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
 import StudentHomework from '@/components/Homework/StudentHomework.vue'
-import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile } from '@/types'
+import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile, Schedule } from '@/types'
 import Modal from '@/components/Modal.vue'
-import { getNow } from '@/lib/date'
+import { fetchSchedules } from '@/api'
+import { getNow, parseLocalDate } from '@/lib/date'
+import { getStoredStudentSession } from '@/lib/studentSession'
 
 const route = useRoute()
 const router = useRouter()
 const store = useAppStore()
 const courseId = route.params.id as string
-const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser))
+const studentSession = computed(() => getStoredStudentSession())
+const myStudent = computed(() => {
+  const session = studentSession.value
+  return (
+    store.students.find((student) => session.id && student.id === session.id) ||
+    store.students.find((student) => session.studentId && student.studentId === session.studentId) ||
+    store.students.find((student) => session.name && student.name === session.name) ||
+    store.students.find((student) => student.name === store.currentUser) ||
+    null
+  )
+})
+const homeworkStudentId = computed(() =>
+  studentSession.value.studentId ||
+  myStudent.value?.studentId ||
+  myStudent.value?.id ||
+  studentSession.value.id ||
+  '',
+)
+const currentClassName = computed(() =>
+  myStudent.value?.className ||
+  studentSession.value.className ||
+  '',
+)
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
 const VALID_TABS = ['ai_tier', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
@@ -825,9 +849,52 @@ const activeTab = ref<string>(
 const selectedFiles = ref<Record<string, File>>({})
 
 onMounted(async () => {
+  try {
+    const response = await fetchSchedules(
+      currentClassName.value
+        ? { courseId, class: currentClassName.value }
+        : { courseId },
+    )
+    const remoteSchedules = (response.schedules ?? []) as Schedule[]
+    if (remoteSchedules.length > 0) {
+      store.schedules = [
+        ...store.schedules.filter((schedule) => {
+          if (schedule.courseId !== courseId) return true
+          if (!currentClassName.value) return false
+          return String(schedule.className ?? '').trim() !== currentClassName.value
+        }),
+        ...remoteSchedules,
+      ]
+
+      const latestEndDate = remoteSchedules
+        .map((schedule) => parseLocalDate(schedule.endDate))
+        .filter((date): date is Date => date !== null)
+        .reduce<Date | null>((latest, current) => {
+          if (!latest || current.getTime() > latest.getTime()) return current
+          return latest
+        }, null)
+
+      const currentCourse = store.courses.find((course) => course.id === courseId)
+      if (currentCourse && latestEndDate) {
+        const endDate = [
+          latestEndDate.getFullYear(),
+          String(latestEndDate.getMonth() + 1).padStart(2, '0'),
+          String(latestEndDate.getDate()).padStart(2, '0'),
+        ].join('-')
+        store.courses = store.courses.map((course) =>
+          course.id === courseId ? { ...course, endDate } : course
+        )
+      }
+    }
+  } catch (error) {
+    console.warn('同步课程结束日期失败，继续使用本地课程数据:', error)
+  }
+
+  await store.syncCourseEvaluationState(courseId)
+  await store.syncQualityEvaluationState(courseId)
   store.pushNearDeadlineEvalReminders()
   if (myStudent.value) {
-    store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
+    store.autoAssignOverdueBasicTier(courseId, myStudent.value.id, currentClassName.value)
     await store.syncStudentHomeworkTodos(courseId, myStudent.value.id)
   }
 })
@@ -849,7 +916,7 @@ const tabs = [
 ]
 
 const course = computed(() => store.courses.find((c) => c.id === courseId))
-const isReadOnly = computed(() => course.value?.status !== 'active')
+const isReadOnly = computed(() => store.isCourseEnded(courseId, currentClassName.value))
 const myEnrollment = computed(() =>
   store.enrollments.find((e) => e.courseId === courseId && e.studentId === myStudent.value?.id)
 )
@@ -874,8 +941,8 @@ const tierRecord = computed(() =>
 const myTier = computed<LearningTier>(() => tierRecord.value?.tier ?? 'basic')
 const myTierScore = computed(() => tierRecord.value?.score ?? 0)
 const tierFinalized = computed(() => tierRecord.value !== null)
-const firstClassEnded = computed(() => store.isFirstClassStarted(courseId))
-const secondClassStarted = computed(() => store.isSecondClassStarted(courseId))
+const firstClassEnded = computed(() => store.isFirstClassStarted(courseId, currentClassName.value))
+const secondClassStarted = computed(() => store.isSecondClassStarted(courseId, currentClassName.value))
 // 是否逾期自动分配（score=0 且第二节课已开始）
 const isAutoAssigned = computed(() =>
   tierFinalized.value && secondClassStarted.value && myTierScore.value === 0
@@ -1748,8 +1815,11 @@ async function handleQualityFileSelect(e: Event) {
   input.value = ''
 }
 
-function submitQuality() {
+const qualitySubmitting = ref(false)
+
+async function submitQuality() {
   if (!myStudent.value) return
+  if (qualitySubmitting.value) return
   qualitySubmitError.value = ''
 
   // 多次提交：每次提交必须有新的文件
@@ -1758,16 +1828,24 @@ function submitQuality() {
     return
   }
 
-  store.submitQualityEvaluation({
-    courseId,
-    studentId: myStudent.value.id,
-    files: qualityPendingFiles.value,
-    description: qualityDesc.value,
-  })
+  qualitySubmitting.value = true
+  try {
+    await store.submitQualityEvaluation({
+      courseId,
+      studentId: myStudent.value.id,
+      files: qualityPendingFiles.value,
+      description: qualityDesc.value,
+    })
 
-  // 清空本地状态
-  qualityPendingFiles.value = []
-  qualityDesc.value = ''
-  alert('素质评价提交成功！请等待教师批改。')
+    qualityPendingFiles.value = []
+    qualityDesc.value = ''
+    alert('素质评价提交成功！请等待教师批改。')
+  } catch (error) {
+    qualitySubmitError.value = error instanceof Error
+      ? error.message
+      : '提交失败，请稍后重试'
+  } finally {
+    qualitySubmitting.value = false
+  }
 }
 </script>

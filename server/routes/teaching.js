@@ -132,6 +132,83 @@ router.post('/scores/bulk', async (req, res) => {
 
 // ==================== 分组 (Student Groups) ====================
 
+/** GET /api/teaching/groups/:courseId - 获取某课程分组 */
+router.get('/groups/:courseId', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT * FROM student_groups WHERE course_id = ? ORDER BY id',
+      [req.params.courseId]
+    );
+
+    const groups = rows.map((row) => {
+      let memberIds = [];
+      if (Array.isArray(row.member_ids)) {
+        memberIds = row.member_ids;
+      } else if (typeof row.member_ids === 'string' && row.member_ids.trim()) {
+        try {
+          const parsed = JSON.parse(row.member_ids);
+          memberIds = Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
+        } catch {
+          memberIds = row.member_ids.split(',').map((id) => id.trim()).filter(Boolean);
+        }
+      }
+
+      return {
+        id: row.id,
+        courseId: row.course_id,
+        name: row.name,
+        memberIds,
+      };
+    });
+
+    res.json({ success: true, groups });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+/** POST /api/teaching/groups/sync - 按课程整体同步分组 */
+router.post('/groups/sync', async (req, res) => {
+  const courseId = String(req.body?.courseId || '').trim();
+  const inputGroups = Array.isArray(req.body?.groups) ? req.body.groups : null;
+
+  if (!courseId || inputGroups === null) {
+    return res.status(400).json({ success: false, message: 'courseId and groups are required' });
+  }
+
+  const groups = inputGroups
+    .filter((group) => group && String(group.name || '').trim())
+    .map((group, index) => ({
+      id: String(group.id || `group-${courseId}-${Date.now()}-${index}`),
+      name: String(group.name || '').trim(),
+      memberIds: Array.from(new Set(
+        Array.isArray(group.memberIds)
+          ? group.memberIds.map((id) => String(id)).filter(Boolean)
+          : []
+      )),
+    }));
+
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+    await connection.execute('DELETE FROM student_groups WHERE course_id = ?', [courseId]);
+
+    for (const group of groups) {
+      await connection.execute(
+        'INSERT INTO student_groups (id, course_id, name, member_ids) VALUES (?, ?, ?, ?)',
+        [group.id, courseId, group.name, JSON.stringify(group.memberIds)]
+      );
+    }
+
+    await connection.commit();
+    res.json({ success: true, courseId, groups });
+  } catch (e) {
+    await connection.rollback();
+    res.status(500).json({ success: false, message: e.message });
+  } finally {
+    connection.release();
+  }
+});
+
 /** POST /api/teaching/groups/bulk - 批量导入分组 */
 router.post('/groups/bulk', async (req, res) => {
   try {

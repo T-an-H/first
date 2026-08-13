@@ -218,6 +218,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen } from 'lucide-vue-next'
 import { API_BASE } from '@/api'
+import { getStoredStudentSession } from '@/lib/studentSession'
 import { useAppStore } from '@/stores/app'
 
 const props = defineProps<{ courseId: string; studentId: string; tier?: string }>()
@@ -232,6 +233,16 @@ const questions = ref<any[]>([])
 const answers = ref<Record<string, string>>({})
 const submitting = ref(false)
 const studentTier = ref('')
+const sessionStudent = computed(() => getStoredStudentSession())
+const fallbackStudent = computed(() => store.students.find((student) => student.name === store.currentUser) ?? null)
+const effectiveStudentId = computed(() =>
+  sessionStudent.value.studentId ||
+  props.studentId ||
+  fallbackStudent.value?.studentId ||
+  sessionStudent.value.id ||
+  fallbackStudent.value?.id ||
+  '',
+)
 
 onMounted(async () => {
   await fetchStudentTier()
@@ -239,7 +250,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => [props.courseId, props.studentId, props.tier],
+  () => [props.courseId, effectiveStudentId.value, props.tier],
   async () => {
     await fetchStudentTier()
     await loadHomeworks()
@@ -259,13 +270,18 @@ const unansweredCount = computed(() =>
 )
 
 async function fetchStudentTier() {
-  if (!props.studentId) return
+  if (!effectiveStudentId.value) {
+    studentTier.value = props.tier || ''
+    return
+  }
 
   try {
-    const res = await fetch(`${API_BASE}/tier-test/${props.courseId}/result/${props.studentId}`)
+    const res = await fetch(`${API_BASE}/tier-test/${props.courseId}/result/${encodeURIComponent(effectiveStudentId.value)}`)
     const data = await res.json()
     if (data.success && data.result) {
       studentTier.value = data.result.tier
+    } else {
+      studentTier.value = props.tier || ''
     }
   } catch {
     studentTier.value = props.tier || ''
@@ -276,7 +292,9 @@ async function loadHomeworks() {
   try {
     const tier = studentTier.value || props.tier || ''
     const tierParam = tier ? `&tier=${tier}` : ''
-    const res = await fetch(`${API}/student/${props.courseId}?studentId=${props.studentId}${tierParam}`)
+    const studentIdParam = effectiveStudentId.value ? `studentId=${encodeURIComponent(effectiveStudentId.value)}` : ''
+    const query = [studentIdParam, tierParam.replace(/^&/, '')].filter(Boolean).join('&')
+    const res = await fetch(`${API}/student/${props.courseId}${query ? `?${query}` : ''}`)
     const data = await res.json()
     if (data.success) {
       homeworks.value = data.homeworks
@@ -314,6 +332,10 @@ function cancelAnswer() {
 
 async function submitAnswers() {
   if (!allAnswered.value || !answeringHomework.value) return
+  if (!effectiveStudentId.value) {
+    alert('提交失败：未识别到当前学生账号，请重新登录后再试')
+    return
+  }
 
   submitting.value = true
 
@@ -327,7 +349,7 @@ async function submitAnswers() {
     const res = await fetch(`${API}/${currentHomework.id}/submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentId: props.studentId, answers: answerList }),
+      body: JSON.stringify({ studentId: effectiveStudentId.value, answers: answerList }),
     })
     const data = await res.json()
 
@@ -338,7 +360,7 @@ async function submitAnswers() {
     }
 
     cancelAnswer()
-    await store.syncStudentHomeworkTodos(props.courseId, props.studentId)
+    await store.syncStudentHomeworkTodos(props.courseId, effectiveStudentId.value)
     await router.push({
       name: 'StudentHomeworkResult',
       params: {
@@ -348,7 +370,7 @@ async function submitAnswers() {
       query: {
         title: currentHomework.title || '',
         chapterTitle: currentHomework.chapterTitle || '',
-        studentId: props.studentId,
+        studentId: effectiveStudentId.value,
         source: 'submit',
       },
     })
@@ -370,7 +392,7 @@ function openResultPage(hw: any) {
     query: {
       title: hw.title || '',
       chapterTitle: hw.chapterTitle || '',
-      studentId: props.studentId,
+      studentId: effectiveStudentId.value,
       source: 'list',
     },
   })

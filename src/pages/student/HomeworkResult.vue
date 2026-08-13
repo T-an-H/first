@@ -162,6 +162,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AlertCircle, ArrowLeft, LoaderCircle } from 'lucide-vue-next'
 import { API_BASE } from '@/api'
+import { getStoredStudentSession } from '@/lib/studentSession'
 import { useAppStore } from '@/stores/app'
 
 const route = useRoute()
@@ -185,15 +186,12 @@ const studentId = computed(() => {
   const queryStudentId = String(route.query.studentId || '')
   if (queryStudentId) return queryStudentId
 
-  try {
-    const info = JSON.parse(localStorage.getItem('userInfo') || '{}')
-    if (info.student_id) return info.student_id
-  } catch {
-    // ignore
-  }
+  const session = getStoredStudentSession()
+  if (session.studentId) return session.studentId
+  if (session.id) return session.id
 
   const student = store.students.find((item) => item.name === store.currentUser)
-  return student?.id || ''
+  return student?.studentId || student?.id || ''
 })
 
 const correctCount = computed(() =>

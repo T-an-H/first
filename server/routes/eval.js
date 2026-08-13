@@ -6,6 +6,52 @@ import pool from '../db.js';
 
 const router = Router();
 
+function formatDateValue(value) {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  return String(value);
+}
+
+function mapEvaluationRow(row) {
+  return {
+    id: row.id,
+    courseId: row.course_id,
+    studentId: row.student_id,
+    sessionNumber: Number(row.session_number || 0),
+    type: row.type,
+    score: Number(row.score || 0),
+    evaluatorId: row.evaluator_id || '',
+    evaluatorName: row.evaluator_name || '',
+    comment: row.comment || '',
+    createdAt: formatDateValue(row.created_at),
+  };
+}
+
+function mapSubmittedEvalKey(row) {
+  return `${row.course_id}||${row.student_id}||${row.session_number}||${row.type}`;
+}
+
+router.get('/course/:courseId', async (req, res) => {
+  try {
+    const [evaluationRows] = await pool.execute(
+      'SELECT * FROM evaluations WHERE course_id = ? ORDER BY session_number, created_at, id',
+      [req.params.courseId]
+    );
+    const [submittedRows] = await pool.execute(
+      'SELECT course_id, student_id, session_number, type FROM teacher_submitted_evals WHERE course_id = ?',
+      [req.params.courseId]
+    );
+
+    res.json({
+      success: true,
+      evaluations: evaluationRows.map(mapEvaluationRow),
+      teacherSubmittedEvals: submittedRows.map(mapSubmittedEvalKey),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // ==================== 评价配置 ====================
 
 /** GET /api/eval/config/:courseId - 获取评价配置 */

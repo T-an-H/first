@@ -41,6 +41,7 @@ export interface Teacher {
   email: string;
   avatar: string;
   courseIds: string[];
+  departmentId?: string;
 }
 
 /** 企业导师 */

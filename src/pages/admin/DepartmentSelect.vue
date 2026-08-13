@@ -98,7 +98,7 @@
         <div class="absolute inset-0 bg-black/50" @click="showDeleteConfirm = false" />
         <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
           <h3 class="text-lg font-semibold text-gray-900 mb-2">确认删除</h3>
-          <p class="text-sm text-gray-500 mb-5">确定要删除「{{ deleteTarget?.name }}」吗？该学院下的课程分类和班级关联将被一并清理。</p>
+          <p class="text-sm text-gray-500 mb-5">确定要删除「{{ deleteTarget?.name }}」吗？如果该学院下已有课程分类、课程、班级或学生数据，将无法删除。</p>
           <div class="flex gap-3">
             <button @click="handleDelete" class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-medium transition-colors">确认删除</button>
             <button @click="showDeleteConfirm = false" class="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-sm font-medium transition-colors">取消</button>
@@ -110,8 +110,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { createDepartment, deleteDepartment as apiDeleteDepartment, fetchDepartments, updateDepartment as apiUpdateDepartment } from '@/api'
 import { useAppStore } from '@/stores/app'
 import { GraduationCap, Plus, ArrowRight, LogOut, Trash2 } from 'lucide-vue-next'
 import type { Department } from '@/types'
@@ -126,9 +127,31 @@ const form = ref({ name: '', color: '#3b82f6' })
 const showDeleteConfirm = ref(false)
 const deleteTarget = ref<Department | null>(null)
 
+onMounted(() => {
+  void loadDepartments()
+})
+
+async function loadDepartments() {
+  try {
+    const res = await fetchDepartments()
+    if (res.success) {
+      const nextDepartments = res.departments.length > 0 ? res.departments : store.departments
+      store.departments = nextDepartments
+      if (store.selectedDepartmentId && nextDepartments.length > 0 && !nextDepartments.some((dept: Department) => dept.id === store.selectedDepartmentId)) {
+        store.setSelectedDepartment(null)
+      }
+    }
+  } catch (error) {
+    console.error('加载学院失败:', error)
+  }
+}
+
 function selectDepartment(dept: Department) {
   store.setSelectedDepartment(dept.id)
-  router.push('/admin/categories')
+  router.push({
+    path: '/admin/categories',
+    query: { departmentId: dept.id },
+  })
 }
 
 function openAddModal() {
@@ -137,21 +160,27 @@ function openAddModal() {
   showModal.value = true
 }
 
-function handleSave() {
+async function handleSave() {
   if (!form.value.name.trim()) return
-  if (editingDept.value) {
-    store.updateDepartment(editingDept.value.id, {
-      name: form.value.name.trim(),
-      color: form.value.color,
-    })
-  } else {
-    store.addDepartment({
-      id: `dept-${Date.now()}`,
-      name: form.value.name.trim(),
-      color: form.value.color,
-    })
+
+  try {
+    if (editingDept.value) {
+      await apiUpdateDepartment(editingDept.value.id, {
+        name: form.value.name.trim(),
+        color: form.value.color,
+      })
+    } else {
+      await createDepartment({
+        name: form.value.name.trim(),
+        color: form.value.color,
+      })
+    }
+
+    await loadDepartments()
+    showModal.value = false
+  } catch (error: any) {
+    window.alert(error?.message || '保存学院失败')
   }
-  showModal.value = false
 }
 
 function confirmDeleteDept() {
@@ -161,12 +190,17 @@ function confirmDeleteDept() {
   }
 }
 
-function handleDelete() {
-  if (deleteTarget.value) {
-    store.deleteDepartment(deleteTarget.value.id)
+async function handleDelete() {
+  if (!deleteTarget.value) return
+
+  try {
+    await apiDeleteDepartment(deleteTarget.value.id)
+    await loadDepartments()
     showDeleteConfirm.value = false
     deleteTarget.value = null
     showModal.value = false
+  } catch (error: any) {
+    window.alert(error?.message || '删除学院失败')
   }
 }
 

@@ -574,6 +574,13 @@ const sortedAndFilteredCourses = computed(() => {
   if (q) {
     list = list.filter((c) => c.title.toLowerCase().includes(q))
   }
+
+  // 课程是否结束以管理员排课的最晚结束日期为准，数据库里的静态 status 只作为历史兼容字段。
+  list = list.map((course) => ({
+    ...course,
+    status: store.isCourseEnded(course.id) ? 'inactive' : 'active',
+  }))
+
   // 排序：活跃课程按名称字母先后 → 已结束放最后
   return [...list].sort((a, b) => {
     if (a.status !== 'active' && b.status === 'active') return 1
@@ -616,8 +623,9 @@ function getCourseGradient(courseId: string): string {
 }
 
 /** 选中一门课程，用于学员管理 / 资源 / 评价面板 */
-function selectCourse(courseId: string) {
+async function selectCourse(courseId: string) {
   selectedCourseId.value = courseId
+  await store.syncCourseEvaluationState(courseId)
 }
 
 const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
@@ -727,15 +735,13 @@ function handleOneClickGroup() {
   const otherGroups = allGroups.filter(g =>
     !g.memberIds.some(mid => memberIds.includes(mid))
   )
-  store.clearCourseGroups(selectedCourseId.value)
-  ;[...otherGroups, ...groups].forEach(g => {
-    store.addStudentGroup({
-      id: `grp-${selectedCourseId.value}-${Date.now()}-${Math.random()}`,
-      courseId: selectedCourseId.value!,
+  store.setCourseGroups(
+    selectedCourseId.value,
+    [...otherGroups, ...groups].map((g) => ({
       name: g.name,
       memberIds: g.memberIds,
-    })
-  })
+    })),
+  )
 
   showOneClickGroup.value = false
   oneClickGroupData.value = { className: '', groupCount: 2 }
@@ -1378,14 +1384,7 @@ async function handleImportGroups() {
     }
 
     if (groups.length > 0) {
-      groups.forEach(g => {
-        store.addStudentGroup({
-          id: `grp-${selectedCourseId.value}-${Date.now()}-${Math.random()}`,
-          courseId: selectedCourseId.value!,
-          name: g.name,
-          memberIds: g.memberIds,
-        })
-      })
+      store.setCourseGroups(selectedCourseId.value, groups)
       alert(`成功导入 ${groups.length} 个分组`)
     } else {
       alert('未识别到有效分组数据，请确保 Excel 包含"组名"和"成员姓名"列')

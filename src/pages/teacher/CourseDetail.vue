@@ -9,8 +9,8 @@
         <h1 class="text-2xl font-bold text-gray-900">{{ course?.title || '课程详情' }}</h1>
         <p class="text-gray-500 mt-1">{{ course?.id }} · {{ course?.duration }}课时</p>
       </div>
-      <span :class="`text-xs px-2 py-0.5 rounded-full ${course?.status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`">
-        {{ course?.status === 'active' ? '进行中' : '已结束' }}
+      <span :class="`text-xs px-2 py-0.5 rounded-full ${!isCourseEnded ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`">
+        {{ !isCourseEnded ? '进行中' : '已结束' }}
       </span>
     </div>
 
@@ -1897,6 +1897,15 @@ import {
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
+import {
+  bulkImportEnrollments,
+  bulkImportGroups,
+  bulkImportSchedules,
+  bulkImportScores,
+  fetchCourseStudents,
+  fetchSchedules,
+  updateStudent as syncStudent,
+} from '@/api'
 import * as echarts from 'echarts'
 
 const route = useRoute()
@@ -1904,8 +1913,16 @@ const router = useRouter()
 const store = useAppStore()
 
 const courseId = computed(() => route.params.id as string)
-const course = computed(() => store.courses.find((c) => c.id === courseId.value))
-const isReadOnly = computed(() => course.value?.status !== 'active')
+const course = computed(() => {
+  const item = store.courses.find((c) => c.id === courseId.value)
+  if (!item) return undefined
+  return {
+    ...item,
+    status: store.isCourseEnded(courseId.value) ? 'inactive' : 'active',
+  }
+})
+const isCourseEnded = computed(() => store.isCourseEnded(courseId.value))
+const isReadOnly = computed(() => isCourseEnded.value)
 /** 导师模式：纯导师登录，或学院领导以导师身份进入 /mentor 路由（我的课程/详情均为导师视图） */
 const isMentor = computed(() => store.currentRole === 'mentor' || route.path.startsWith('/mentor'))
 /** 领导以教师身份进入 /teacher 路由（教师部分视图） */
@@ -1933,11 +1950,24 @@ const canManageProjects = computed(() => !isViewOnly.value || isMentor.value)
 // 从数据库加载课程学员
 onMounted(async () => {
   try {
-    const res = await fetch(`http://localhost:3000/api/courses/${courseId.value}/students`)
-    const data = await res.json()
-    if (data.success && data.students.length > 0) {
+    const scheduleResponse = await fetchSchedules({ courseId: courseId.value })
+    const remoteSchedules = (scheduleResponse.schedules ?? []) as Schedule[]
+    if (remoteSchedules.length > 0) {
+      store.schedules = [
+        ...store.schedules.filter((schedule) => schedule.courseId !== courseId.value),
+        ...remoteSchedules,
+      ]
+    }
+  } catch (error) {
+    console.warn('同步课程排课失败，继续使用本地课程数据:', error)
+  }
+
+  try {
+    const data = await fetchCourseStudents(courseId.value)
+    const remoteStudents = Array.isArray(data.students) ? data.students : []
+    if (remoteStudents.length > 0) {
       // 更新 store.students 为数据库数据
-      for (const s of data.students) {
+      for (const s of remoteStudents) {
         const existing = store.students.findIndex((x) => x.studentId === s.studentId)
         if (existing >= 0) {
           store.students[existing] = { ...store.students[existing], ...s }
@@ -1946,9 +1976,11 @@ onMounted(async () => {
         }
       }
       // 同步 enrollments（避免重复）
-      const existingIds = new Set(store.enrollments.map((e) => e.studentId))
-      for (const s of data.students) {
-        if (!existingIds.has(s.id)) {
+      for (const s of remoteStudents) {
+        const hasCurrentCourseEnrollment = store.enrollments.some(
+          (e) => e.courseId === courseId.value && e.studentId === s.id && e.status !== 'dropped'
+        )
+        if (!hasCurrentCourseEnrollment) {
           store.enrollments.push({
             id: `enr-db-${s.id}-${courseId.value}`,
             studentId: s.id,
@@ -1964,6 +1996,8 @@ onMounted(async () => {
   } catch (e) {
     console.error('加载课程学员失败:', e)
   }
+  await store.syncCourseEvaluationState(courseId.value)
+  await store.syncQualityEvaluationState(courseId.value)
   ensureWrittenExams()
   normalizeProjectShares()
   syncProjectWeightLocksFromStore()
@@ -2228,43 +2262,28 @@ async function saveAddClass() {
         enrollDate: getNow().toISOString().split('T')[0],
       })
       try {
-        await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
-        })
+        await bulkImportEnrollments([{ id: enrId, studentId: student!.id, courseId: courseId.value }])
       } catch {}
     }
     try {
-      await fetch(`http://localhost:3000/api/teaching/students/${student!.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ className }),
-      })
+      await syncStudent(student!.id, { className })
     } catch {}
   }
 
   // 同步到课程管理：为该班级创建排课记录
   if (course && addClassMembers.value.length > 0) {
     try {
-      await fetch('http://localhost:3000/api/schedules/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          schedules: [{
-            courseId: courseId.value,
-            title: course.title,
-            teacher: course.teacher || '',
-            className,
-            room: '待定',
-            startDate: new Date().toISOString().split('T')[0],
-            timeSlot: '09:00-11:00',
-          }],
-        }),
-      })
+      await bulkImportSchedules([{
+        courseId: courseId.value,
+        title: course.title,
+        teacher: course.teacher || '',
+        className,
+        room: '\u5f85\u5b9a',
+        startDate: new Date().toISOString().split('T')[0],
+        timeSlot: '09:00-11:00',
+      }])
     } catch {}
   }
-
   const total = addClassMembers.value.length
   const msg = total > 0
     ? `已创建班级"${className}"，共处理 ${total} 名成员（匹配已有 ${assignedCount} 人，新建 ${createdCount} 人）`
@@ -2333,11 +2352,7 @@ async function saveAddStudent() {
   })
   // 同步到 MySQL
   try {
-    await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
-    })
+    await bulkImportEnrollments([{ id: enrId, studentId: student!.id, courseId: courseId.value }])
   } catch {}
   showAddStudentModal.value = false
   alert(`已将"${name}"加入本课程`)
@@ -3367,7 +3382,7 @@ async function handleExcelImport(event: Event) {
     }
     // 同步到 MySQL
     if (scores.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/scores/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ scores }) }) } catch {}
+      try { await bulkImportScores(scores) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生的成绩`)
     input.value = ''
@@ -4213,7 +4228,7 @@ async function handleImportStudentsExcel(event: Event) {
     }
     // 同步到 MySQL
     if (enrollments.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/enrollments/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ enrollments }) }) } catch {}
+      try { await bulkImportEnrollments(enrollments) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生`)
   } catch (err) {
@@ -4630,7 +4645,7 @@ async function handleImportGroupsExcel(event: Event) {
     }
     // 同步到 MySQL
     if (groups.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ groups }) }) } catch {}
+      try { await bulkImportGroups(groups) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 个分组`)
   } catch (err) {
@@ -4669,7 +4684,7 @@ function onQualityCommentChange(submissionId: string, comment: string) {
   qualityCommentDrafts.value[submissionId] = comment
 }
 
-function saveQualityEval(qeId: string, submissionId: string) {
+async function saveQualityEval(qeId: string, submissionId: string) {
   // 保护：已批改的评分不可再修改
   const qe = store.qualityEvaluations.find((q) => q.id === qeId)
   const sub = qe?.submissions.find((s) => s.id === submissionId)
@@ -4687,10 +4702,13 @@ function saveQualityEval(qeId: string, submissionId: string) {
     return
   }
   const comment = qualityCommentDrafts.value[submissionId]
-  store.scoreQualityEvaluation(qeId, submissionId, score, comment)
-  // 清除草稿
-  delete qualityScoreDrafts.value[submissionId]
-  delete qualityCommentDrafts.value[submissionId]
-  alert('批改已保存，该次素质评价分数将自动加成到学生总成绩中。保存后不可修改。')
+  try {
+    await store.scoreQualityEvaluation(qeId, submissionId, score, comment)
+    delete qualityScoreDrafts.value[submissionId]
+    delete qualityCommentDrafts.value[submissionId]
+    alert('批改已保存，该次素质评价分数将自动加成到学生总成绩中。保存后不可修改。')
+  } catch (error) {
+    alert(error instanceof Error ? error.message : '保存失败，请稍后重试')
+  }
 }
 </script>

@@ -14,6 +14,12 @@ type RequestError = Error & {
   status?: number
 }
 
+function buildQuery(params: Record<string, any> = {}) {
+  return new URLSearchParams(
+    Object.entries(params).flatMap(([key, value]) => (value == null ? [] : [[key, String(value)]])),
+  ).toString()
+}
+
 async function request(url: string, options: RequestOptions = {}) {
   const { timeoutMs = 3000, ...fetchOptions } = options
   const controller = new AbortController()
@@ -76,22 +82,137 @@ export async function verifyToken(token: string) {
 }
 
 export async function fetchStudents(params: Record<string, any> = {}) {
-  const query = new URLSearchParams(
-    Object.entries(params).flatMap(([key, value]) => (value == null ? [] : [[key, String(value)]])),
-  ).toString()
+  const query = buildQuery(params)
   return request(`/students${query ? `?${query}` : ''}`)
 }
 
-export async function fetchClasses() {
-  return request('/students/classes')
+export async function fetchStudentCourses(studentId: string) {
+  return request(`/students/${encodeURIComponent(studentId)}/courses`)
 }
 
-export async function fetchCategories() {
-  return request('/categories')
+export async function createAdminStudent(data: any) {
+  return request('/students', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
-export async function fetchCourses() {
-  return request('/categories/courses')
+export async function updateAdminStudent(id: string, data: any) {
+  return request(`/students/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteAdminStudent(id: string) {
+  return request(`/students/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchDepartments(params: Record<string, any> = {}) {
+  const query = buildQuery(params)
+  return request(`/departments${query ? `?${query}` : ''}`)
+}
+
+export async function createDepartment(data: any) {
+  return request('/departments', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateDepartment(id: string, data: any) {
+  return request(`/departments/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteDepartment(id: string) {
+  return request(`/departments/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchClasses(params: Record<string, any> = {}) {
+  const query = buildQuery(params)
+  return request(`/classes${query ? `?${query}` : ''}`)
+}
+
+export async function createClass(data: any) {
+  return request('/classes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateClass(id: string, data: any) {
+  return request(`/classes/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteClass(id: string) {
+  return request(`/classes/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchTeachers(params: Record<string, any> = {}) {
+  const query = buildQuery(params)
+  return request(`/teachers${query ? `?${query}` : ''}`)
+}
+
+export async function updateTeacher(id: string, data: any) {
+  return request(`/teachers/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteTeacher(id: string) {
+  return request(`/teachers/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchCategories(params: Record<string, any> = {}) {
+  const query = buildQuery(params)
+  return request(`/categories${query ? `?${query}` : ''}`)
+}
+
+export async function createCategory(data: any) {
+  return request('/categories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateCategory(id: string, data: any) {
+  return request(`/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteCategory(id: string) {
+  return request(`/categories/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+export async function fetchCourses(params: Record<string, any> = {}) {
+  const query = buildQuery(params)
+  return request(`/courses${query ? `?${query}` : ''}`)
+}
+
+export async function createCourse(data: any) {
+  return request('/courses', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 export async function syncCategoriesFromSchedules() {
@@ -106,9 +227,7 @@ export async function bulkImportSchedules(schedules: any) {
 }
 
 export async function fetchSchedules(params: Record<string, any> = {}) {
-  const query = new URLSearchParams(
-    Object.entries(params).flatMap(([key, value]) => (value == null ? [] : [[key, String(value)]])),
-  ).toString()
+  const query = buildQuery(params)
   return request(`/schedules${query ? `?${query}` : ''}`)
 }
 
@@ -144,8 +263,24 @@ export async function bulkImportGroups(groups: any) {
   })
 }
 
+export async function saveCourseGroups(courseId: string, groups: any[]) {
+  return request('/teaching/groups/sync', {
+    method: 'POST',
+    keepalive: true,
+    body: JSON.stringify({ courseId, groups }),
+  })
+}
+
 export async function fetchEvalConfig(courseId: string) {
   return request(`/eval/config/${courseId}`)
+}
+
+export async function fetchCourseEvaluationState(courseId: string) {
+  return request(`/eval/course/${encodeURIComponent(courseId)}`)
+}
+
+export async function fetchCourseGroups(courseId: string) {
+  return request(`/teaching/groups/${encodeURIComponent(courseId)}`)
 }
 
 export async function saveEvalConfig(config: any) {
@@ -202,6 +337,37 @@ export async function fetchStudentScores(studentId: string) {
   return request(`/teaching/scores/student/${studentId}`)
 }
 
+export async function fetchCourseQualityEvaluations(courseId: string) {
+  return request(`/quality-evaluations/course/${encodeURIComponent(courseId)}`)
+}
+
+export async function fetchStudentQualityEvaluation(courseId: string, studentId: string) {
+  return request(
+    `/quality-evaluations/student/${encodeURIComponent(courseId)}/${encodeURIComponent(studentId)}`,
+  )
+}
+
+export async function submitQualityEvaluation(data: any) {
+  return request('/quality-evaluations/submit', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    timeoutMs: 30000,
+  })
+}
+
+export async function scoreQualityEvaluation(data: any) {
+  return request(
+    `/quality-evaluations/${encodeURIComponent(data.evaluationId)}/submissions/${encodeURIComponent(data.submissionId)}/score`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        score: data.score,
+        teacherComment: data.teacherComment,
+      }),
+    },
+  )
+}
+
 export async function fetchDepartmentCourses(department: string) {
   return request(`/courses/department/${encodeURIComponent(department)}`)
 }
@@ -210,10 +376,20 @@ export async function fetchDepartmentStudents(department: string) {
   return request(`/students/department/${encodeURIComponent(department)}`)
 }
 
+export async function fetchCourseStudents(courseId: string) {
+  return request(`/courses/${courseId}/students`)
+}
+
 export async function updateCourse(id: string, data: any) {
   return request(`/courses/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
+  })
+}
+
+export async function deleteCourse(id: string) {
+  return request(`/courses/${id}`, {
+    method: 'DELETE',
   })
 }
 

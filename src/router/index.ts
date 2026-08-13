@@ -21,12 +21,22 @@ const router = createRouter({
         {
           path: 'categories',
           name: 'AdminCategories',
+          component: () => import('@/pages/admin/Categories.vue'),
+        },
+        {
+          path: 'schedules',
+          name: 'AdminSchedules',
           component: () => import('@/pages/admin/Schedules.vue'),
         },
         {
           path: 'students',
           name: 'AdminStudents',
           component: () => import('@/pages/admin/Students.vue'),
+        },
+        {
+          path: 'teachers',
+          name: 'AdminTeachers',
+          component: () => import('@/pages/admin/Teachers.vue'),
         },
         {
           path: 'students/:id',
@@ -171,11 +181,6 @@ const router = createRouter({
     {
       path: '/',
       redirect: '/login',
-    },
-    // 向后兼容：旧的 /admin/schedules → 新的 /admin/categories
-    {
-      path: '/admin/schedules',
-      redirect: '/admin/categories',
     },
     {
       path: '/:pathMatch(.*)*',

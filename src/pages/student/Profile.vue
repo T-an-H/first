@@ -1,824 +1,705 @@
 <template>
-  <div id="student-profile-root"></div>
+  <div class="space-y-6">
+    <section class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-6">
+      <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">个人画像</h1>
+          <p class="text-sm text-gray-500 mt-1">查看个人信息、课程状态和今日安排</p>
+        </div>
+        <div v-if="loading" class="text-sm text-gray-400">正在同步数据库数据...</div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-[1.2fr,1fr] gap-6 mt-6">
+        <div class="rounded-xl border border-gray-100 bg-gray-50 p-5">
+          <div class="flex items-start gap-4">
+            <div class="w-16 h-16 rounded-full bg-brand-400/10 text-brand-700 flex items-center justify-center text-2xl font-bold">
+              {{ displayName.slice(0, 1) || '?' }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-3 flex-wrap">
+                <h2 class="text-xl font-semibold text-gray-900">{{ displayName }}</h2>
+                <span class="px-2.5 py-1 rounded-full text-xs font-medium" :class="statusClass">
+                  {{ statusText }}
+                </span>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 text-sm text-gray-600">
+                <div>
+                  <div class="text-gray-400">学号</div>
+                  <div class="mt-1 font-medium text-gray-900">{{ displayStudentId }}</div>
+                </div>
+                <div>
+                  <div class="text-gray-400">班级</div>
+                  <div class="mt-1 font-medium text-gray-900">{{ currentClassName || '未关联班级' }}</div>
+                </div>
+                <div>
+                  <div class="text-gray-400">邮箱</div>
+                  <div class="mt-1 font-medium text-gray-900 break-all">{{ student?.email || '未设置' }}</div>
+                </div>
+                <div>
+                  <div class="text-gray-400">电话</div>
+                  <div class="mt-1 font-medium text-gray-900">{{ student?.phone || '未设置' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div v-for="item in statCards" :key="item.label" class="rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div class="text-xs text-gray-400">{{ item.label }}</div>
+            <div class="mt-2 text-2xl font-bold" :class="item.color">{{ item.value }}</div>
+            <div v-if="item.tip" class="mt-1 text-xs text-gray-400">{{ item.tip }}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <div class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900">今日学习轨迹</h2>
+          <span class="text-sm text-gray-400">{{ todaySchedules.length }} 节</span>
+        </div>
+
+        <div v-if="todaySchedules.length === 0" class="text-sm text-gray-400 py-10 text-center">
+          今天还没有课程安排
+        </div>
+
+        <div v-else class="mt-5 space-y-3">
+          <div
+            v-for="schedule in todaySchedules"
+            :key="schedule.id"
+            class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3"
+          >
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0">
+                <div class="font-medium text-gray-900 truncate">
+                  {{ schedule.title || getCourse(schedule.courseId)?.title || '未命名课程' }}
+                </div>
+                <div class="mt-1 text-sm text-gray-500">
+                  {{ schedule.timeSlot || '未设置时间' }}
+                </div>
+              </div>
+              <div class="text-right text-sm text-gray-500 flex-shrink-0">
+                <div>{{ schedule.room || '未设置地点' }}</div>
+                <div class="mt-1">{{ schedule.teacher || '未设置教师' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold text-gray-900">成绩概览</h2>
+          <span class="text-sm text-gray-400">{{ scoreSummaries.length }} 门</span>
+        </div>
+
+        <div v-if="scoreSummaries.length === 0" class="text-sm text-gray-400 py-10 text-center">
+          数据库中还没有这位学生的成绩记录
+        </div>
+
+        <div v-else class="mt-5 space-y-3">
+          <div
+            v-for="item in scoreSummaries"
+            :key="item.courseId"
+            class="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3"
+          >
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <div class="font-medium text-gray-900 truncate">{{ item.courseTitle }}</div>
+                <div class="mt-1 text-sm text-gray-500">{{ item.teacher || '未设置教师' }}</div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <div class="text-xl font-bold" :class="gradeColorClass(item.score)">
+                  {{ item.score }}
+                </div>
+                <div class="mt-1 text-xs text-gray-400">{{ gradeLevel(item.score) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-xl border border-brand-400/20 shadow-sm p-6">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold text-gray-900">课程进度</h2>
+        <span class="text-sm text-gray-400">{{ courseRows.length }} 门</span>
+      </div>
+
+      <div v-if="courseRows.length === 0" class="text-sm text-gray-400 py-10 text-center">
+        还没有从后端读取到这位学生的课程
+      </div>
+
+      <div v-else class="mt-5 space-y-4">
+        <div
+          v-for="item in courseRows"
+          :key="item.courseId"
+          class="rounded-xl border border-gray-100 p-4"
+        >
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div class="min-w-0">
+              <div class="flex items-center gap-3 flex-wrap">
+                <h3 class="text-base font-semibold text-gray-900 truncate">{{ item.courseTitle }}</h3>
+                <span class="px-2.5 py-1 rounded-full text-xs font-medium" :class="item.badgeClass">
+                  {{ item.statusText }}
+                </span>
+              </div>
+              <div class="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-500">
+                <span>教师：{{ item.teacher || '未设置' }}</span>
+                <span>学分：{{ item.credits }}</span>
+                <span>时间：{{ item.timeLabel }}</span>
+              </div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm text-gray-400">当前进度</div>
+              <div class="mt-1 text-2xl font-bold text-brand-700">{{ item.progress }}%</div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <div class="h-2 rounded-full bg-brand-400/10 overflow-hidden">
+              <div class="h-full rounded-full bg-brand-700" :style="{ width: `${item.progress}%` }" />
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+            <span>开始：{{ item.startDate }}</span>
+            <span>结束：{{ item.endDate }}</span>
+            <span v-if="item.score !== null">成绩：{{ item.score }} 分</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import {
+  fetchSchedules,
+  fetchStudentCourses,
+  fetchStudentScores,
+  fetchStudents,
+} from '@/api'
+import {
+  getStoredStudentSession,
+  getStudentLookupKeyword,
+  matchStudentFromSession,
+} from '@/lib/studentSession'
 import { useAppStore } from '@/stores/app'
-import * as d3 from 'd3'
-import { renderIcon } from '@/utils/d3-renderer'
-import { getNow } from '@/lib/date'
+import type { Course, Enrollment, Grade, Schedule, Student } from '@/types'
+
+type StudentScore = {
+  id: string
+  courseId: string
+  courseTitle?: string
+  studentId: string
+  examName: string
+  score: number
+  fullScore: number
+  weight: number
+  type: string
+  status: string
+  gradedAt: string
+}
 
 const store = useAppStore()
-const student = computed(() => store.students.find((s) => s.name === store.currentUser))
-const myEnrollments = computed(() => (student.value ? store.enrollments.filter((e) => e.studentId === student.value!.id) : []))
-const myGrades = computed(() => (student.value ? store.grades.filter((g) => g.studentId === student.value!.id) : []))
 
-const completed = computed(() => myEnrollments.value.filter((e) => e.status === 'completed').length)
-const inProgress = computed(() => myEnrollments.value.filter((e) => e.status === 'in_progress').length)
+const loading = ref(false)
+const remoteStudent = ref<Student | null>(null)
+const remoteCourses = ref<Course[]>([])
+const remoteEnrollments = ref<Enrollment[]>([])
+const remoteScores = ref<StudentScore[]>([])
+const dbSchedules = ref<Schedule[]>([])
+
+const weekdayMap: Record<string, number> = {
+  周一: 0,
+  星期一: 0,
+  周二: 1,
+  星期二: 1,
+  周三: 2,
+  星期三: 2,
+  周四: 3,
+  星期四: 3,
+  周五: 4,
+  星期五: 4,
+  周六: 5,
+  星期六: 5,
+  周日: 6,
+  星期日: 6,
+  星期天: 6,
+}
+
+type ScheduleOccurrence = {
+  schedule: Schedule
+  start: Date
+  end: Date
+}
+
+const student = computed(() => remoteStudent.value ?? matchStudentFromSession(store.students, store.currentUser) ?? null)
+
+const currentClassName = computed(() =>
+  String(
+    remoteStudent.value?.className ||
+      student.value?.className ||
+      getStoredStudentSession().className ||
+      '',
+  ).trim(),
+)
+
+const myEnrollments = computed(() => {
+  if (remoteStudent.value?.id) return remoteEnrollments.value
+  if (!student.value) return []
+  return store.enrollments.filter((item) => item.studentId === student.value!.id)
+})
+
+const myGrades = computed(() => {
+  if (!student.value) return []
+  return store.grades.filter((item) => item.studentId === student.value!.id)
+})
+
+const displayName = computed(() => student.value?.name || store.currentUser || '当前学生')
+const displayStudentId = computed(() => student.value?.studentId || student.value?.id || '未识别')
+const statusText = computed(() => (student.value?.status === 'inactive' ? '停用' : '在读'))
+const statusClass = computed(() =>
+  student.value?.status === 'inactive'
+    ? 'bg-red-50 text-red-600'
+    : 'bg-emerald-50 text-emerald-600',
+)
+
+function createSessionStudent() {
+  const session = getStoredStudentSession()
+  if (!session.id && !session.studentId && !session.name) return null
+
+  return {
+    id: session.id || session.studentId || '',
+    name: session.name || store.currentUser || '当前学生',
+    phone: '',
+    email: '',
+    avatar: '',
+    joinDate: '',
+    status: 'active' as const,
+    studentId: session.studentId,
+    className: session.className,
+  }
+}
+
+function mergeStudentIntoStore(nextStudent: Student | null) {
+  if (!nextStudent?.id) return
+  const nextMap = new Map(store.students.map((item) => [item.id, item]))
+  nextMap.set(nextStudent.id, nextStudent)
+  store.students = Array.from(nextMap.values())
+}
+
+function mergeCoursesIntoStore(nextCourses: Course[]) {
+  if (nextCourses.length === 0) return
+  const nextMap = new Map(store.courses.map((item) => [item.id, item]))
+  nextCourses.forEach((course) => nextMap.set(course.id, course))
+  store.courses = Array.from(nextMap.values())
+}
+
+function replaceStudentEnrollments(studentId: string, nextEnrollments: Enrollment[]) {
+  if (!studentId) return
+  store.enrollments = [
+    ...store.enrollments.filter((item) => item.studentId !== studentId),
+    ...nextEnrollments,
+  ]
+}
+
+function mergeSchedulesByClass(className: string, schedules: Schedule[]) {
+  const normalizedClassName = String(className).trim()
+  if (!normalizedClassName) return
+  store.schedules = [
+    ...store.schedules.filter(
+      (item) => String(item.className ?? '').trim() !== normalizedClassName,
+    ),
+    ...schedules,
+  ]
+}
+
+function replaceStudentGrades(studentId: string, scores: StudentScore[]) {
+  const grouped = new Map<string, StudentScore[]>()
+  scores.forEach((score) => {
+    const courseId = String(score.courseId || '').trim()
+    if (!courseId) return
+    if (!grouped.has(courseId)) grouped.set(courseId, [])
+    grouped.get(courseId)!.push(score)
+  })
+
+  const grades: Grade[] = Array.from(grouped.entries()).map(([courseId, items]) => {
+    const totalWeight = items.reduce((sum, item) => sum + Number(item.weight || 0), 0)
+    const weightedTotal = totalWeight > 0
+      ? items.reduce((sum, item) => sum + Number(item.score || 0) * Number(item.weight || 0), 0) / totalWeight
+      : items.reduce((sum, item) => sum + Number(item.score || 0), 0) / Math.max(items.length, 1)
+    const latest = [...items].sort((left, right) => String(right.gradedAt).localeCompare(String(left.gradedAt)))[0]
+
+    return {
+      id: `db-grade-${studentId}-${courseId}`,
+      studentId,
+      courseId,
+      score: Math.round(weightedTotal),
+      semester: '',
+      comment: '',
+      gradedAt: latest?.gradedAt || '',
+      totalScore: Math.round(weightedTotal),
+    }
+  })
+
+  store.grades = [
+    ...store.grades.filter((item) => item.studentId !== studentId),
+    ...grades,
+  ]
+}
+
+function getCourse(courseId: string) {
+  return remoteCourses.value.find((item) => item.id === courseId) || store.courses.find((item) => item.id === courseId)
+}
+
+function parseClockTime(value?: string) {
+  const match = String(value || '').trim().match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return null
+  return { hours: Number(match[1]), minutes: Number(match[2]) }
+}
+
+function applyClockTime(baseDate: Date, timeValue?: string) {
+  const clock = parseClockTime(timeValue)
+  if (!clock) return null
+  const next = new Date(baseDate)
+  next.setHours(clock.hours, clock.minutes, 0, 0)
+  return next
+}
+
+function getWeekdayInSameWeek(date: Date, weekday: number) {
+  const mondayBasedIndex = (date.getDay() + 6) % 7
+  const next = new Date(date)
+  next.setDate(next.getDate() - mondayBasedIndex + weekday)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function normalizeDateOnly(date: Date) {
+  const next = new Date(date)
+  next.setHours(0, 0, 0, 0)
+  return next
+}
+
+function getFirstWeekdayOnOrAfter(date: Date, weekday: number) {
+  const next = getWeekdayInSameWeek(date, weekday)
+  if (next.getTime() < normalizeDateOnly(date).getTime()) {
+    next.setDate(next.getDate() + 7)
+  }
+  return next
+}
+
+function getLastWeekdayOnOrBefore(date: Date, weekday: number) {
+  const next = getWeekdayInSameWeek(date, weekday)
+  if (next.getTime() > normalizeDateOnly(date).getTime()) {
+    next.setDate(next.getDate() - 7)
+  }
+  return next
+}
+
+function buildScheduleOccurrences(schedule: Schedule): ScheduleOccurrence[] {
+  const startBoundary = schedule.startDate ? new Date(schedule.startDate) : null
+  const endBoundary = schedule.endDate ? new Date(schedule.endDate) : startBoundary
+  const [startTime = '', endTime = ''] = String(schedule.timeSlot || '')
+    .split('-')
+    .map((item) => item.trim())
+
+  if (
+    !startBoundary ||
+    Number.isNaN(startBoundary.getTime()) ||
+    !endBoundary ||
+    Number.isNaN(endBoundary.getTime()) ||
+    !startTime ||
+    !endTime
+  ) {
+    return []
+  }
+
+  const hasExplicitWeekday = Boolean(String(schedule.day || '').trim())
+  const weekday = getScheduleWeekday(schedule)
+  const dates: Date[] = []
+
+  if (hasExplicitWeekday && weekday >= 0) {
+    const firstDate = getFirstWeekdayOnOrAfter(startBoundary, weekday)
+    const lastDate = getLastWeekdayOnOrBefore(endBoundary, weekday)
+    if (firstDate.getTime() > lastDate.getTime()) return []
+
+    for (
+      const cursor = new Date(firstDate);
+      cursor.getTime() <= lastDate.getTime();
+      cursor.setDate(cursor.getDate() + 7)
+    ) {
+      dates.push(new Date(cursor))
+    }
+  } else {
+    dates.push(new Date(startBoundary))
+  }
+
+  return dates
+    .map((date) => {
+      const start = applyClockTime(date, startTime)
+      const end = applyClockTime(date, endTime)
+      if (!start || !end) return null
+      if (end.getTime() < start.getTime()) end.setDate(end.getDate() + 1)
+      return { schedule, start, end }
+    })
+    .filter((item): item is ScheduleOccurrence => item !== null)
+}
+
+function getCourseOccurrences(courseId: string, className = '') {
+  const normalizedClassName = String(className).trim()
+  const sourceSchedules = dbSchedules.value.filter((item) => {
+    if (item.courseId !== courseId) return false
+    if (!normalizedClassName) return true
+    return String(item.className || '').trim() === normalizedClassName
+  })
+
+  const occurrences: ScheduleOccurrence[] = []
+  const seen = new Set<string>()
+
+  sourceSchedules.forEach((schedule) => {
+    buildScheduleOccurrences(schedule).forEach((occurrence) => {
+      const key = `${schedule.id}::${occurrence.start.getTime()}::${occurrence.end.getTime()}`
+      if (seen.has(key)) return
+      seen.add(key)
+      occurrences.push(occurrence)
+    })
+  })
+
+  return occurrences.sort((left, right) => left.start.getTime() - right.start.getTime())
+}
+
+function getScheduleWeekday(schedule: Schedule) {
+  const normalizedDay = String(schedule.day || '').trim()
+  if (normalizedDay && weekdayMap[normalizedDay] != null) return weekdayMap[normalizedDay]
+  const startDate = schedule.startDate ? new Date(schedule.startDate) : null
+  return startDate && !Number.isNaN(startDate.getTime()) ? (startDate.getDay() + 6) % 7 : -1
+}
+
+function formatDate(value?: string) {
+  if (!value) return '未设置'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`
+}
+
+function getEnrollmentProgress(enrollment: Enrollment) {
+  const occurrences = getCourseOccurrences(enrollment.courseId, currentClassName.value)
+  if (occurrences.length === 0) return Math.max(0, Math.min(100, Number(enrollment.progress || 0)))
+  const completedCount = occurrences.filter((item) => item.end.getTime() <= Date.now()).length
+  return Math.round((completedCount / occurrences.length) * 100)
+}
+
+function getEnrollmentStatusText(enrollment: Enrollment) {
+  const className = currentClassName.value
+  if (store.isCourseEnded(enrollment.courseId, className) || enrollment.status === 'completed') {
+    return '已结束'
+  }
+  if (store.isFirstClassStarted(enrollment.courseId, className) || enrollment.status === 'in_progress') {
+    return '学习中'
+  }
+  return '未开始'
+}
+
+function getEnrollmentBadgeClass(statusText: string) {
+  if (statusText === '已结束') return 'bg-gray-100 text-gray-600'
+  if (statusText === '学习中') return 'bg-brand-400/10 text-brand-700'
+  return 'bg-amber-50 text-amber-600'
+}
+
+function gradeLevel(score: number) {
+  if (score >= 90) return '优秀'
+  if (score >= 80) return '良好'
+  if (score >= 60) return '及格'
+  return '待提升'
+}
+
+function gradeColorClass(score: number) {
+  if (score >= 90) return 'text-emerald-600'
+  if (score >= 80) return 'text-blue-600'
+  if (score >= 60) return 'text-brand-700'
+  return 'text-red-500'
+}
+
+const completedCount = computed(() => {
+  const className = currentClassName.value
+  return myEnrollments.value.filter(
+    (item) => item.status === 'completed' || store.isCourseEnded(item.courseId, className),
+  ).length
+})
+
+const inProgressCount = computed(() => {
+  const className = currentClassName.value
+  return myEnrollments.value.filter((item) => {
+    if (item.status === 'dropped') return false
+    return (
+      !store.isCourseEnded(item.courseId, className) &&
+      (store.isFirstClassStarted(item.courseId, className) || item.status === 'in_progress')
+    )
+  }).length
+})
 
 const avgScore = computed(() => {
   if (myGrades.value.length === 0) return 0
-  // 与成绩查询页面一致：优先用 calcTotalScore 计算加权总分，无详细成绩时回退
-  const totals = myGrades.value.map((g) => {
-    const d = store.detailedGrades.find((dg) => dg.studentId === g.studentId && dg.courseId === g.courseId)
-    if (d) return store.calcTotalScore(g.courseId, d)
-    const base = g.totalScore ?? g.score ?? 0
-    return Math.min(100, base + store.getStudentQualityScore(g.courseId, g.studentId))
-  })
-  return Math.round(totals.reduce((s, t) => s + t, 0) / totals.length)
+  const total = myGrades.value.reduce(
+    (sum, item) => sum + Number(item.totalScore ?? item.score ?? 0),
+    0,
+  )
+  return Math.round(total / myGrades.value.length)
 })
 
-// 判断是否已录入期中及期末成绩（用于控制"平均成绩"的显示）
-const hasMidtermAndFinal = computed(() => {
-  if (!student.value) return false
-  return store.detailedGrades.some((dg) => {
-    if (dg.studentId !== student.value!.id) return false
-    const hasMidterm = (dg.midtermExamScore != null && dg.midtermExamScore > 0) || (dg.midtermProjectScore != null && dg.midtermProjectScore > 0)
-    const hasFinal = (dg.finalExamScore != null && dg.finalExamScore > 0) || (dg.finalProjectScore != null && dg.finalProjectScore > 0)
-    return hasMidterm && hasFinal
-  })
-})
-
-const totalCredits = computed(() => {
-  return myEnrollments.value.reduce((sum, e) => {
-    const course = store.courses.find((c) => c.id === e.courseId)
-    return sum + (course ? Math.round(course.duration / 8) : 0)
-  }, 0)
-})
+const totalCredits = computed(() =>
+  myEnrollments.value.reduce((sum, item) => sum + Number(getCourse(item.courseId)?.credits || 0), 0),
+)
 
 const avgProgress = computed(() => {
   if (myEnrollments.value.length === 0) return 0
-  // 实时计算：基于已上课节数 / 总课节数
-  const now = getNow()
-  const progresses = myEnrollments.value.map((e) => {
-    const courseSchedules = store.schedules.filter((s) => s.courseId === e.courseId)
-    if (courseSchedules.length === 0) return 0
-    const startedCount = courseSchedules.filter((s) => new Date(s.startDate) < now).length
-    return Math.round((startedCount / courseSchedules.length) * 100)
-  })
-  return Math.round(progresses.reduce((s, p) => s + p, 0) / progresses.length)
+  const total = myEnrollments.value.reduce((sum, item) => sum + getEnrollmentProgress(item), 0)
+  return Math.round(total / myEnrollments.value.length)
 })
 
-const getCourse = (id: string) => store.courses.find((c) => c.id === id)
-
-// ====== 今日学习轨迹（根据课表，按班级从数据库加载，与课表页面一致） ======
-const dayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const dbSchedules = ref<any[]>([])
-
-function getTodayLabel(): string {
-  return dayLabels[(new Date().getDay() + 6) % 7]
-}
-
-function getScheduleDay(sch: any): string {
-  if (sch.day) return sch.day
-  if (sch.startDate) {
-    const d = new Date(sch.startDate)
-    if (!isNaN(d.getTime())) return dayLabels[(d.getDay() + 6) % 7]
-  }
-  return '-'
-}
-
-async function loadMySchedules() {
-  try {
-    const studentName = store.currentUser
-    if (!studentName) return
-    // 1. 查询学生信息获取班级
-    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
-    const stuData = await stuRes.json()
-    const myInfo = stuData.students?.[0]
-    if (!myInfo?.className) return
-    // 2. 按班级加载排课（与课表页面 Schedule.vue 数据源一致）
-    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
-    const schData = await schRes.json()
-    if (schData.success) {
-      dbSchedules.value = schData.schedules
-    }
-  } catch (e) {
-    console.error('加载课表失败:', e)
-  }
-}
+const statCards = computed(() => [
+  { label: '学习中课程', value: `${inProgressCount.value} 门`, color: 'text-brand-700', tip: '根据真实排课进度计算' },
+  { label: '已完成课程', value: `${completedCount.value} 门`, color: 'text-emerald-600', tip: '只有最后一节课结束后才计入' },
+  { label: '总学分', value: `${totalCredits.value}`, color: 'text-gray-900', tip: '按课程学分汇总' },
+  { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900', tip: avgScore.value > 0 ? `平均成绩 ${avgScore.value} 分` : '暂无成绩' },
+])
 
 const todaySchedules = computed(() => {
-  const today = getTodayLabel()
-  return dbSchedules.value
-    .filter((s: any) => getScheduleDay(s) === today)
-    .sort((a: any, b: any) => (a.timeSlot || '').localeCompare(b.timeSlot || ''))
+  const todayIndex = (new Date().getDay() + 6) % 7
+  return [...dbSchedules.value]
+    .filter((item) => getScheduleWeekday(item) === todayIndex)
+    .sort((left, right) => String(left.timeSlot || '').localeCompare(String(right.timeSlot || '')))
 })
 
-const radarData = computed(() => {
-  const result: { label: string; value: number }[] = []
-  for (const enr of myEnrollments.value) {
-    const course = getCourse(enr.courseId)
-    if (!course) continue
-    const detailedGrade = store.detailedGrades.find(
-      (dg) => dg.studentId === student.value!.id && dg.courseId === enr.courseId
+const scoreSummaries = computed(() => {
+  const scoreMap = new Map(myGrades.value.map((item) => [item.courseId, item]))
+  const courseIds = Array.from(
+    new Set([
+      ...remoteScores.value.map((item) => item.courseId),
+      ...myGrades.value.map((item) => item.courseId),
+    ]),
+  )
+
+  return courseIds
+    .map((courseId) => {
+      const grade = scoreMap.get(courseId)
+      const course = getCourse(courseId)
+      return {
+        courseId,
+        courseTitle: course?.title || remoteScores.value.find((item) => item.courseId === courseId)?.courseTitle || '未命名课程',
+        teacher: course?.teacher || '',
+        score: Math.round(Number(grade?.totalScore ?? grade?.score ?? 0)),
+      }
+    })
+    .filter((item) => item.score > 0)
+    .sort((left, right) => right.score - left.score)
+})
+
+const courseRows = computed(() =>
+  myEnrollments.value.map((enrollment) => {
+    const course = getCourse(enrollment.courseId)
+    const score = myGrades.value.find((item) => item.courseId === enrollment.courseId)
+    const statusText = getEnrollmentStatusText(enrollment)
+    const relatedSchedules = dbSchedules.value.filter((item) => item.courseId === enrollment.courseId)
+    const sortedSchedules = [...relatedSchedules].sort((left, right) =>
+      String(left.startDate || '').localeCompare(String(right.startDate || '')),
     )
-    if (!detailedGrade) continue
-    const cfg = store.getGradeConfig(enr.courseId)
-    const selfEval = detailedGrade.selfEvalScore ?? 0
-    const peerReview = detailedGrade.peerReviewScore ?? 0
-    const interGroup = detailedGrade.interGroupScore ?? 0
-    const teacherScore = detailedGrade.teacherScore ?? 0
-    const mentorScore = detailedGrade.mentorScore ?? 0
-    const hasRegularScore = selfEval > 0 || peerReview > 0 || interGroup > 0 || teacherScore > 0 || mentorScore > 0
-    if (!hasRegularScore) continue
-    const regularScore =
-      (selfEval * cfg.selfEvalWeight +
-        peerReview * cfg.peerReviewWeight +
-        interGroup * cfg.interGroupEvalWeight +
-        teacherScore * cfg.teacherScoreWeight +
-        mentorScore * cfg.mentorScoreWeight) /
-      100
-    result.push({
-      label: course.title,
-      value: Math.round(regularScore),
-    })
-  }
-  return result
-})
+    const firstSchedule = sortedSchedules[0]
+    const lastSchedule = sortedSchedules[sortedSchedules.length - 1]
 
-// ====== 素质评价雷达图数据（取素质评价分最高的 5 门课程） ======
-const qualityRadarData = computed(() => {
-  if (!student.value) return []
-  const result: { label: string; value: number }[] = []
-  for (const enr of myEnrollments.value) {
-    const course = getCourse(enr.courseId)
-    if (!course) continue
-    const qe = store.getStudentQualityEvaluation(enr.courseId, student.value.id)
-    if (!qe || qe.submissions.length === 0) continue
-    const graded = qe.submissions.filter((s) => s.score !== undefined)
-    if (graded.length === 0) continue
-    const latest = graded[graded.length - 1]
-    result.push({ label: course.title, value: Math.round(latest.score ?? 0) })
-  }
-  // 按分数降序，取前 5 门
-  return result.sort((a, b) => b.value - a.value).slice(0, 5)
-})
-
-// ====== 增值评价数据 ======
-const selectedTrendCourseIndex = ref(0)
-
-const evalTrendData = computed(() => {
-  if (!student.value) return []
-  const studentId = student.value.id
-  
-  // 获取该学生的所有评价记录
-  const studentEvals = store.evaluations
-    .filter(ev => ev.studentId === studentId && ev.score > 0)
-    .sort((a, b) => {
-      // 先按课程分组，再按 sessionNumber 排序
-      if (a.courseId !== b.courseId) return a.courseId.localeCompare(b.courseId)
-      return a.sessionNumber - b.sessionNumber
-    })
-  
-  if (studentEvals.length === 0) return []
-  
-  // 按课程分组
-  const courseMap = new Map<string, { courseTitle: string; sessions: { session: number; score: number; date: string }[] }>()
-  
-  for (const ev of studentEvals) {
-    const course = getCourse(ev.courseId)
-    if (!course) continue
-    
-    if (!courseMap.has(ev.courseId)) {
-      courseMap.set(ev.courseId, {
-        courseTitle: course.title,
-        sessions: []
-      })
-    }
-    
-    const courseData = courseMap.get(ev.courseId)!
-    courseData.sessions.push({
-      session: ev.sessionNumber,
-      score: ev.score,
-      date: ev.createdAt
-    })
-  }
-  
-  // 转换为图表数据格式
-  const result: { courseId: string; courseTitle: string; points: { x: number; y: number; label: string }[] }[] = []
-  
-  courseMap.forEach((value, key) => {
-    if (value.sessions.length < 1) return // 至少需要1次评价才能显示趋势
-    const points = value.sessions.map(s => ({
-      x: s.session,
-      y: s.score,
-      label: `第${s.session}次`
-    }))
-    result.push({
-      courseId: key,
-      courseTitle: value.courseTitle,
-      points
-    })
-  })
-  
-  return result
-})
-
-// 获取增值评价统计信息
-const evalTrendStats = computed(() => {
-  if (evalTrendData.value.length === 0) return null
-  
-  const stats = evalTrendData.value.map(course => {
-    const points = course.points
-    const currentScore = points[points.length - 1].y
-    const previousScore = points.length > 1 ? points[points.length - 2].y : null
-    const change = previousScore !== null ? currentScore - previousScore : null
-    
     return {
-      courseId: course.courseId,
-      courseTitle: course.courseTitle,
-      currentScore,
-      previousScore,
-      change,
-      hasTrend: points.length > 1
+      courseId: enrollment.courseId,
+      courseTitle: course?.title || firstSchedule?.title || '未命名课程',
+      teacher: course?.teacher || firstSchedule?.teacher || '',
+      credits: Number(course?.credits || 0),
+      progress: getEnrollmentProgress(enrollment),
+      statusText,
+      badgeClass: getEnrollmentBadgeClass(statusText),
+      startDate: formatDate(course?.startDate || firstSchedule?.startDate || enrollment.enrollDate),
+      endDate: formatDate(course?.endDate || lastSchedule?.endDate || firstSchedule?.endDate),
+      timeLabel: firstSchedule?.timeSlot || '未设置',
+      score: score ? Math.round(Number(score.totalScore ?? score.score ?? 0)) : null,
     }
-  })
-  
-  return stats
-})
+  }),
+)
 
-/** 绘制雷达图（坐标以 viewBox="-120 -120 440 440"、中心 (100,100)、最外层半径 150 为基准） */
-function drawRadarChart(
-  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>,
-  data: { label: string; value: number }[]
-) {
-  if (data.length === 0) return
-  const angleOf = (i: number): number => ((360 / data.length) * i - 90) * Math.PI / 180
+async function loadRemoteProfileData() {
+  loading.value = true
 
-  // 网格多边形（5 层）
-  for (let level = 1; level <= 5; level++) {
-    const r = level * 30
-    const points = data.map((_, i) => {
-      const angle = angleOf(i)
-      return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
-    }).join(' ')
-    svg.append('polygon')
-      .attr('points', points)
-      .attr('fill', 'none')
-      .attr('stroke', '#5eb6b9')
-      .attr('stroke-width', 1)
-      .attr('stroke-opacity', 0.3)
-  }
+  try {
+    const session = getStoredStudentSession()
+    const search = getStudentLookupKeyword(store.currentUser, session)
+    let resolvedStudent =
+      matchStudentFromSession(store.students, store.currentUser, session) ?? createSessionStudent()
 
-  // 轴线
-  data.forEach((_, i) => {
-    const angle = angleOf(i)
-    svg.append('line')
-      .attr('x1', 100).attr('y1', 100)
-      .attr('x2', 100 + 150 * Math.cos(angle)).attr('y2', 100 + 150 * Math.sin(angle))
-      .attr('stroke', '#5eb6b9')
-      .attr('stroke-width', 1)
-      .attr('stroke-opacity', 0.3)
-  })
-
-  // 数据多边形
-  const polyPoints = data.map((d, i) => {
-    const angle = angleOf(i)
-    const r = d.value * 1.5
-    return `${100 + r * Math.cos(angle)},${100 + r * Math.sin(angle)}`
-  }).join(' ')
-  svg.append('polygon')
-    .attr('points', polyPoints)
-    .attr('fill', 'rgba(65, 90, 119, 0.2)')
-    .attr('stroke', '#429fc4')
-    .attr('stroke-width', 2)
-
-  // 数据点 + 标签
-  data.forEach((d, i) => {
-    const angle = angleOf(i)
-    const r = d.value * 1.5
-    const x = 100 + r * Math.cos(angle)
-    const y = 100 + r * Math.sin(angle)
-    const lx = 100 + Math.min(r + 25, 170) * Math.cos(angle)
-    const ly = 100 + Math.min(r + 25, 170) * Math.sin(angle)
-    const anchor = x > 100 ? 'start' : 'end'
-
-    svg.append('circle')
-      .attr('cx', x).attr('cy', y)
-      .attr('r', 4).attr('fill', '#429fc4')
-
-    svg.append('text')
-      .attr('x', lx).attr('y', ly)
-      .attr('text-anchor', anchor)
-      .attr('font-size', 9).attr('fill', '#5eb6b9')
-      .text(d.label)
-
-    svg.append('text')
-      .attr('x', lx).attr('y', ly + 12)
-      .attr('text-anchor', anchor)
-      .attr('font-size', 9).attr('fill', '#429fc4').attr('font-weight', 'bold')
-      .text(`${d.value}分`)
-  })
-}
-
-const showDetailModal = ref(false)
-
-const careerRecommendations = computed(() => {
-  if (radarData.value.length === 0) return []
-
-  const scores: Record<string, number> = {}
-  radarData.value.forEach((d) => {
-    scores[d.label] = d.value
-  })
-
-  const aiScore = scores['AI 生成式应用开发'] || 0
-  const vizScore = scores['数据可视化与商业分析'] || 0
-  const frontendScore = scores['React 前端开发实战'] || 0
-  const tsScore = scores['TypeScript 高级编程'] || 0
-  const commScore = scores['高效沟通与表达训练'] || 0
-
-  const recommendations: { title: string; description: string; tags: string[]; matchScore: number; icon: string }[] = []
-
-  if (aiScore >= 80) {
-    recommendations.push({
-      title: 'AI 应用开发工程师',
-      description: '利用AI技术构建智能化应用，将大语言模型能力融入产品，是当前最热门的职业方向之一。',
-      tags: ['AI', '大模型', '应用开发', '创新'],
-      matchScore: Math.round((aiScore * 0.6 + frontendScore * 0.2 + tsScore * 0.2)),
-      icon: 'sparkles'
-    })
-  }
-
-  if (vizScore >= 75) {
-    recommendations.push({
-      title: '数据可视化工程师',
-      description: '将复杂数据转化为直观的可视化图表，帮助企业洞察业务趋势，支持数据驱动决策。',
-      tags: ['数据可视化', '图表', 'BI', '分析'],
-      matchScore: Math.round((vizScore * 0.5 + frontendScore * 0.3 + commScore * 0.2)),
-      icon: 'lineChart'
-    })
-  }
-
-  if (frontendScore >= 75) {
-    recommendations.push({
-      title: '前端开发工程师',
-      description: '负责构建用户界面和交互体验，结合React、TypeScript等现代技术栈打造高质量Web应用。',
-      tags: ['React', 'TypeScript', 'UI', '交互'],
-      matchScore: Math.round((frontendScore * 0.5 + tsScore * 0.3 + vizScore * 0.2)),
-      icon: 'cpu'
-    })
-  }
-
-  if (aiScore >= 70 && frontendScore >= 70) {
-    recommendations.push({
-      title: '全栈AI开发工程师',
-      description: '兼具前端开发与AI技术能力，能够独立完成从界面到智能功能的完整项目开发。',
-      tags: ['全栈', 'AI', '前端', '后端'],
-      matchScore: Math.round((aiScore * 0.35 + frontendScore * 0.35 + tsScore * 0.3)),
-      icon: 'sparkles'
-    })
-  }
-
-  return recommendations.sort((a, b) => b.matchScore - a.matchScore).slice(0, 3)
-})
-
-const abilityAnalysis = computed(() => {
-  if (radarData.value.length === 0) return '暂无能力数据'
-
-  const scores = radarData.value.map((d) => d.value)
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-  const maxScore = Math.max(...scores)
-  const minScore = Math.min(...scores)
-  const maxLabel = radarData.value.find((d) => d.value === maxScore)?.label || ''
-  const minLabel = radarData.value.find((d) => d.value === minScore)?.label || ''
-
-  let analysis = `您的平均能力得分为 ${Math.round(avg)} 分，整体表现`
-
-  if (avg >= 85) analysis += '优秀'
-  else if (avg >= 75) analysis += '良好'
-  else if (avg >= 65) analysis += '中等'
-  else analysis += '有待提升'
-
-  analysis += `。您的优势课程是「${maxLabel}」，建议继续深耕；`
-
-  if (minScore < 75) {
-    analysis += `「${minLabel}」相对薄弱，建议加强学习。`
-  } else {
-    analysis += '各课程均衡发展，可尝试拓展更多领域。'
-  }
-
-  return analysis
-})
-
-function getScoreClass(score: number): string {
-  if (score >= 90) return 'bg-emerald-100 text-emerald-700'
-  if (score >= 80) return 'bg-blue-100 text-blue-700'
-  if (score >= 70) return 'bg-brand-50 text-gray-800'
-  if (score >= 60) return 'bg-brand-600/15 text-brand-800'
-  return 'bg-brand-600/15 text-red-700'
-}
-
-function getScoreText(score: number): string {
-  if (score >= 90) return '优秀'
-  if (score >= 80) return '良好'
-  if (score >= 70) return '中等'
-  if (score >= 60) return '及格'
-  return '需提升'
-}
-
-function getCourseDetail(title: string): string {
-  const detailMap: Record<string, string> = {
-    'AI 生成式应用开发': 'AI技术方向',
-    '数据可视化与商业分析': '数据分析方向',
-    'React 前端开发实战': '前端开发方向',
-    'TypeScript 高级编程': '编程语言方向',
-    '高效沟通与表达训练': '软技能方向'
-  }
-  return detailMap[title] || '综合能力'
-}
-
-function renderProfile(root: HTMLElement) {
-  const container = d3.select(root)
-  container.selectAll('*').remove()
-
-  const s = student.value
-  const enrs = myEnrollments.value
-  const rd = radarData.value
-  const recs = careerRecommendations.value
-
-  // 页面标题
-  const titleDiv = container.append('div')
-  titleDiv.append('h1').attr('class', 'text-2xl font-bold text-gray-900').text('个人画像')
-  titleDiv.append('p').attr('class', 'text-gray-400 mt-1').text('查看个人信息与学习能力分析')
-
-  // 个人信息卡片
-  const infoCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
-  const infoRow = infoCard.append('div').attr('class', 'flex items-start gap-6')
-
-  // 头像
-  const avatar = infoRow.append('div').attr('class', 'w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0')
-  avatar.append('span').attr('class', 'text-2xl font-bold text-brand-600').text(s?.name?.charAt(0) || '?')
-
-  // 信息
-  const infoContent = infoRow.append('div').attr('class', 'flex-1')
-  infoContent.append('h2').attr('class', 'text-xl font-bold text-gray-900').text(s?.name || store.currentUser || '未知用户')
-  const infoGrid = infoContent.append('div').attr('class', 'grid grid-cols-2 gap-x-8 gap-y-2 mt-3')
-
-  const infoItems = [
-    { icon: 'mail' as const, text: s?.email || '未设置' },
-    { icon: 'phone' as const, text: s?.phone || '未设置' },
-    { icon: 'calendar' as const, text: `入学时间：${s?.joinDate || '未知'}` },
-    { icon: 'user' as const, text: `学号：${s?.id || '未知'}` },
-  ]
-  infoItems.forEach((item) => {
-    const span = infoGrid.append('span').attr('class', 'flex items-center gap-2 text-sm text-gray-400')
-    renderIcon(span, item.icon).attr('class', 'w-4 h-4')
-    span.append('span').text(item.text)
-  })
-
-  // 能力雷达图 + 学习统计 两列布局
-  const twoCol = container.append('div').attr('class', 'grid grid-cols-1 lg:grid-cols-2 gap-6')
-
-  // 雷达图卡片
-  const radarCard = twoCol.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
-  const radarTitle = radarCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(radarTitle, 'barChart3').attr('class', 'w-5 h-5 text-brand-600')
-  radarTitle.append('span').text('课程成绩雷达图')
-
-  if (rd.length > 0) {
-    const svgWrap = radarCard.append('div')
-      .attr('class', 'relative w-80 h-80 mx-auto cursor-pointer')
-      .on('click', () => {
-        const scrollY = window.scrollY
-        showDetailModal.value = true
-        reRender()
-        window.scrollTo(0, scrollY)
-      })
-
-    const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
-    drawRadarChart(svg, rd)
-
-    // hover提示
-    const hoverOverlay = svgWrap.append('div')
-      .attr('class', 'absolute inset-0 flex items-center justify-center bg-black/10 rounded-lg opacity-0 hover:opacity-100 transition-opacity')
-    hoverOverlay.append('span').attr('class', 'text-white font-medium text-sm bg-brand-600 px-3 py-1 rounded-full shadow-lg').text('点击查看详情')
-  } else {
-    radarCard.append('p').attr('class', 'text-gray-400 text-center py-12')
-      .html('暂无平时成绩数据<br />完成课程评价后将生成能力雷达图')
-  }
-
-  // 素质评价雷达图（取素质评价分最高的 5 门课程，与课程成绩雷达图并排）
-  const qrd = qualityRadarData.value
-  const qualityRadarCard = twoCol.append('div').attr('class', 'bg-white rounded-xl p-6 border border-emerald-400/20 shadow-sm')
-  const qualityRadarTitle = qualityRadarCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(qualityRadarTitle, 'award').attr('class', 'w-5 h-5 text-emerald-600')
-  qualityRadarTitle.append('span').text('素质评价雷达图')
-
-  if (qrd.length > 0) {
-    const svgWrap = qualityRadarCard.append('div').attr('class', 'relative w-72 h-72 mx-auto')
-    const svg = svgWrap.append('svg').attr('viewBox', '-120 -120 440 440').attr('class', 'w-full h-full')
-    drawRadarChart(svg, qrd)
-
-    // 各课程素质评价分一览（按分数从高到低排序）
-    const scoreList = qualityRadarCard.append('div').attr('class', 'mt-4 grid grid-cols-1 gap-1.5')
-    qrd.forEach((d) => {
-      const row = scoreList.append('div').attr('class', 'flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-400/10')
-      row.append('span').attr('class', 'text-xs text-gray-600 truncate').text(d.label)
-      row.append('span').attr('class', 'text-sm font-bold text-emerald-600 flex-shrink-0').text(`${d.value}分`)
-    })
-  } else {
-    qualityRadarCard.append('div').attr('class', 'text-center py-8')
-      .append('p').attr('class', 'text-gray-400').text('暂无素质评价数据')
-    qualityRadarCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成素质评价打分后将生成雷达图')
-  }
-
-  // 增值评价板块
-  const trendData = evalTrendData.value
-  const trendStats = evalTrendStats.value
-  const trendCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
-  const trendTitle = trendCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(trendTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
-  trendTitle.append('span').text('增值评价')
-
-  if (trendData.length > 0) {
-    // 课程切换标签（放在折线图上方）
-    const courseTabs = trendCard.append('div').attr('class', 'flex flex-wrap gap-2 mb-4')
-    
-    trendData.forEach((course, index) => {
-      const isActive = selectedTrendCourseIndex.value === index
-      const tab = courseTabs.append('button')
-        .attr('class', `px-3 py-1.5 text-sm rounded-full transition-colors cursor-pointer ${isActive ? 'bg-brand-700 text-white' : 'bg-brand-50 text-brand-700 hover:bg-brand-100'}`)
-        .text(course.courseTitle)
-      
-      tab.on('click', () => {
-        selectedTrendCourseIndex.value = index
-        const scrollY = window.scrollY
-        reRender()
-        window.scrollTo(0, scrollY)
-      })
-    })
-    
-    // 当前选中的课程
-    const currentCourse = trendData[selectedTrendCourseIndex.value]
-    const currentStat = trendStats?.[selectedTrendCourseIndex.value]
-    
-    // 绘制当前课程折线图
-    const chartWidth = 400
-    const chartHeight = 120
-    const padding = { top: 20, right: 20, bottom: 30, left: 40 }
-    const innerWidth = chartWidth - padding.left - padding.right
-    const innerHeight = chartHeight - padding.top - padding.bottom
-    
-    const courseSection = trendCard.append('div').attr('class', 'border border-brand-400/10 rounded-lg p-4')
-    const courseHeader = courseSection.append('div').attr('class', 'flex items-center justify-between mb-3')
-    courseHeader.append('h4').attr('class', 'font-semibold text-gray-900').text(currentCourse.courseTitle)
-    
-    // 统计信息
-    if (currentStat && currentStat.hasTrend) {
-      const change = currentStat.change!
-      // 分数无变化时不显示统计文字（原为"保持不变"）
-      if (change !== 0) {
-        const changeColor = change > 0 ? 'text-emerald-600' : 'text-red-500'
-        const changeText = change > 0 ? `进步 ${change.toFixed(1)} 分` : `退步 ${Math.abs(change).toFixed(1)} 分`
-        courseHeader.append('span').attr('class', `text-sm font-medium ${changeColor}`).text(changeText)
+    if (search) {
+      try {
+        const studentRes = await fetchStudents({ search, pageSize: 10 })
+        resolvedStudent =
+          matchStudentFromSession(studentRes.students ?? [], store.currentUser, session) ??
+          resolvedStudent
+      } catch (error) {
+        console.warn('加载学生信息失败，继续使用本地学生信息', error)
       }
-    } else {
-      courseHeader.append('span').attr('class', 'text-xs text-gray-400').text('首次评价，暂无对比')
     }
-    
-    const svgContainer = courseSection.append('div').attr('class', 'flex justify-center')
-    const svg = svgContainer.append('svg')
-      .attr('width', chartWidth)
-      .attr('height', chartHeight)
-      .attr('viewBox', `0 0 ${chartWidth} ${chartHeight}`)
-    
-    const points = currentCourse.points
-    const maxY = 100
-    const xStep = points.length > 1 ? innerWidth / (points.length - 1) : 0
-    
-    // Y轴
-    svg.append('line')
-      .attr('x1', padding.left).attr('y1', padding.top)
-      .attr('x2', padding.left).attr('y2', padding.top + innerHeight)
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 1)
-    
-    // X轴
-    svg.append('line')
-      .attr('x1', padding.left).attr('y1', padding.top + innerHeight)
-      .attr('x2', padding.left + innerWidth).attr('y2', padding.top + innerHeight)
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 1)
-    
-    // Y轴刻度
-    for (let i = 0; i <= 4; i++) {
-      const y = padding.top + innerHeight * (1 - i / 4)
-      const val = maxY * (i / 4)
-      svg.append('line')
-        .attr('x1', padding.left - 5).attr('y1', y)
-        .attr('x2', padding.left).attr('y2', y)
-        .attr('stroke', '#9ca3af').attr('stroke-width', 1)
-      svg.append('text')
-        .attr('x', padding.left - 8).attr('y', y + 3)
-        .attr('text-anchor', 'end').attr('font-size', '9').attr('fill', '#9ca3af')
-        .text(val.toString())
-    }
-    
-    // 折线路径
-    const linePoints: string[] = []
-    points.forEach((point, i) => {
-      const x = padding.left + (points.length > 1 ? i * xStep : innerWidth / 2)
-      const y = padding.top + innerHeight * (1 - point.y / 100)
-      linePoints.push(`${x},${y}`)
-    })
-    
-    // 折线
-    if (linePoints.length > 1) {
-      svg.append('polyline')
-        .attr('points', linePoints.join(' '))
-        .attr('fill', 'none')
-        .attr('stroke', '#429fc4')
-        .attr('stroke-width', 2)
-        .attr('stroke-linecap', 'round')
-        .attr('stroke-linejoin', 'round')
-    }
-    
-    // 数据点
-    points.forEach((point, i) => {
-      const x = padding.left + (points.length > 1 ? i * xStep : innerWidth / 2)
-      const y = padding.top + innerHeight * (1 - point.y / 100)
-      
-      svg.append('circle')
-        .attr('cx', x).attr('cy', y)
-        .attr('r', 4)
-        .attr('fill', '#429fc4')
-        .attr('stroke', 'white')
-        .attr('stroke-width', 2)
-      
-      svg.append('text')
-        .attr('x', x).attr('y', y - 10)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '10').attr('fill', '#429fc4').attr('font-weight', 'bold')
-        .text(`${point.y}分`)
-      
-      svg.append('text')
-        .attr('x', x).attr('y', padding.top + innerHeight + 15)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '9').attr('fill', '#6b7280')
-        .text(point.label)
-    })
-  } else {
-    // 无评价数据
-    trendCard.append('div').attr('class', 'text-center py-8')
-      .append('p').attr('class', 'text-gray-400').text('暂无评价数据')
-    trendCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成课程评价后将生成增值评价趋势图')
-  }
 
-  // 学习统计
-  const statCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-gray-100 shadow-sm')
-  const statTitle = statCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(statTitle, 'trendingUp').attr('class', 'w-5 h-5 text-brand-600')
-  statTitle.append('span').text('学习统计')
+    remoteStudent.value = resolvedStudent
+    mergeStudentIntoStore(resolvedStudent)
 
-  const statItems = [
-    { label: '学习中课程', value: `${inProgress.value} 门`, color: 'text-gray-900' },
-    { label: '已完成课程', value: `${completed.value} 门`, color: 'text-emerald-600' },
-    { label: '总学分', value: `${totalCredits.value} 学分`, color: 'text-brand-600' },
-    ...(hasMidtermAndFinal.value ? [{ label: '平均成绩', value: `${avgScore.value} 分`, color: 'text-brand-700' }] : []),
-    { label: '平均进度', value: `${avgProgress.value}%`, color: 'text-gray-900' },
-  ]
-  const statBody = statCard.append('div').attr('class', 'grid grid-cols-2 md:grid-cols-5 gap-3')
-  statItems.forEach((item) => {
-    const cell = statBody.append('div').attr('class', 'p-4 bg-gray-50 rounded-lg')
-    cell.append('p').attr('class', 'text-sm text-gray-600').text(item.label)
-    cell.append('p').attr('class', `text-2xl font-bold mt-1 ${item.color}`).text(item.value)
-  })
+    const studentId = resolvedStudent?.id || session.id || ''
+    if (studentId) {
+      try {
+        const [courseRes, scoreRes] = await Promise.all([
+          fetchStudentCourses(studentId),
+          fetchStudentScores(studentId),
+        ])
 
-  // 今日学习轨迹
-  const todaySchs = todaySchedules.value
-  const trackCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-brand-400/20 shadow-sm')
-  const trackTitle = trackCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(trackTitle, 'bookOpen').attr('class', 'w-5 h-5 text-brand-600')
-  trackTitle.append('span').text('今日学习轨迹')
+        remoteStudent.value = courseRes.student ?? remoteStudent.value
+        remoteCourses.value = courseRes.courses ?? []
+        remoteEnrollments.value = courseRes.enrollments ?? []
+        remoteScores.value = scoreRes.scores ?? []
 
-  if (todaySchs.length > 0) {
-    const trackList = trackCard.append('div').attr('class', 'relative')
-    todaySchs.forEach((sch, index) => {
-      const item = trackList.append('div').attr('class', 'flex gap-4 pb-6 relative')
-
-      if (index < todaySchs.length - 1) {
-        item.append('div').attr('class', 'absolute left-[7px] top-4 bottom-0 w-0.5 bg-blue-200')
+        mergeStudentIntoStore(remoteStudent.value)
+        mergeCoursesIntoStore(remoteCourses.value)
+        replaceStudentEnrollments(remoteStudent.value?.id || studentId, remoteEnrollments.value)
+        replaceStudentGrades(remoteStudent.value?.id || studentId, remoteScores.value)
+      } catch (error) {
+        console.warn('加载学生课程或成绩失败，继续使用已存在数据', error)
       }
-
-      item.append('div').attr('class', 'w-4 h-4 rounded-full mt-1 flex-shrink-0 bg-brand-600')
-
-      const content = item.append('div').attr('class', 'flex-1')
-      content.append('p').attr('class', 'font-medium text-gray-900').text(sch.title || getCourse(sch.courseId)?.title || '未知课程')
-      content.append('p').attr('class', 'text-sm text-gray-400').text(sch.timeSlot || '')
-    })
-  } else {
-    trackCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('今日暂无课程安排')
-  }
-
-  // 详情弹窗 (showDetailModal)
-  if (showDetailModal.value) {
-    const modalOverlay = container.append('div').attr('class', 'fixed inset-0 z-50 flex items-center justify-center p-4')
-    modalOverlay.append('div').attr('class', 'absolute inset-0 bg-black/50').on('click', () => {
-      const scrollY = window.scrollY
-      showDetailModal.value = false
-      reRender()
-      window.scrollTo(0, scrollY)
-    })
-
-    const modalBox = modalOverlay.append('div').attr('class', 'relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden')
-
-    // modal header
-    const modalHeader = modalBox.append('div').attr('class', 'flex items-center justify-between p-6 border-b border-brand-400/20')
-    const modalHeaderTitle = modalHeader.append('h3').attr('class', 'text-xl font-bold text-gray-900 flex items-center gap-2')
-    renderIcon(modalHeaderTitle, 'barChart3').attr('class', 'w-6 h-6 text-brand-600')
-    modalHeaderTitle.append('span').text('能力分析详情')
-
-    const closeBtn = modalHeader.append('button')
-      .attr('class', 'p-2 hover:bg-brand-400/10 rounded-lg transition-colors')
-      .on('click', () => {
-        const scrollY = window.scrollY
-        showDetailModal.value = false
-        reRender()
-        window.scrollTo(0, scrollY)
-      })
-    const closeSvg = closeBtn.append('svg').attr('class', 'w-6 h-6 text-gray-400')
-      .attr('fill', 'none').attr('stroke', 'currentColor').attr('viewBox', '0 0 24 24')
-    closeSvg.append('path').attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
-      .attr('stroke-width', '2').attr('d', 'M6 18L18 6M6 6l12 12')
-
-    const modalBody = modalBox.append('div').attr('class', 'p-6 overflow-y-auto max-h-[calc(90vh-80px)]')
-
-    // 能力综合分析
-    const analysisBanner = modalBody.append('div').attr('class', 'mb-6 p-5 bg-gradient-to-r from-brand-600 to-indigo-600 rounded-xl')
-    const bannerRow = analysisBanner.append('div').attr('class', 'flex items-start gap-4')
-    const bannerIcon = bannerRow.append('div').attr('class', 'w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0')
-    renderIcon(bannerIcon, 'sparkles').attr('class', 'w-5 h-5 text-white')
-    const bannerText = bannerRow.append('div').attr('class', 'flex-1')
-    bannerText.append('h5').attr('class', 'font-semibold text-white mb-2').text('能力综合分析')
-    bannerText.append('p').attr('class', 'text-white/90 text-sm leading-relaxed').text(abilityAnalysis.value)
-
-    // 课程分析 + 职业推荐 两列
-    const modalGrid = modalBody.append('div').attr('class', 'grid grid-cols-1 lg:grid-cols-2 gap-6')
-
-    // 课程分析
-    const courseAnalysisCol = modalGrid.append('div')
-    const courseAnalysisTitle = courseAnalysisCol.append('h4').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-    renderIcon(courseAnalysisTitle, 'bookOpen').attr('class', 'w-5 h-5 text-brand-600')
-    courseAnalysisTitle.append('span').text('课程分析')
-
-    const courseList = courseAnalysisCol.append('div').attr('class', 'space-y-4')
-    rd.forEach((data) => {
-      const item = courseList.append('div').attr('class', 'p-4 bg-brand-400/10 rounded-lg')
-      const header = item.append('div').attr('class', 'flex items-center justify-between mb-2')
-      header.append('span').attr('class', 'font-medium text-gray-900').text(data.label)
-      header.append('span').attr('class', 'text-lg font-bold text-brand-600').text(`${data.value}分`)
-
-      const barBg = item.append('div').attr('class', 'w-full bg-brand-400/10 rounded-full h-2')
-      barBg.append('div').attr('class', 'bg-brand-600 h-2 rounded-full').style('width', `${data.value}%`)
-
-      const tags = item.append('div').attr('class', 'mt-3 flex flex-wrap gap-2')
-      tags.append('span').attr('class', `px-2 py-1 text-xs rounded-full ${getScoreClass(data.value)}`)
-        .text(getScoreText(data.value))
-      tags.append('span').attr('class', 'px-2 py-1 text-xs bg-brand-400/10 text-brand-600 rounded-full')
-        .text(getCourseDetail(data.label))
-    })
-
-    // 职业推荐
-    const careerCol = modalGrid.append('div')
-    const careerTitle = careerCol.append('h4').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-    renderIcon(careerTitle, 'sparkles').attr('class', 'w-5 h-5 text-indigo-500')
-    careerTitle.append('span').text('职业推荐')
-
-    const careerList = careerCol.append('div').attr('class', 'space-y-4')
-    if (recs.length > 0) {
-      recs.forEach((rec) => {
-        const card = careerList.append('div').attr('class', 'p-4 bg-gradient-to-br from-brand-400/5 to-brand-400/5 rounded-lg')
-        const cardHeader = card.append('div').attr('class', 'flex items-center gap-2 mb-2')
-        renderIcon(cardHeader, rec.icon as any).attr('class', 'w-5 h-5 text-brand-600')
-        cardHeader.append('span').attr('class', 'font-semibold text-gray-900').text(rec.title)
-        cardHeader.append('span').attr('class', 'ml-auto text-sm font-bold text-brand-600').text(`${rec.matchScore}%`)
-
-        card.append('p').attr('class', 'text-sm text-gray-600 mb-3').text(rec.description)
-
-        const tagRow = card.append('div').attr('class', 'flex flex-wrap gap-1')
-        rec.tags.forEach((tag) => {
-          tagRow.append('span').attr('class', 'px-2 py-1 text-xs bg-brand-600/15 text-gray-800 rounded-full').text(tag)
-        })
-      })
-    } else {
-      careerList.append('div').attr('class', 'text-gray-400 text-center py-8').text('完成课程评价后，系统将生成职业推荐')
     }
+
+    const className = String(
+      remoteStudent.value?.className || resolvedStudent?.className || session.className || '',
+    ).trim()
+
+    if (!className) {
+      dbSchedules.value = []
+      return
+    }
+
+    try {
+      const scheduleRes = await fetchSchedules({ class: className })
+      dbSchedules.value = scheduleRes.schedules ?? []
+      mergeSchedulesByClass(className, dbSchedules.value)
+    } catch (error) {
+      console.warn('加载学生课表失败，继续使用本地课表数据', error)
+      dbSchedules.value = store.schedules.filter(
+        (item) => String(item.className ?? '').trim() === className,
+      )
+    }
+  } finally {
+    loading.value = false
   }
 }
 
-function reRender() {
-  const el = document.getElementById('student-profile-root')
-  if (el) renderProfile(el)
-}
-
-onMounted(async () => {
-  await loadMySchedules()
-  const el = document.getElementById('student-profile-root')
-  if (el) renderProfile(el)
+onMounted(() => {
+  void loadRemoteProfileData()
 })
-
-watch([myEnrollments, myGrades, todaySchedules, hasMidtermAndFinal, avgProgress, store.evaluations, store.courses], () => {
-  const el = document.getElementById('student-profile-root')
-  if (el) renderProfile(el)
-}, { deep: true })
 </script>

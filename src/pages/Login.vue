@@ -140,6 +140,76 @@ function mockPortal(role: string, subRole?: string): string {
   return '/'
 }
 
+function resolveStoreRole(role: string, subRole?: string) {
+  if (role === 'teacher' && subRole && subRole !== 'teacher') {
+    return subRole as 'mentor' | 'leader'
+  }
+  return role as 'admin' | 'teacher' | 'student'
+}
+
+function getExtraRoleFlags(name: string, subRole?: string) {
+  let isTeacherFromDb = false
+  let isMentorFromDb = false
+
+  if (subRole === 'leader') {
+    const leaderData = store.leaders.find((leader) => leader.name === name)
+    if (leaderData?.asTeacher) isTeacherFromDb = true
+    if (leaderData?.asMentor) isMentorFromDb = true
+  }
+
+  return { isTeacherFromDb, isMentorFromDb }
+}
+
+function completeLogin(user: { name: string; role: string; sub_role?: string }, portal: string, options?: {
+  token?: string
+  userInfo?: unknown
+  demoMode?: boolean
+}) {
+  const { isTeacherFromDb, isMentorFromDb } = getExtraRoleFlags(user.name, user.sub_role)
+
+  if (options?.token) {
+    localStorage.setItem('token', options.token)
+  }
+
+  if (options?.userInfo) {
+    localStorage.setItem('userInfo', JSON.stringify(options.userInfo))
+  }
+
+  if (options?.demoMode) {
+    localStorage.setItem('isDemoMode', 'true')
+  } else {
+    localStorage.removeItem('isDemoMode')
+  }
+
+  store.login(
+    user.name,
+    resolveStoreRole(user.role, user.sub_role),
+    isTeacherFromDb,
+    isMentorFromDb,
+  )
+
+  loading.value = false
+  router.push(portal)
+}
+
+function isBackendConnectionError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err || '')
+  return /failed to fetch|network|timeout|abort|load failed/i.test(message)
+}
+
+function getLoginErrorMessage(...errors: unknown[]) {
+  if (errors.some((error) => isBackendConnectionError(error))) {
+    return '连接后端失败，请确认后端已启动'
+  }
+
+  for (const error of errors) {
+    const message = error instanceof Error ? error.message : String(error || '')
+    if (message) return message
+  }
+
+  return '登录失败，请稍后再试'
+}
+
 async function handleLogin() {
   if (!account.value.trim() || !password.value.trim()) {
     error.value = '请输入账号和密码'
@@ -153,51 +223,47 @@ async function handleLogin() {
   const pwd = password.value.trim()
   const mock = MOCK_USERS[acc]
 
-  if (mock && mock.role !== 'student') {
-    if (mock.password !== pwd) {
-      error.value = '账号或密码错误'
-      loading.value = false
+  try {
+    const data = await unifiedLogin(acc, pwd)
+    completeLogin(data.user, data.portal || mockPortal(data.user.role, data.user.sub_role), {
+      token: data.token,
+      userInfo: data.user,
+    })
+    return
+  } catch (unifiedErr: any) {
+    if (isBackendConnectionError(unifiedErr) && mock && mock.role !== 'student') {
+      if (mock.password !== pwd) {
+        error.value = '账号或密码错误'
+        loading.value = false
+        return
+      }
+
+      completeLogin(mock, mockPortal(mock.role, mock.sub_role), {
+        demoMode: true,
+        userInfo: {
+          account: acc,
+          name: mock.name,
+          role: mock.role,
+          sub_role: mock.sub_role,
+        },
+      })
       return
     }
 
-    localStorage.setItem('isDemoMode', 'true')
-
-    let role = mock.role
-    if (role === 'teacher' && mock.sub_role) role = mock.sub_role
-
-    let isTeacherFromDb = false
-    let isMentorFromDb = false
-    if (mock.sub_role === 'leader') {
-      const leaderData = store.leaders.find((leader) => leader.name === mock.name)
-      if (leaderData?.asTeacher) isTeacherFromDb = true
-      if (leaderData?.asMentor) isMentorFromDb = true
+    try {
+      const data = await studentLogin(acc, pwd)
+      completeLogin(
+        { name: data.user.name, role: 'student' },
+        '/student/courses',
+        {
+          token: data.token,
+          userInfo: data.user,
+        },
+      )
+    } catch (studentErr: any) {
+      error.value = getLoginErrorMessage(studentErr, unifiedErr)
+      loading.value = false
     }
-
-    store.login(mock.name, role as any, isTeacherFromDb, isMentorFromDb)
-    loading.value = false
-    router.push(mockPortal(mock.role, mock.sub_role))
-
-    unifiedLogin(acc, pwd)
-      .then((res) => {
-        localStorage.setItem('token', res.token)
-        localStorage.setItem('userInfo', JSON.stringify(res.user))
-      })
-      .catch(() => {})
-
-    return
-  }
-
-  try {
-    const data = await studentLogin(acc, pwd)
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('userInfo', JSON.stringify(data.user))
-    localStorage.removeItem('isDemoMode')
-    store.login(data.user.name, 'student', false, false)
-    loading.value = false
-    router.push('/student/courses')
-  } catch (err: any) {
-    error.value = err?.message || '连接后端失败，请确认后端已启动'
-    loading.value = false
   }
 }
 </script>

@@ -1,7 +1,24 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
-import { getNow } from '@/lib/date'
-import { API_BASE, saveEvaluation as apiSaveEval, deleteEvaluation as apiDeleteEval, submitTeacherEval as apiSubmitEval, saveEvalConfig as apiSaveConfig, saveEvalReminders as apiSaveReminders, updateEvalReminder as apiUpdateReminder } from '@/api'
+import { getNow, getTodayStart, parseLocalDate } from '@/lib/date'
+import { buildCourseScheduleOccurrences } from '@/lib/schedule'
+import {
+  API_BASE,
+  fetchCourseEvaluationState,
+  fetchCourseGroups,
+  fetchCourseQualityEvaluations,
+  fetchEvalConfig,
+  saveEvaluation as apiSaveEval,
+  deleteEvaluation as apiDeleteEval,
+  submitTeacherEval as apiSubmitEval,
+  saveEvalConfig as apiSaveConfig,
+  saveCourseGroups as apiSaveCourseGroups,
+  saveEvalReminders as apiSaveReminders,
+  updateEvalReminder as apiUpdateReminder,
+  deleteCourse as apiDeleteCourse,
+  submitQualityEvaluation as apiSubmitQualityEvaluation,
+  scoreQualityEvaluation as apiScoreQualityEvaluation,
+} from '@/api'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
@@ -225,6 +242,8 @@ export const useAppStore = defineStore('app', () => {
   const projectWeightLocks = ref<Record<string, { midterm: boolean; final: boolean }>>(
     loadFromStorage<Record<string, { midterm: boolean; final: boolean }>>('projectWeightLocks', {})
   )
+  const courseGroupSyncInFlight = new Map<string, Promise<void>>()
+  const dirtyCourseGroupSyncs = new Set<string>()
 
   // 配置完成标记（权重配置 / 评价方案配置）
   const configCompleted = ref<Record<string, { weights: boolean; evalConfig: boolean }>>(
@@ -437,7 +456,7 @@ export const useAppStore = defineStore('app', () => {
       saveToStorage('teachers', teachers.value)
     }
     // 同步到数据库
-    fetch(`http://localhost:3000/api/courses/${id}`, { method: 'DELETE' }).catch(() => {})
+    apiDeleteCourse(id).catch(() => {})
   }
 
   function addCategory(category: Category) {
@@ -713,6 +732,78 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 评价系统 ======
 
+  async function syncCourseEvaluationState(courseId: string) {
+    if (!courseId) return
+
+    const [evaluationResult, configResult, groupsResult] = await Promise.allSettled([
+      fetchCourseEvaluationState(courseId),
+      fetchEvalConfig(courseId),
+      fetchCourseGroups(courseId),
+    ])
+
+    if (evaluationResult.status === 'fulfilled') {
+      const remoteEvaluations = Array.isArray(evaluationResult.value.evaluations)
+        ? evaluationResult.value.evaluations as Evaluation[]
+        : []
+      const remoteSubmittedKeys = Array.isArray(evaluationResult.value.teacherSubmittedEvals)
+        ? evaluationResult.value.teacherSubmittedEvals as string[]
+        : []
+
+      evaluations.value = [
+        ...evaluations.value.filter((evaluation) => evaluation.courseId !== courseId),
+        ...remoteEvaluations,
+      ]
+      teacherSubmittedEvals.value = [
+        ...teacherSubmittedEvals.value.filter((key) => !key.startsWith(`${courseId}||`)),
+        ...remoteSubmittedKeys,
+      ]
+
+      saveToStorage('evaluations', evaluations.value)
+      saveToStorage('teacherSubmittedEvals', teacherSubmittedEvals.value)
+    } else {
+      console.warn('同步课程评价失败，继续使用当前缓存:', evaluationResult.reason)
+    }
+
+    if (configResult.status === 'fulfilled') {
+      const remoteConfig = configResult.value.config as EvaluationConfig | null
+      evalConfigs.value = evalConfigs.value.filter((config) => config.courseId !== courseId)
+      if (remoteConfig) {
+        evalConfigs.value = [...evalConfigs.value, remoteConfig]
+      }
+      saveToStorage('evalConfigs', evalConfigs.value)
+    } else {
+      console.warn('同步课程评价配置失败，继续使用当前缓存:', configResult.reason)
+    }
+
+    if (groupsResult.status === 'fulfilled') {
+      const remoteGroups = Array.isArray(groupsResult.value.groups)
+        ? groupsResult.value.groups as StudentGroup[]
+        : []
+      replaceCourseGroups(courseId, remoteGroups)
+    } else {
+      console.warn('同步课程分组失败，继续使用当前缓存:', groupsResult.reason)
+    }
+  }
+
+  async function syncQualityEvaluationState(courseId: string) {
+    if (!courseId) return
+
+    try {
+      const result = await fetchCourseQualityEvaluations(courseId)
+      const remoteEvaluations = Array.isArray(result.evaluations)
+        ? result.evaluations as QualityEvaluation[]
+        : []
+
+      qualityEvaluations.value = [
+        ...qualityEvaluations.value.filter((evaluation) => evaluation.courseId !== courseId),
+        ...remoteEvaluations,
+      ]
+      saveToStorage('qualityEvaluations', qualityEvaluations.value)
+    } catch (error) {
+      console.warn('同步素质评价失败，继续使用当前缓存:', error)
+    }
+  }
+
   function addEvaluation(ev: Evaluation) {
     const course = courses.value.find(c => c.id === ev.courseId)
     if (course && course.status === 'inactive') {
@@ -755,14 +846,130 @@ export const useAppStore = defineStore('app', () => {
     apiSaveConfig(config).catch(() => {})
   }
 
-  function addStudentGroup(group: StudentGroup) {
-    studentGroups.value = [...studentGroups.value, group]
+  function normalizeStudentGroup(
+    group: Partial<StudentGroup>,
+    fallbackCourseId?: string,
+    fallbackId?: string,
+  ): StudentGroup {
+    return {
+      id: String(group.id || fallbackId || `grp-${fallbackCourseId || 'course'}-${Date.now()}`),
+      courseId: String(group.courseId || fallbackCourseId || ''),
+      name: String(group.name || '').trim(),
+      memberIds: Array.from(new Set(
+        Array.isArray(group.memberIds)
+          ? group.memberIds.map((memberId) => String(memberId)).filter(Boolean)
+          : [],
+      )),
+    }
+  }
+
+  function replaceCourseGroups(
+    courseId: string,
+    groups: Array<Partial<StudentGroup> & Pick<StudentGroup, 'name' | 'memberIds'>>,
+  ) {
+    const normalizedGroups = groups
+      .map((group, index) => normalizeStudentGroup(group, courseId, `grp-${courseId}-${Date.now()}-${index}`))
+      .filter((group) => !!group.courseId && !!group.name)
+
+    studentGroups.value = [
+      ...studentGroups.value.filter((group) => group.courseId !== courseId),
+      ...normalizedGroups,
+    ]
     saveToStorage('studentGroups', studentGroups.value)
+    return normalizedGroups
+  }
+
+  function getCourseGroupPayload(courseId: string) {
+    return studentGroups.value
+      .filter((group) => group.courseId === courseId)
+      .map((group) => normalizeStudentGroup(group, courseId, group.id))
+      .filter((group) => !!group.name)
+      .map((group) => ({
+        id: group.id,
+        name: group.name,
+        memberIds: group.memberIds,
+      }))
+  }
+
+  async function syncCourseGroupsToDatabase(courseId: string) {
+    if (!courseId) return
+
+    const runningTask = courseGroupSyncInFlight.get(courseId)
+    if (runningTask) {
+      dirtyCourseGroupSyncs.add(courseId)
+      return runningTask
+    }
+
+    const task = (async () => {
+      try {
+        do {
+          dirtyCourseGroupSyncs.delete(courseId)
+          const payload = getCourseGroupPayload(courseId)
+          const result = await apiSaveCourseGroups(courseId, payload)
+
+          if (!dirtyCourseGroupSyncs.has(courseId)) {
+            const remoteGroups = Array.isArray(result.groups)
+              ? result.groups as StudentGroup[]
+              : payload.map((group) => ({ ...group, courseId }))
+            replaceCourseGroups(courseId, remoteGroups)
+          }
+        } while (dirtyCourseGroupSyncs.has(courseId))
+      } catch (error) {
+        console.warn('同步课程分组失败，继续保留当前本地分组:', error)
+      } finally {
+        courseGroupSyncInFlight.delete(courseId)
+      }
+    })()
+
+    courseGroupSyncInFlight.set(courseId, task)
+    return task
+  }
+
+  function addStudentGroup(group: StudentGroup) {
+    const normalizedGroup = normalizeStudentGroup(group, group.courseId, group.id)
+    studentGroups.value = [...studentGroups.value, normalizedGroup]
+    saveToStorage('studentGroups', studentGroups.value)
+    void syncCourseGroupsToDatabase(normalizedGroup.courseId)
   }
 
   function addStudent(student: Student) {
     students.value = [...students.value, student]
     saveToStorage('students', students.value)
+  }
+
+  function addTeacher(teacher: Teacher) {
+    teachers.value = [...teachers.value, teacher]
+    saveToStorage('teachers', teachers.value)
+  }
+
+  function updateTeacher(id: string, data: Partial<Teacher>) {
+    const oldTeacher = teachers.value.find((teacher) => teacher.id === id)
+    teachers.value = teachers.value.map((teacher) => (teacher.id === id ? { ...teacher, ...data } : teacher))
+    saveToStorage('teachers', teachers.value)
+
+    if (oldTeacher && data.name && data.name !== oldTeacher.name) {
+      courses.value = courses.value.map((course) =>
+        course.teacher === oldTeacher.name ? { ...course, teacher: data.name as string } : course
+      )
+      schedules.value = schedules.value.map((schedule) =>
+        schedule.teacher === oldTeacher.name ? { ...schedule, teacher: data.name as string } : schedule
+      )
+      saveToStorage('courses', courses.value)
+      saveToStorage('schedules', schedules.value)
+
+      if (
+        currentUser.value === oldTeacher.name &&
+        (currentRole.value === 'teacher' || secondaryRoles.value.includes('teacher'))
+      ) {
+        currentUser.value = data.name
+        saveToStorage('currentUser', data.name)
+      }
+    }
+  }
+
+  function deleteTeacher(id: string) {
+    teachers.value = teachers.value.filter((teacher) => teacher.id !== id)
+    saveToStorage('teachers', teachers.value)
   }
 
   function updateStudent(id: string, data: Partial<Student>) {
@@ -776,13 +983,29 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function updateStudentGroup(id: string, data: Partial<StudentGroup>) {
-    studentGroups.value = studentGroups.value.map((g) => (g.id === id ? { ...g, ...data } : g))
+    const existingGroup = studentGroups.value.find((group) => group.id === id)
+    if (!existingGroup) return
+
+    const normalizedGroup = normalizeStudentGroup(
+      { ...existingGroup, ...data, id },
+      existingGroup.courseId,
+      id,
+    )
+
+    studentGroups.value = studentGroups.value.map((group) => (
+      group.id === id ? normalizedGroup : group
+    ))
     saveToStorage('studentGroups', studentGroups.value)
+    void syncCourseGroupsToDatabase(normalizedGroup.courseId)
   }
 
   function deleteStudentGroup(id: string) {
-    studentGroups.value = studentGroups.value.filter((g) => g.id !== id)
+    const existingGroup = studentGroups.value.find((group) => group.id === id)
+    if (!existingGroup) return
+
+    studentGroups.value = studentGroups.value.filter((group) => group.id !== id)
     saveToStorage('studentGroups', studentGroups.value)
+    void syncCourseGroupsToDatabase(existingGroup.courseId)
   }
 
   /** 获取某课程的分组列表 */
@@ -792,24 +1015,15 @@ export const useAppStore = defineStore('app', () => {
 
   /** 清空某课程所有分组 */
   function clearCourseGroups(courseId: string) {
-    studentGroups.value = studentGroups.value.filter((g) => g.courseId !== courseId)
+    studentGroups.value = studentGroups.value.filter((group) => group.courseId !== courseId)
     saveToStorage('studentGroups', studentGroups.value)
+    void syncCourseGroupsToDatabase(courseId)
   }
 
   /** 批量设置某课程的分组 */
   function setCourseGroups(courseId: string, groups: { name: string; memberIds: string[] }[]) {
-    // 先清空旧分组
-    studentGroups.value = studentGroups.value.filter((g) => g.courseId !== courseId)
-    // 添加新分组
-    groups.forEach((g, i) => {
-      studentGroups.value.push({
-        id: `grp-${courseId}-${Date.now()}-${i}`,
-        courseId,
-        name: g.name,
-        memberIds: g.memberIds,
-      })
-    })
-    saveToStorage('studentGroups', studentGroups.value)
+    replaceCourseGroups(courseId, groups)
+    void syncCourseGroupsToDatabase(courseId)
   }
 
   /** 随机分组：将某课程的学生随机分成 n 组 */
@@ -1008,6 +1222,170 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /** 获取某课程期中/期末项目占比的锁定状态 */
+  type ScheduleOccurrence = {
+    schedule: Schedule
+    start: Date
+    end: Date
+  }
+
+  const scheduleWeekdayMap: Record<string, number> = {
+    周日: 0,
+    星期日: 0,
+    周天: 0,
+    星期天: 0,
+    周一: 1,
+    星期一: 1,
+    周二: 2,
+    星期二: 2,
+    周三: 3,
+    星期三: 3,
+    周四: 4,
+    星期四: 4,
+    周五: 5,
+    星期五: 5,
+    周六: 6,
+    星期六: 6,
+  }
+
+  function parseClockTime(value: string): { hours: number; minutes: number } | null {
+    const match = String(value).trim().match(/^(\d{1,2}):(\d{2})$/)
+    if (!match) return null
+
+    const hours = Number(match[1])
+    const minutes = Number(match[2])
+    if (
+      Number.isNaN(hours) ||
+      Number.isNaN(minutes) ||
+      hours < 0 ||
+      hours > 23 ||
+      minutes < 0 ||
+      minutes > 59
+    ) {
+      return null
+    }
+
+    return { hours, minutes }
+  }
+
+  function applyClockTime(date: Date, value: string): Date | null {
+    const parsed = parseClockTime(value)
+    if (!parsed) return null
+
+    const result = new Date(date)
+    result.setHours(parsed.hours, parsed.minutes, 0, 0)
+    return result
+  }
+
+  function getWeekdayInSameWeek(anchor: Date, weekday: number): Date {
+    const result = new Date(anchor)
+    result.setHours(0, 0, 0, 0)
+
+    const mondayOffset = (result.getDay() + 6) % 7
+    result.setDate(result.getDate() - mondayOffset)
+
+    const targetOffset = weekday === 0 ? 6 : weekday - 1
+    result.setDate(result.getDate() + targetOffset)
+    return result
+  }
+
+  function normalizeDateOnly(date: Date): Date {
+    const result = new Date(date)
+    result.setHours(0, 0, 0, 0)
+    return result
+  }
+
+  function getFirstWeekdayOnOrAfter(anchor: Date, weekday: number): Date {
+    const result = getWeekdayInSameWeek(anchor, weekday)
+    if (result.getTime() < normalizeDateOnly(anchor).getTime()) {
+      result.setDate(result.getDate() + 7)
+    }
+    return result
+  }
+
+  function getLastWeekdayOnOrBefore(anchor: Date, weekday: number): Date {
+    const result = getWeekdayInSameWeek(anchor, weekday)
+    if (result.getTime() > normalizeDateOnly(anchor).getTime()) {
+      result.setDate(result.getDate() - 7)
+    }
+    return result
+  }
+
+  function getScheduleWeekday(schedule: Schedule): number | null {
+    const label = String(schedule.day ?? '').trim()
+    if (label && label in scheduleWeekdayMap) {
+      return scheduleWeekdayMap[label]
+    }
+
+    const startDate = parseLocalDate(schedule.startDate)
+    return startDate ? startDate.getDay() : null
+  }
+
+  function buildScheduleOccurrences(schedule: Schedule): ScheduleOccurrence[] {
+    const startBoundary = parseLocalDate(schedule.startDate)
+    const endBoundary = parseLocalDate(schedule.endDate) ?? startBoundary
+    const [startTime = '', endTime = ''] = String(schedule.timeSlot ?? '')
+      .split('-')
+      .map((part) => part.trim())
+
+    if (!startBoundary || !endBoundary || !startTime || !endTime) return []
+
+    const hasExplicitWeekday = Boolean(String(schedule.day ?? '').trim())
+    const weekday = getScheduleWeekday(schedule)
+    const dates: Date[] = []
+
+    if (hasExplicitWeekday && weekday !== null) {
+      const firstDate = getFirstWeekdayOnOrAfter(startBoundary, weekday)
+      const lastDate = getLastWeekdayOnOrBefore(endBoundary, weekday)
+      if (firstDate.getTime() > lastDate.getTime()) return []
+
+      for (
+        const cursor = new Date(firstDate);
+        cursor.getTime() <= lastDate.getTime();
+        cursor.setDate(cursor.getDate() + 7)
+      ) {
+        dates.push(new Date(cursor))
+      }
+    } else {
+      dates.push(new Date(startBoundary))
+    }
+
+    const occurrences: ScheduleOccurrence[] = []
+    for (const date of dates) {
+      const start = applyClockTime(date, startTime)
+      const end = applyClockTime(date, endTime)
+      if (!start || !end) continue
+
+      if (end.getTime() < start.getTime()) {
+        end.setDate(end.getDate() + 1)
+      }
+
+      occurrences.push({ schedule, start, end })
+    }
+
+    return occurrences
+  }
+
+  function getCourseScheduleOccurrences(courseId: string, className = ''): ScheduleOccurrence[] {
+    return buildCourseScheduleOccurrences(schedules.value, courseId, className)
+  }
+
+  function resolveStudentClassName(studentId: string, fallbackClassName = ''): string {
+    const normalizedFallback = String(fallbackClassName).trim()
+    if (normalizedFallback) return normalizedFallback
+
+    return String(
+      students.value.find((student) => student.id === studentId)?.className ?? '',
+    ).trim()
+  }
+
+  function formatDateOnly(date: Date): string {
+    return [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0'),
+    ].join('-')
+  }
+
   function getProjectWeightLock(courseId: string, section: 'midterm' | 'final'): boolean {
     return projectWeightLocks.value[courseId]?.[section] ?? false
   }
@@ -1043,8 +1421,15 @@ export const useAppStore = defineStore('app', () => {
   // ====== 评价轮次锁定与时机 ======
 
   /** 锁定某评价轮次（锁定后不可再修改评价） */
-  function lockSession(courseId: string, sessionNumber: number) {
-    const key = `${courseId}||${sessionNumber}`
+  function buildSessionKey(courseId: string, sessionNumber: number, className = ''): string {
+    const normalizedClassName = String(className).trim()
+    return normalizedClassName
+      ? `${courseId}||${normalizedClassName}||${sessionNumber}`
+      : `${courseId}||${sessionNumber}`
+  }
+
+  function lockSession(courseId: string, sessionNumber: number, className = '') {
+    const key = buildSessionKey(courseId, sessionNumber, className)
     if (!lockedSessions.value.includes(key)) {
       lockedSessions.value = [...lockedSessions.value, key]
       saveToStorage('lockedSessions', lockedSessions.value)
@@ -1052,26 +1437,28 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /** 检查某评价轮次是否已锁定 */
-  function isSessionLocked(courseId: string, sessionNumber: number): boolean {
-    return lockedSessions.value.includes(`${courseId}||${sessionNumber}`)
+  function isSessionLocked(courseId: string, sessionNumber: number, className = ''): boolean {
+    return lockedSessions.value.includes(buildSessionKey(courseId, sessionNumber, className))
   }
 
   /**
    * 获取某评价轮次对应的课次索引范围
    * 将课程所有课次按总评价次数均分
    */
-  function getSessionScheduleRangeIndex(courseId: string, sessionNumber: number, totalSessions: number): { startIdx: number; endIdx: number } | null {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+  function getSessionScheduleRangeIndex(
+    courseId: string,
+    sessionNumber: number,
+    totalSessions: number,
+    className = '',
+  ): { startIdx: number; endIdx: number } | null {
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length === 0 || totalSessions <= 0) return null
 
-    if (courseSchedules.length === 0) return null
-
-    const perSession = Math.ceil(courseSchedules.length / totalSessions)
+    const perSession = Math.ceil(occurrences.length / totalSessions)
     const startIdx = (sessionNumber - 1) * perSession
-    const endIdx = Math.min(sessionNumber * perSession - 1, courseSchedules.length - 1)
+    const endIdx = Math.min(sessionNumber * perSession - 1, occurrences.length - 1)
 
-    if (startIdx >= courseSchedules.length) return null
+    if (startIdx >= occurrences.length) return null
 
     return { startIdx, endIdx }
   }
@@ -1080,16 +1467,29 @@ export const useAppStore = defineStore('app', () => {
    * 获取某评价轮次对应的课次结束日期
    * 将课程的所有课次按总评价次数均分后，取对应轮次的最后一节课结束时间
    */
-  function getSessionEndDate(courseId: string, sessionNumber: number): Date | null {
-    const totalSessions = getEvalSessions(courseId)
-    const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions)
+  function getSessionEndDate(courseId: string, sessionNumber: number, className = ''): Date | null {
+    const totalSessions = getEvalSessions(courseId, className)
+    const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions, className)
     if (!range) return null
 
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    return occurrences[range.endIdx]?.end ?? null
+  }
 
-    return new Date(courseSchedules[range.endIdx].endDate)
+  function getCourseEndDate(courseId: string, className = ''): Date | null {
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length > 0) {
+      return occurrences[occurrences.length - 1].end
+    }
+
+    const course = courses.value.find((item) => item.id === courseId)
+    return parseLocalDate(course?.endDate)
+  }
+
+  function isCourseEnded(courseId: string, className = ''): boolean {
+    const endDate = getCourseEndDate(courseId, className)
+    if (!endDate) return false
+    return getNow().getTime() >= endDate.getTime()
   }
 
   /**
@@ -1097,44 +1497,38 @@ export const useAppStore = defineStore('app', () => {
    * 第1次评价从第一节课上课就开启
    * 第k次评价从该轮次对应第一节课上课时开启
    */
-  function isSessionTime(courseId: string, sessionNumber: number): boolean {
-    const totalSessions = getEvalSessions(courseId)
+  function isSessionTime(courseId: string, sessionNumber: number, className = ''): boolean {
+    const totalSessions = getEvalSessions(courseId, className)
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
 
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    if (courseSchedules.length === 0) return true
+    if (occurrences.length === 0) return true
 
     // 第1次评价从第一节课上课就开启
     if (sessionNumber === 1) {
-      return getNow() >= new Date(courseSchedules[0].startDate)
+      return getNow() >= occurrences[0].start
     }
 
     // 其他轮次：从对应轮次第一节课上课开始
-    const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions)
+    const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions, className)
     // 无对应排课（幻影场次）→ 永不开启，避免提前锁定真实场次
     if (!range) return false
-    return getNow() >= new Date(courseSchedules[range.startIdx].startDate)
+    return getNow() >= occurrences[range.startIdx].start
   }
 
   /**
    * 判断最终评价轮次是否已过截止期
    * 最终评价截止时间为该轮次开启后第三天
    */
-  function isFinalSessionDeadlinePassed(courseId: string, totalSessions: number): boolean {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    if (courseSchedules.length === 0) return false
+  function isFinalSessionDeadlinePassed(courseId: string, totalSessions: number, className = ''): boolean {
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length === 0) return false
 
     // 最终评价轮次的第一节课开始时间
-    const range = getSessionScheduleRangeIndex(courseId, totalSessions, totalSessions)
+    const range = getSessionScheduleRangeIndex(courseId, totalSessions, totalSessions, className)
     if (!range) return false
 
     // 最终评价截止时间：评价开启时间 + 3天
-    const deadline = new Date(courseSchedules[range.startIdx].startDate)
+    const deadline = new Date(occurrences[range.startIdx].start)
     deadline.setDate(deadline.getDate() + 3)
     return getNow() > deadline
   }
@@ -1143,12 +1537,12 @@ export const useAppStore = defineStore('app', () => {
    * 自动锁定所有历史轮次并处理逾期
    * 当第 N 次评价开启时，第 1 ~ N-1 次及之前的评价自动锁定
    */
-  function autoLockPreviousSession(courseId: string, currentSession: number) {
+  function autoLockPreviousSession(courseId: string, currentSession: number, className = '') {
     for (let s = 1; s < currentSession; s++) {
-      if (!isSessionLocked(courseId, s)) {
-        processSessionOverdue(courseId, s)
+      if (!isSessionLocked(courseId, s, className)) {
+        processSessionOverdue(courseId, s, className)
         markSessionEvalRemindersCompleted(courseId, s)
-        lockSession(courseId, s)
+        lockSession(courseId, s, className)
       }
     }
   }
@@ -1187,21 +1581,22 @@ export const useAppStore = defineStore('app', () => {
    * - 最终轮次：最后一节课结束时间
    * - 非最终轮次：该轮次对应最后一节课结束时间
    */
-  function getSessionDeadline(courseId: string, sessionNumber: number, totalSessions: number): string {
+  function getSessionDeadline(courseId: string, sessionNumber: number, totalSessions: number, className = ''): string {
     const courseSchedules = schedules.value
       .filter((s) => s.courseId === courseId)
       .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
 
-    if (courseSchedules.length === 0) return ''
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length === 0) return ''
 
     if (sessionNumber >= totalSessions) {
       // 最终轮次：最后一节课结束时间后第三天
-      const lastEnd = new Date(courseSchedules[courseSchedules.length - 1].endDate)
+      const lastEnd = new Date(occurrences[occurrences.length - 1].end)
       lastEnd.setDate(lastEnd.getDate() + 3)
       return lastEnd.toISOString().split('T')[0]
     }
     // 非最终轮次：该轮次最后一节课结束时间
-    const end = getSessionEndDate(courseId, sessionNumber)
+    const end = getSessionEndDate(courseId, sessionNumber, className)
     if (end) return end.toISOString().split('T')[0]
     return ''
   }
@@ -1210,13 +1605,13 @@ export const useAppStore = defineStore('app', () => {
    * 当某评价轮次可开始评价时，生成待办提醒（教师端和学生端）
    * 含截止日期计算
    */
-  function generateSessionReminders(courseId: string, sessionNumber: number) {
+  function generateSessionReminders(courseId: string, sessionNumber: number, className = '') {
     const course = courses.value.find((c) => c.id === courseId)
     const config = evalConfigs.value.find((c) => c.courseId === courseId)
     if (!course || !config) return
 
-    const totalSessions = getEvalSessions(courseId)
-    const deadline = getSessionDeadline(courseId, sessionNumber, totalSessions)
+    const totalSessions = getEvalSessions(courseId, className)
+    const deadline = getSessionDeadline(courseId, sessionNumber, totalSessions, className)
     const enabledTypes = TEMPLATE_EVAL_TYPES[config.template] || ['self', 'teacher']
     const courseEnrollments = enrollments.value.filter(
       (e) => e.courseId === courseId && e.status !== 'dropped'
@@ -1648,44 +2043,49 @@ export const useAppStore = defineStore('app', () => {
   // ====== 素质评价操作 ======
 
   /** 学生提交素质评价（追加一条提交记录，保留历史提交） */
-  function submitQualityEvaluation(data: { courseId: string; studentId: string; files: QualityEvalFile[]; description?: string }) {
-    const submission: QualityEvalSubmission = {
-      id: `qes-${Date.now()}`,
-      files: data.files,
-      description: data.description,
-      submittedAt: getNow().toISOString().split('T')[0],
+  async function submitQualityEvaluation(data: {
+    courseId: string
+    studentId: string
+    files: QualityEvalFile[]
+    description?: string
+  }) {
+    const result = await apiSubmitQualityEvaluation(data)
+    const remoteEvaluation = result.evaluation as QualityEvaluation | null
+    if (!remoteEvaluation) {
+      throw new Error('服务器未返回素质评价提交记录')
     }
-    const existing = qualityEvaluations.value.find(
-      (q) => q.courseId === data.courseId && q.studentId === data.studentId
-    )
-    if (existing) {
-      qualityEvaluations.value = qualityEvaluations.value.map((q) =>
-        q.id === existing.id ? { ...q, submissions: [...q.submissions, submission] } : q
-      )
-    } else {
-      qualityEvaluations.value = [
-        ...qualityEvaluations.value,
-        { id: `qe-${Date.now()}`, courseId: data.courseId, studentId: data.studentId, submissions: [submission] },
-      ]
-    }
+
+    qualityEvaluations.value = [
+      ...qualityEvaluations.value.filter(
+        (evaluation) => evaluation.id !== remoteEvaluation.id,
+      ),
+      remoteEvaluation,
+    ]
     saveToStorage('qualityEvaluations', qualityEvaluations.value)
+    return remoteEvaluation
   }
 
   /** 教师对某次提交评分 */
-  function scoreQualityEvaluation(id: string, submissionId: string, score: number, comment?: string) {
-    qualityEvaluations.value = qualityEvaluations.value.map((q) =>
-      q.id === id
-        ? {
-            ...q,
-            submissions: q.submissions.map((s) =>
-              s.id === submissionId
-                ? { ...s, score, teacherComment: comment || s.teacherComment, gradedAt: getNow().toISOString().split('T')[0] }
-                : s
-            ),
-          }
-        : q
-    )
+  async function scoreQualityEvaluation(id: string, submissionId: string, score: number, comment?: string) {
+    const result = await apiScoreQualityEvaluation({
+      evaluationId: id,
+      submissionId,
+      score,
+      teacherComment: comment,
+    })
+    const remoteEvaluation = result.evaluation as QualityEvaluation | null
+    if (!remoteEvaluation) {
+      throw new Error('服务器未返回评分结果')
+    }
+
+    qualityEvaluations.value = [
+      ...qualityEvaluations.value.filter(
+        (evaluation) => evaluation.id !== remoteEvaluation.id,
+      ),
+      remoteEvaluation,
+    ]
     saveToStorage('qualityEvaluations', qualityEvaluations.value)
+    return remoteEvaluation
   }
 
   /** 获取某课程所有素质评价 */
@@ -1726,51 +2126,61 @@ export const useAppStore = defineStore('app', () => {
   // ====== 配置提醒 ======
 
   /** 第一节课是否已经开始（配置锁定期） */
-  function isFirstClassStarted(courseId: string): boolean {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    if (courseSchedules.length === 0) return false
-    return getNow() >= new Date(courseSchedules[0].endDate)
+  function isFirstClassStarted(courseId: string, className = ''): boolean {
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length === 0) return false
+    return getNow().getTime() >= occurrences[0].end.getTime()
   }
 
   /** 第二节课是否已经开始（AI 分层测试截止点） */
-  function isSecondClassStarted(courseId: string): boolean {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    // 有至少两节课才判定第二节课开始
-    if (courseSchedules.length < 2) return false
-    return getNow() >= new Date(courseSchedules[1].startDate)
+  function isSecondClassStarted(courseId: string, className = ''): boolean {
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length < 2) return false
+    return getNow().getTime() >= occurrences[1].start.getTime()
   }
 
   /** 获取某学生所有未完成的 AI 分层测试（测试窗口已开但未超时） */
   function getPendingAITierTests(studentId: string): { courseId: string; courseTitle: string; deadline: string }[] {
     const result: { courseId: string; courseTitle: string; deadline: string }[] = []
     const myEnrollments = enrollments.value.filter((e) => e.studentId === studentId)
+    const className = resolveStudentClassName(studentId)
+    const now = getNow().getTime()
+
     for (const enr of myEnrollments) {
       const course = courses.value.find((c) => c.id === enr.courseId)
       if (!course || course.status !== 'active') continue
+
       const tierKey = `${enr.courseId}||${studentId}`
-      if (studentTiers.value[tierKey]) continue // 已测试
-      if (!isFirstClassStarted(enr.courseId)) continue // 第一节课未结束
-      if (isSecondClassStarted(enr.courseId)) continue // 第二节课已开始（已超时）
-      // 计算截止日：第二节的 endDate
-      const courseSchedules = schedules.value
-        .filter((s) => s.courseId === enr.courseId)
-        .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-      const deadline = courseSchedules.length >= 2 ? courseSchedules[1].startDate : ''
-      result.push({ courseId: enr.courseId, courseTitle: course.title, deadline })
+      if (studentTiers.value[tierKey]) continue
+
+      const occurrences = getCourseScheduleOccurrences(enr.courseId, className)
+      if (occurrences.length < 2) continue
+      if (now < occurrences[0].end.getTime()) continue
+      if (now >= occurrences[1].start.getTime()) continue
+
+      result.push({
+        courseId: enr.courseId,
+        courseTitle: course.title,
+        deadline: formatDateOnly(occurrences[1].start),
+      })
     }
+
     return result
   }
 
-  /** 逾期未测自动分配到基础层 */
-  function autoAssignOverdueBasicTier(courseId: string, studentId: string) {
+  /** 间隔到第二节课后自动分配基础层 */
+  function autoAssignOverdueBasicTier(courseId: string, studentId: string, fallbackClassName = '') {
     const key = `${courseId}||${studentId}`
-    if (studentTiers.value[key]) return // 已有记录，跳过
-    if (!isFirstClassStarted(courseId)) return // 第一节课未结束
-    if (!isSecondClassStarted(courseId)) return // 第二节课还未开始，未逾期
+    const className = resolveStudentClassName(studentId, fallbackClassName)
+    if (studentTiers.value[key]) return
+
+    const occurrences = getCourseScheduleOccurrences(courseId, className)
+    if (occurrences.length < 2) return
+
+    const now = getNow().getTime()
+    if (now < occurrences[0].end.getTime()) return
+    if (now < occurrences[1].start.getTime()) return
+
     const record: StudentTierRecord = {
       courseId,
       studentId,
@@ -1781,8 +2191,6 @@ export const useAppStore = defineStore('app', () => {
     studentTiers.value = { ...studentTiers.value, [key]: record }
     saveToStorage('studentTiers', studentTiers.value)
   }
-
-  /** 标记某课程的某项配置已完成 */
   function markConfigCompleted(courseId: string, type: 'weights' | 'evalConfig') {
     configCompleted.value = {
       ...configCompleted.value,
@@ -2259,8 +2667,8 @@ export const useAppStore = defineStore('app', () => {
     submitHomework, getHomeworkSubmission,
     setStudentHomeworkSummaries, getStudentHomeworkSummaries, getPendingStudentHomeworkTasks,
     findStudentHomeworkSummary, syncStudentHomeworkTodos,
-    addEvaluation, updateEvaluation, deleteEvaluation,
-    setEvalConfig, addStudentGroup, addStudent, updateStudent, deleteStudent, updateStudentGroup, deleteStudentGroup,
+    syncCourseEvaluationState, syncQualityEvaluationState, addEvaluation, updateEvaluation, deleteEvaluation,
+    setEvalConfig, addStudentGroup, addStudent, addTeacher, updateTeacher, deleteTeacher, updateStudent, deleteStudent, updateStudentGroup, deleteStudentGroup,
     getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
     detectAnomalies, getEvalSessions, hasGroups,
     submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
@@ -2268,7 +2676,7 @@ export const useAppStore = defineStore('app', () => {
     setExamWeight, getExamWeight, getExamWeightsForCourse,
     getProjectWeightLock, setProjectWeightLock,
     hasFinalExamSubmitted, isEvalConfigEditable, isWeightConfigEditable,
-    lockSession, isSessionLocked, getSessionScheduleRangeIndex, getSessionEndDate, isSessionTime, isFinalSessionDeadlinePassed, autoLockPreviousSession, autoLockExpiredSessions,
+    lockSession, isSessionLocked, getSessionScheduleRangeIndex, getSessionEndDate, isCourseEnded, isSessionTime, isFinalSessionDeadlinePassed, autoLockPreviousSession, autoLockExpiredSessions,
     generateSessionReminders, checkAndGenerateSessionReminders, getSessionDeadline, checkAndMarkOverdueReminders,
     generateAutoTodos, generateEvalReminders, pushNearDeadlineEvalReminders, processSessionOverdue,
     markEvalReminderCompleted, markSessionEvalRemindersCompleted,
