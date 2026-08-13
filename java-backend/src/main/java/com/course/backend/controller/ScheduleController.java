@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -80,5 +81,24 @@ public class ScheduleController {
     public Result<Void> deleteSchedule(@PathVariable String id) {
         scheduleService.removeById(id);
         return Result.ok();
+    }
+
+    /**
+     * POST /api/schedules/bulk  批量新建排课（循环单条保存）
+     * body: [ { courseId, title?, day?, class_name?, startDate?, endDate?, timeSlot?, room?, teacher?, mentor? }, ... ]
+     */
+    @PostMapping("/bulk")
+    public Result<List<Schedule>> addSchedulesBulk(@RequestBody List<Schedule> schedules) {
+        List<Schedule> saved = new ArrayList<>();
+        long base = System.currentTimeMillis();
+        for (int i = 0; i < schedules.size(); i++) {
+            Schedule s = schedules.get(i);
+            if (!StringUtils.hasText(s.getId())) {
+                s.setId("sch-" + base + "-" + i);
+            }
+            scheduleService.save(s);
+            saved.add(s);
+        }
+        return Result.ok(saved);
     }
 }
