@@ -11,7 +11,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { department } = req.query;
-    let sql = 'SELECT * FROM courses';
+    let sql = 'SELECT * FROM course';
     const params = [];
 
     if (department) {
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
 router.get('/teacher/:name', async (req, res) => {
   try {
     const { department } = req.query;
-    let sql = 'SELECT * FROM courses WHERE (teacher = ? OR mentor = ?)';
+    let sql = 'SELECT * FROM course WHERE (teacher = ? OR mentor = ?)';
     const params = [req.params.name, req.params.name];
 
     if (department) {
@@ -57,7 +57,7 @@ router.get('/:id/students', async (req, res) => {
   try {
     // 1. 找该课程的所有排课，提取班级名
     const [schedules] = await pool.execute(
-      'SELECT DISTINCT class_name FROM schedules WHERE course_id = ? AND class_name IS NOT NULL',
+      'SELECT DISTINCT class_name FROM schedule WHERE course_id = ? AND class_name IS NOT NULL',
       [req.params.id]
     );
 
@@ -70,7 +70,7 @@ router.get('/:id/students', async (req, res) => {
     // 2. 找这些班级的学生
     const placeholders = classNames.map(() => '?').join(',');
     const [students] = await pool.execute(
-      `SELECT id, student_id, name, phone, email, class_name, status FROM students WHERE class_name IN (${placeholders}) ORDER BY name`,
+      `SELECT id, student_id, name, phone, email, class_name, status FROM student WHERE class_name IN (${placeholders}) ORDER BY name`,
       classNames
     );
 
@@ -95,7 +95,7 @@ router.get('/:id/students', async (req, res) => {
 router.get('/department/:dept', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT * FROM courses WHERE department = ? ORDER BY status DESC, title',
+      'SELECT * FROM course WHERE department = ? ORDER BY status DESC, title',
       [req.params.dept]
     );
     res.json({ success: true, courses: rows });
@@ -107,9 +107,9 @@ router.get('/department/:dept', async (req, res) => {
 /** DELETE /api/courses/:id - 删除课程 */
 router.delete('/:id', async (req, res) => {
   try {
-    await pool.execute('DELETE FROM courses WHERE id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM course WHERE id = ?', [req.params.id]);
     // 同时删除相关排课
-    await pool.execute('DELETE FROM schedules WHERE course_id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM schedule WHERE course_id = ?', [req.params.id]);
     res.json({ success: true, message: '删除成功' });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });

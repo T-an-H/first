@@ -8,6 +8,7 @@ import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
 import { getNow } from '@/lib/date'
+import { CAREERS } from '@/data/careers'
 
 const store = useAppStore()
 const student = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
@@ -315,63 +316,87 @@ function drawRadarChart(
 
 const showDetailModal = ref(false)
 
+// ====== 职业分析：期末成绩取最高的 6 门课程，与 1000 职业对照表比对，取重叠最大的 3 个职业 ======
+
+/** 系统课程名 → 职业表课程名 映射（将系统课程与职业要求课程对齐） */
+const COURSE_NAME_MAP: Record<string, string[]> = {
+  'React前端开发实战': ['React', 'HTML', 'CSS', 'JavaScript', 'Web前端开发', '前端开发'],
+  'Vue3组件化开发': ['Vue框架', 'Web前端开发', '前端开发', 'JavaScript'],
+  'Python数据分析': ['Python数据分析', 'Python', '数据分析', '统计学', '数据可视化基础'],
+  'Java企业级应用': ['Java程序设计', '微服务架构', '数据库原理', '软件工程'],
+  '数据结构与算法': ['数据结构', '算法分析', '算法设计'],
+  '前端工程化': ['Web前端开发', 'JavaScript', '前端开发', '软件工程'],
+  'TypeScript进阶': ['程序设计基础', '编程基础'],
+  '移动端开发': ['移动软件开发', '移动应用开发'],
+  '微服务架构': ['微服务架构', '软件工程', '分布式系统'],
+  '数据库原理与应用': ['数据库原理', '数据库系统', '数据库应用', '数据库基础', '数据库'],
+}
+
+/** 将系统课程标题映射为职业表中的课程名（显式映射优先，无映射时按名称包含关系兜底） */
+function mapCourseToCareerNames(title: string): string[] {
+  if (COURSE_NAME_MAP[title]) return COURSE_NAME_MAP[title]
+  const matched: string[] = []
+  for (const c of CAREERS) {
+    for (const cn of c.courses) {
+      if (cn.length >= 2 && (title.includes(cn) || cn.includes(title))) {
+        if (!matched.includes(cn)) matched.push(cn)
+      }
+    }
+  }
+  return matched
+}
+
+/** 学生期末成绩最高的 6 门课程（期末笔试/期末项目取最高分，未出分的课程不计入） */
+const finalTopCourses = computed(() => {
+  if (!student.value) return []
+  const courseScores: { title: string; score: number }[] = []
+  for (const enr of myEnrollments.value) {
+    const course = getCourse(enr.courseId)
+    if (!course) continue
+    const dg = store.detailedGrades.find((d) => d.studentId === student.value!.id && d.courseId === enr.courseId)
+    if (!dg) continue
+    const finalScore = Math.max(dg.finalExamScore ?? 0, dg.finalProjectScore ?? 0)
+    if (finalScore <= 0) continue
+    courseScores.push({ title: course.title, score: Math.round(finalScore) })
+  }
+  return courseScores.sort((a, b) => b.score - a.score).slice(0, 6)
+})
+
 const careerRecommendations = computed(() => {
-  if (radarData.value.length === 0) return []
+  const top6 = finalTopCourses.value
+  if (top6.length === 0) return []
 
-  const scores: Record<string, number> = {}
-  radarData.value.forEach((d) => {
-    scores[d.label] = d.value
+  // 将最高的 6 门系统课程映射为职业表课程名集合
+  const owned: Set<string> = new Set()
+  const courseOwnedMap: { courseTitle: string; matched: string[] }[] = []
+  for (const cs of top6) {
+    const matched = mapCourseToCareerNames(cs.title)
+    matched.forEach((m) => owned.add(m))
+    courseOwnedMap.push({ courseTitle: cs.title, matched })
+  }
+
+  // 逐职业计算重叠度（命中课程数），按重叠度降序、覆盖率降序取前 3
+  const scored = CAREERS.map((c, idx) => {
+    const overlap = c.courses.filter((cn) => owned.has(cn)).length
+    return { career: c, overlap, coverage: c.courses.length > 0 ? overlap / c.courses.length : 0, idx }
   })
+    .filter((s) => s.overlap > 0)
+    .sort((a, b) => b.overlap - a.overlap || b.coverage - a.coverage || a.idx - b.idx)
+    .slice(0, 3)
 
-  const aiScore = scores['AI 生成式应用开发'] || 0
-  const vizScore = scores['数据可视化与商业分析'] || 0
-  const frontendScore = scores['React 前端开发实战'] || 0
-  const tsScore = scores['TypeScript 高级编程'] || 0
-  const commScore = scores['高效沟通与表达训练'] || 0
-
-  const recommendations: { title: string; description: string; tags: string[]; matchScore: number; icon: string }[] = []
-
-  if (aiScore >= 80) {
-    recommendations.push({
-      title: 'AI 应用开发工程师',
-      description: '利用AI技术构建智能化应用，将大语言模型能力融入产品，是当前最热门的职业方向之一。',
-      tags: ['AI', '大模型', '应用开发', '创新'],
-      matchScore: Math.round((aiScore * 0.6 + frontendScore * 0.2 + tsScore * 0.2)),
-      icon: 'sparkles'
-    })
-  }
-
-  if (vizScore >= 75) {
-    recommendations.push({
-      title: '数据可视化工程师',
-      description: '将复杂数据转化为直观的可视化图表，帮助企业洞察业务趋势，支持数据驱动决策。',
-      tags: ['数据可视化', '图表', 'BI', '分析'],
-      matchScore: Math.round((vizScore * 0.5 + frontendScore * 0.3 + commScore * 0.2)),
-      icon: 'lineChart'
-    })
-  }
-
-  if (frontendScore >= 75) {
-    recommendations.push({
-      title: '前端开发工程师',
-      description: '负责构建用户界面和交互体验，结合React、TypeScript等现代技术栈打造高质量Web应用。',
-      tags: ['React', 'TypeScript', 'UI', '交互'],
-      matchScore: Math.round((frontendScore * 0.5 + tsScore * 0.3 + vizScore * 0.2)),
-      icon: 'cpu'
-    })
-  }
-
-  if (aiScore >= 70 && frontendScore >= 70) {
-    recommendations.push({
-      title: '全栈AI开发工程师',
-      description: '兼具前端开发与AI技术能力，能够独立完成从界面到智能功能的完整项目开发。',
-      tags: ['全栈', 'AI', '前端', '后端'],
-      matchScore: Math.round((aiScore * 0.35 + frontendScore * 0.35 + tsScore * 0.3)),
-      icon: 'sparkles'
-    })
-  }
-
-  return recommendations.sort((a, b) => b.matchScore - a.matchScore).slice(0, 3)
+  return scored.map((s) => {
+    const hitCourses = s.career.courses.filter((cn) => owned.has(cn))
+    const hitCourseTitles = courseOwnedMap
+      .filter((cm) => cm.matched.some((m) => hitCourses.includes(m)))
+      .map((cm) => cm.courseTitle)
+    return {
+      title: s.career.name,
+      description: `属于「${s.career.category}」，与您的${hitCourseTitles.join('、')}课程高度匹配。`,
+      tags: hitCourses,
+      matchScore: Math.round((s.overlap / 6) * 100),
+      icon: 'briefcase',
+    }
+  })
 })
 
 const abilityAnalysis = computed(() => {
@@ -522,6 +547,48 @@ function renderProfile(root: HTMLElement) {
     qualityRadarCard.append('div').attr('class', 'text-center py-8')
       .append('p').attr('class', 'text-gray-400').text('暂无素质评价数据')
     qualityRadarCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成素质评价打分后将生成雷达图')
+  }
+
+  // 职业分析板块：期末成绩最高 6 门课程 + 与 1000 职业表匹配的 3 个推荐职业
+  const top6 = finalTopCourses.value
+  const recs2 = careerRecommendations.value
+  const careerCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-indigo-400/20 shadow-sm')
+  const careerTitle = careerCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
+  renderIcon(careerTitle, 'briefcase').attr('class', 'w-5 h-5 text-indigo-600')
+  careerTitle.append('span').text('职业分析')
+
+  if (top6.length === 0) {
+    careerCard.append('p').attr('class', 'text-gray-400 text-center py-8').text('暂无期末成绩数据')
+    careerCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1')
+      .text('期末成绩发布后，系统将自动取成绩最高的 6 门课程，与 1000 个职业对照匹配，推荐最契合的 3 个职业')
+  } else {
+    // 最高的 6 门课程
+    careerCard.append('p').attr('class', 'text-sm font-medium text-gray-700 mb-2')
+      .text(`期末成绩最高的 ${top6.length} 门课程`)
+    const chipRow = careerCard.append('div').attr('class', 'flex flex-wrap gap-2 mb-5')
+    top6.forEach((t) => {
+      const chip = chipRow.append('span').attr('class', 'px-2.5 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200')
+      chip.append('span').text(t.title)
+      chip.append('span').attr('class', 'ml-1 font-bold').text(`${t.score}分`)
+    })
+    // 推荐职业
+    if (recs2.length > 0) {
+      careerCard.append('p').attr('class', 'text-sm font-medium text-gray-700 mb-2').text('为您推荐的职业匹配')
+      recs2.forEach((rec) => {
+        const card = careerCard.append('div').attr('class', 'p-4 bg-gradient-to-br from-indigo-400/5 to-indigo-400/10 rounded-lg')
+        const header = card.append('div').attr('class', 'flex items-center gap-2 mb-2')
+        renderIcon(header, rec.icon as any).attr('class', 'w-5 h-5 text-indigo-600')
+        header.append('span').attr('class', 'font-semibold text-gray-900').text(rec.title)
+        header.append('span').attr('class', 'ml-auto text-sm font-bold text-indigo-600').text(`${rec.matchScore}%`)
+        card.append('p').attr('class', 'text-sm text-gray-600 mb-3').text(rec.description)
+        const tagRow = card.append('div').attr('class', 'flex flex-wrap gap-1')
+        rec.tags.forEach((tag) => {
+          tagRow.append('span').attr('class', 'px-2 py-1 text-xs bg-indigo-600/15 text-gray-800 rounded-full').text(tag)
+        })
+      })
+    } else {
+      careerCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('暂未找到与您课程高度匹配的职业')
+    }
   }
 
   // 增值评价板块
@@ -801,7 +868,7 @@ function renderProfile(root: HTMLElement) {
         })
       })
     } else {
-      careerList.append('div').attr('class', 'text-gray-400 text-center py-8').text('完成课程评价后，系统将生成职业推荐')
+      careerList.append('div').attr('class', 'text-gray-400 text-center py-8').text('暂无期末成绩，发布后系统将自动生成职业推荐')
     }
   }
 }

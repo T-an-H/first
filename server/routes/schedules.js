@@ -26,7 +26,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { class: className } = req.query;
-    let sql = 'SELECT id, course_id, title, teacher, room, class_name, start_date, end_date, time_slot FROM schedules';
+    let sql = 'SELECT id, course_id, title, teacher, room, class_name, start_date, end_date, time_slot FROM schedule';
     const params = [];
 
     if (className) {
@@ -83,14 +83,14 @@ router.post('/bulk', async (req, res) => {
       // 检查是否重复（同课程名称+同日期+同时段+同教室）
       const lookupId = s.courseId || s.title;
       const [existing] = await pool.execute(
-        'SELECT id FROM schedules WHERE (course_id = ? AND start_date = ? AND time_slot = ? AND room = ?)',
+        'SELECT id FROM schedule WHERE (course_id = ? AND start_date = ? AND time_slot = ? AND room = ?)',
         [lookupId, s.startDate, s.timeSlot, s.room]
       );
 
       if (existing.length > 0) {
         // 重复则更新信息（教师、班级等可能变化）
         await pool.execute(
-          'UPDATE schedules SET teacher = ?, class_name = ?, end_date = ? WHERE id = ?',
+          'UPDATE schedule SET teacher = ?, class_name = ?, end_date = ? WHERE id = ?',
           [s.teacher || '', s.className || null, s.endDate || s.startDate, existing[0].id]
         );
         updated++;
@@ -98,7 +98,7 @@ router.post('/bulk', async (req, res) => {
       }
 
       await pool.execute(
-        'INSERT INTO schedules (course_id, title, teacher, room, class_name, start_date, end_date, time_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO schedule (course_id, title, teacher, room, class_name, start_date, end_date, time_slot) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [
           lookupId,
           s.title,
@@ -113,10 +113,10 @@ router.post('/bulk', async (req, res) => {
 
       // 自动创建课程（如果不存在）
       try {
-        const [courseExist] = await pool.execute('SELECT id FROM courses WHERE id = ? OR title = ?', [lookupId, s.title]);
+        const [courseExist] = await pool.execute('SELECT id FROM course WHERE id = ? OR title = ?', [lookupId, s.title]);
         if (courseExist.length === 0) {
           await pool.execute(
-            'INSERT INTO courses (id, title, teacher, department, status) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO course (id, title, teacher, department, status) VALUES (?, ?, ?, ?, ?)',
             [lookupId, s.title, s.teacher || '', s.department || null, 'active']
           );
         }
@@ -145,7 +145,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { title, teacher, room, className, startDate, endDate, timeSlot } = req.body;
     await pool.execute(
-      'UPDATE schedules SET title = ?, teacher = ?, room = ?, class_name = ?, start_date = ?, end_date = ?, time_slot = ? WHERE id = ?',
+      'UPDATE schedule SET title = ?, teacher = ?, room = ?, class_name = ?, start_date = ?, end_date = ?, time_slot = ? WHERE id = ?',
       [title, teacher, room, className || null, startDate, endDate || startDate, timeSlot, id]
     );
     res.json({ success: true, message: '更新成功' });
@@ -161,7 +161,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    await pool.execute('DELETE FROM schedules WHERE id = ?', [id]);
+    await pool.execute('DELETE FROM schedule WHERE id = ?', [id]);
     res.json({ success: true, message: '删除成功' });
   } catch (error) {
     console.error('删除排课失败:', error);
