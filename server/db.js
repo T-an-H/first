@@ -10,8 +10,8 @@ const pool = mysql.createPool({
   host: 'localhost',      // 数据库地址
   port: 3306,             // MySQL 端口
   user: 'root',           // 数据库用户名
-  password: '88888888Lzh', // 数据库密码 ← 修改密码时改这里
-  database: 'course_platform', // 数据库名
+  password: '123456', // 数据库密码 ← 修改密码时改这里
+  database: 'course_db', // 数据库名（与 Java 后端共用 course_db，避免数据割裂）
   waitForConnections: true,
   connectionLimit: 10,    // 最大连接数
   queueLimit: 0,

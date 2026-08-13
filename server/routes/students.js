@@ -25,7 +25,7 @@ function fmtDate(d) {
 router.get('/classes', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT class_name AS name, COUNT(*) AS count FROM students WHERE class_name IS NOT NULL AND class_name != "" GROUP BY class_name ORDER BY class_name'
+      'SELECT class_name AS name, COUNT(*) AS count FROM student WHERE class_name IS NOT NULL AND class_name != "" GROUP BY class_name ORDER BY class_name'
     );
     res.json({ success: true, classes: rows });
   } catch (error) {
@@ -63,14 +63,14 @@ router.get('/', async (req, res) => {
 
     // 查总数
     const [countRows] = await pool.execute(
-      `SELECT COUNT(*) AS total FROM students ${whereClause}`,
+      `SELECT COUNT(*) AS total FROM student ${whereClause}`,
       params
     );
 
     // 查列表
     const [rows] = await pool.execute(
       `SELECT id, student_id, name, phone, email, class_name, department, status, created_at
-       FROM students ${whereClause}
+       FROM student ${whereClause}
        ORDER BY created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, String(limit), String(offset)]
@@ -107,7 +107,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, student_id, name, phone, email, class_name, department, status, created_at FROM students WHERE id = ?',
+      'SELECT id, student_id, name, phone, email, class_name, department, status, created_at FROM student WHERE id = ?',
       [req.params.id]
     );
 
@@ -139,7 +139,7 @@ router.get('/:id', async (req, res) => {
 router.get('/department/:dept', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, student_id, name, phone, email, class_name, department, status, created_at FROM students WHERE department = ? ORDER BY class_name, name',
+      'SELECT id, student_id, name, phone, email, class_name, department, status, created_at FROM student WHERE department = ? ORDER BY class_name, name',
       [req.params.dept]
     );
     const students = rows.map((s) => ({

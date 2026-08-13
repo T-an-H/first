@@ -34,7 +34,7 @@ router.post('/login', async (req, res) => {
 
     // 2. 查数据库找学生
     const [rows] = await pool.execute(
-      'SELECT id, student_id, name, password, phone, email, class_name, status FROM students WHERE student_id = ?',
+      'SELECT id, student_id, name, password, phone, email, class_name, status FROM student WHERE student_id = ?',
       [studentId]
     );
 
@@ -120,7 +120,7 @@ router.post('/register', async (req, res) => {
 
     // 3. 检查学号是否已被注册
     const [existing] = await pool.execute(
-      'SELECT id FROM students WHERE student_id = ?',
+      'SELECT id FROM student WHERE student_id = ?',
       [studentId]
     );
 
@@ -137,7 +137,7 @@ router.post('/register', async (req, res) => {
 
     // 5. 插入数据库
     await pool.execute(
-      'INSERT INTO students (student_id, name, password, phone, email, class_name) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO student (student_id, name, password, phone, email, class_name) VALUES (?, ?, ?, ?, ?, ?)',
       [studentId, name, hashedPassword, phone || null, email || null, className || null]
     );
 
@@ -170,7 +170,7 @@ router.get('/verify', async (req, res) => {
 
     // 查数据库确认学生仍有效
     const [rows] = await pool.execute(
-      'SELECT id, student_id, name, phone, email, class_name, status FROM students WHERE id = ?',
+      'SELECT id, student_id, name, phone, email, class_name, status FROM student WHERE id = ?',
       [decoded.id]
     );
 

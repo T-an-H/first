@@ -11,7 +11,7 @@ const router = Router();
 /** GET /api/eval/config/:courseId - 获取评价配置 */
 router.get('/config/:courseId', async (req, res) => {
   try {
-    const [rows] = await pool.execute('SELECT * FROM eval_configs WHERE course_id = ?', [req.params.courseId]);
+    const [rows] = await pool.execute('SELECT * FROM eval_config WHERE course_id = ?', [req.params.courseId]);
     if (rows.length === 0) return res.json({ success: true, config: null });
     const c = rows[0];
     res.json({ success: true, config: {
@@ -30,7 +30,7 @@ router.post('/config', async (req, res) => {
   try {
     const { courseId, template, frequency, customSessions, hasMentor, overdueRule } = req.body;
     await pool.execute(
-      'REPLACE INTO eval_configs (course_id, template, frequency, custom_sessions, has_mentor, overdue_rule) VALUES (?, ?, ?, ?, ?, ?)',
+      'REPLACE INTO eval_config (course_id, template, frequency, custom_sessions, has_mentor, overdue_rule) VALUES (?, ?, ?, ?, ?, ?)',
       [courseId, template, frequency, customSessions || null, hasMentor ? 1 : 0, overdueRule]
     );
     res.json({ success: true, message: '保存成功' });
@@ -44,7 +44,7 @@ router.post('/save', async (req, res) => {
   try {
     const { id, courseId, studentId, sessionNumber, type, score, evaluatorId, evaluatorName, comment, createdAt } = req.body;
     await pool.execute(
-      'REPLACE INTO evaluations (id, course_id, student_id, session_number, type, score, evaluator_id, evaluator_name, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'REPLACE INTO evaluation (id, course_id, student_id, session_number, type, score, evaluator_id, evaluator_name, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [id, courseId, studentId, sessionNumber, type, score, evaluatorId || '', evaluatorName || '', comment || '', createdAt || '']
     );
     res.json({ success: true });
@@ -58,7 +58,7 @@ router.post('/batch', async (req, res) => {
     if (!evaluations?.length) return res.json({ success: true, count: 0 });
     for (const e of evaluations) {
       await pool.execute(
-        'REPLACE INTO evaluations (id, course_id, student_id, session_number, type, score, evaluator_id, evaluator_name, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'REPLACE INTO evaluation (id, course_id, student_id, session_number, type, score, evaluator_id, evaluator_name, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [e.id, e.courseId, e.studentId, e.sessionNumber, e.type, e.score, e.evaluatorId || '', e.evaluatorName || '', e.comment || '', e.createdAt || '']
       );
     }
@@ -69,7 +69,7 @@ router.post('/batch', async (req, res) => {
 /** DELETE /api/eval/:id - 删除一条评价 */
 router.delete('/:id', async (req, res) => {
   try {
-    await pool.execute('DELETE FROM evaluations WHERE id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM evaluation WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -98,7 +98,7 @@ router.post('/reminders', async (req, res) => {
     if (!reminders?.length) return res.json({ success: true });
     for (const r of reminders) {
       await pool.execute(
-        'REPLACE INTO eval_reminders (id, course_id, course_title, student_id, session_number, deadline, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'REPLACE INTO eval_reminder (id, course_id, course_title, student_id, session_number, deadline, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [r.id, r.courseId, r.courseTitle || '', r.studentId, r.sessionNumber, r.deadline || '', r.status || 'pending']
       );
     }
@@ -110,7 +110,7 @@ router.post('/reminders', async (req, res) => {
 router.put('/reminders/:id', async (req, res) => {
   try {
     const { status } = req.body;
-    await pool.execute('UPDATE eval_reminders SET status = ? WHERE id = ?', [status, req.params.id]);
+    await pool.execute('UPDATE eval_reminder SET status = ? WHERE id = ?', [status, req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });

@@ -2377,8 +2377,17 @@ async function saveAddStudent() {
   if (targetGroupId) {
     const group = store.studentGroups.find((g) => g.id === targetGroupId)
     if (group && !group.memberIds.includes(student!.id)) {
-      store.updateStudentGroup(group.id, { memberIds: [...group.memberIds, student!.id] })
+      const memberIds = [...group.memberIds, student!.id]
+      store.updateStudentGroup(group.id, { memberIds })
       joinedGroupName = group.name
+      // 同步分组到 MySQL
+      try {
+        await fetch('http://localhost:3000/api/teaching/groups/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groups: [{ id: group.id, courseId: courseId.value, name: group.name, memberIds }] }),
+        })
+      } catch {}
     }
   }
   showAddStudentModal.value = false
@@ -4545,13 +4554,14 @@ function openQuickAddToClass(studentId: string) {
 }
 
 /** 确认加入班级：变更班级后从原分组移除（原分组不再适用），再按所选分组加入 */
-function confirmQuickAddToClass() {
+async function confirmQuickAddToClass() {
   if (!quickAddClassSelected.value) return
+  const changedGroups: any[] = []
   for (const g of store.studentGroups) {
     if (g.courseId === courseId.value && g.memberIds.includes(quickAddClassStudentId.value)) {
-      store.updateStudentGroup(g.id, {
-        memberIds: g.memberIds.filter((id) => id !== quickAddClassStudentId.value),
-      })
+      const memberIds = g.memberIds.filter((id) => id !== quickAddClassStudentId.value)
+      store.updateStudentGroup(g.id, { memberIds })
+      changedGroups.push({ id: g.id, courseId: courseId.value, name: g.name, memberIds })
     }
   }
   store.updateStudent(quickAddClassStudentId.value, { className: quickAddClassSelected.value })
@@ -4559,9 +4569,26 @@ function confirmQuickAddToClass() {
   if (quickAddClassGroupSelected.value) {
     const group = store.studentGroups.find((g) => g.id === quickAddClassGroupSelected.value)
     if (group && !group.memberIds.includes(quickAddClassStudentId.value)) {
-      store.updateStudentGroup(group.id, { memberIds: [...group.memberIds, quickAddClassStudentId.value] })
+      const memberIds = [...group.memberIds, quickAddClassStudentId.value]
+      store.updateStudentGroup(group.id, { memberIds })
+      changedGroups.push({ id: group.id, courseId: courseId.value, name: group.name, memberIds })
     }
   }
+  // 同步到 MySQL：班级归属 + 分组成员变更
+  try {
+    await fetch(`http://localhost:3000/api/teaching/students/${quickAddClassStudentId.value}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ className: quickAddClassSelected.value }),
+    })
+    if (changedGroups.length > 0) {
+      await fetch('http://localhost:3000/api/teaching/groups/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groups: changedGroups }),
+      })
+    }
+  } catch {}
   showQuickAddClassModal.value = false
 }
 

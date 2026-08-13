@@ -10,7 +10,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT cat.*, (SELECT COUNT(*) FROM courses WHERE category_id = cat.id) AS course_count FROM categories AS cat ORDER BY cat.name'
+      'SELECT cat.*, (SELECT COUNT(*) FROM course WHERE category_id = cat.id) AS course_count FROM category AS cat ORDER BY cat.name'
     );
     const cats = rows.map((r) => ({
       id: String(r.id),
@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
 router.get('/courses', async (req, res) => {
   try {
     const [rows] = await pool.execute(
-      'SELECT id, title, teacher, category_id, category_name, credits, duration FROM courses ORDER BY title'
+      'SELECT id, title, teacher, category_id, category_name, credits, duration FROM course ORDER BY title'
     );
     const courses = rows.map((r) => ({
       id: String(r.id),
@@ -52,7 +52,7 @@ router.post('/sync', async (req, res) => {
   try {
     // 1. 从 schedules 表提取所有不同的课程
     const [schedules] = await pool.execute(
-      'SELECT DISTINCT course_id, title, teacher, class_name FROM schedules'
+      'SELECT DISTINCT course_id, title, teacher, class_name FROM schedule'
     );
 
     let added = 0, updated = 0, failed = 0;
@@ -72,13 +72,13 @@ router.post('/sync', async (req, res) => {
     const catMap = new Map();
 
     for (const catName of classToCat.values()) {
-      const [existing] = await pool.execute('SELECT id FROM categories WHERE name = ?', [catName]);
+      const [existing] = await pool.execute('SELECT id FROM category WHERE name = ?', [catName]);
       if (existing.length > 0) {
         catMap.set(catName, existing[0].id);
       } else {
         const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316'];
         const color = colors[catMap.size % colors.length];
-        const [res2] = await pool.execute('INSERT INTO categories (name, color) VALUES (?, ?)', [catName, color]);
+        const [res2] = await pool.execute('INSERT INTO category (name, color) VALUES (?, ?)', [catName, color]);
         catMap.set(catName, res2.insertId);
         added++;
       }
@@ -93,16 +93,16 @@ router.post('/sync', async (req, res) => {
       const catName = classToCat.get(s.class_name) || '未分类';
       const catId = catMap.get(catName) || null;
 
-      const [existing] = await pool.execute('SELECT id FROM courses WHERE title = ?', [s.title]);
+      const [existing] = await pool.execute('SELECT id FROM course WHERE title = ?', [s.title]);
       if (existing.length > 0) {
         if (catId) {
-          await pool.execute('UPDATE courses SET teacher = ?, category_id = ?, category_name = ? WHERE id = ?',
+          await pool.execute('UPDATE course SET teacher = ?, category_id = ?, category_name = ? WHERE id = ?',
             [s.teacher, catId, catName, existing[0].id]);
           updated++;
         }
       } else {
         await pool.execute(
-          'INSERT INTO courses (title, teacher, category_id, category_name) VALUES (?, ?, ?, ?)',
+          'INSERT INTO course (title, teacher, category_id, category_name) VALUES (?, ?, ?, ?)',
           [s.title, s.teacher, catId, catName]
         );
         added++;

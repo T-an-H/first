@@ -16,7 +16,7 @@ const router = Router();
 router.get('/todos', async (req, res) => {
   try {
     const { createdBy } = req.query;
-    let sql = 'SELECT * FROM todos';
+    let sql = 'SELECT * FROM todo';
     const params = [];
     if (createdBy) { sql += ' WHERE created_by = ?'; params.push(createdBy); }
     sql += ' ORDER BY due_date, created_at';
@@ -39,7 +39,7 @@ router.post('/todos', async (req, res) => {
     if (!title) return res.status(400).json({ success: false, message: 'title 必填' });
     const todoId = id || `todo-${Date.now()}`;
     await pool.execute(
-      'INSERT INTO todos (id, title, completed, created_at, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO todo (id, title, completed, created_at, due_date, created_by) VALUES (?, ?, ?, ?, ?, ?)',
       [todoId, title, completed ? 1 : 0, createdAt || '', dueDate || '', createdBy || '']
     );
     res.json({ success: true, id: todoId });
@@ -56,7 +56,7 @@ router.put('/todos/:id', async (req, res) => {
     if (dueDate !== undefined) { sets.push('due_date = ?'); params.push(dueDate); }
     if (sets.length === 0) return res.json({ success: true });
     params.push(req.params.id);
-    await pool.execute(`UPDATE todos SET ${sets.join(', ')} WHERE id = ?`, params);
+    await pool.execute(`UPDATE todo SET ${sets.join(', ')} WHERE id = ?`, params);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -64,7 +64,7 @@ router.put('/todos/:id', async (req, res) => {
 /** DELETE /api/teaching/todos/:id - 删除待办 */
 router.delete('/todos/:id', async (req, res) => {
   try {
-    await pool.execute('DELETE FROM todos WHERE id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM todo WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -75,7 +75,7 @@ router.delete('/todos/:id', async (req, res) => {
 router.get('/notes', async (req, res) => {
   try {
     const { createdBy } = req.query;
-    let sql = 'SELECT * FROM notes';
+    let sql = 'SELECT * FROM note';
     const params = [];
     if (createdBy) { sql += ' WHERE created_by = ?'; params.push(createdBy); }
     sql += ' ORDER BY updated_at DESC';
@@ -100,7 +100,7 @@ router.post('/notes', async (req, res) => {
     const noteId = id || `note-${Date.now()}`;
     const now = updatedAt || createdAt || new Date().toISOString();
     await pool.execute(
-      'INSERT INTO notes (id, title, content, created_at, updated_at, created_by, attachments) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO note (id, title, content, created_at, updated_at, created_by, attachments) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [noteId, title, content || '', createdAt || now, now, createdBy || '', attachments ? JSON.stringify(attachments) : null]
     );
     res.json({ success: true, id: noteId });
@@ -118,7 +118,7 @@ router.put('/notes/:id', async (req, res) => {
     if (attachments !== undefined) { sets.push('attachments = ?'); params.push(JSON.stringify(attachments)); }
     if (sets.length === 0) return res.json({ success: true });
     params.push(req.params.id);
-    await pool.execute(`UPDATE notes SET ${sets.join(', ')} WHERE id = ?`, params);
+    await pool.execute(`UPDATE note SET ${sets.join(', ')} WHERE id = ?`, params);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -126,7 +126,7 @@ router.put('/notes/:id', async (req, res) => {
 /** DELETE /api/teaching/notes/:id - 删除笔记 */
 router.delete('/notes/:id', async (req, res) => {
   try {
-    await pool.execute('DELETE FROM notes WHERE id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM note WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -137,7 +137,7 @@ router.delete('/notes/:id', async (req, res) => {
 router.get('/online-docs', async (req, res) => {
   try {
     const { createdBy } = req.query;
-    let sql = 'SELECT * FROM online_docs';
+    let sql = 'SELECT * FROM online_doc';
     const params = [];
     if (createdBy) { sql += ' WHERE created_by = ?'; params.push(createdBy); }
     sql += ' ORDER BY last_edited_at DESC';
@@ -162,7 +162,7 @@ router.post('/online-docs', async (req, res) => {
     const docId = id || `doc-${Date.now()}`;
     const now = lastEditedAt || createdAt || new Date().toISOString();
     await pool.execute(
-      'INSERT INTO online_docs (id, title, content, created_by, created_at, last_edited_at, last_edited_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO online_doc (id, title, content, created_by, created_at, last_edited_at, last_edited_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [docId, title, content || '', createdBy || '', createdAt || now, now, lastEditedBy || createdBy || '']
     );
     res.json({ success: true, id: docId });
@@ -180,7 +180,7 @@ router.put('/online-docs/:id', async (req, res) => {
     if (lastEditedBy !== undefined) { sets.push('last_edited_by = ?'); params.push(lastEditedBy); }
     if (sets.length === 0) return res.json({ success: true });
     params.push(req.params.id);
-    await pool.execute(`UPDATE online_docs SET ${sets.join(', ')} WHERE id = ?`, params);
+    await pool.execute(`UPDATE online_doc SET ${sets.join(', ')} WHERE id = ?`, params);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -188,7 +188,7 @@ router.put('/online-docs/:id', async (req, res) => {
 /** DELETE /api/teaching/online-docs/:id - 删除文档 */
 router.delete('/online-docs/:id', async (req, res) => {
   try {
-    await pool.execute('DELETE FROM online_docs WHERE id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM online_doc WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -199,7 +199,7 @@ router.delete('/online-docs/:id', async (req, res) => {
 router.get('/student-tiers', async (req, res) => {
   try {
     const { courseId, studentId } = req.query;
-    let sql = 'SELECT * FROM student_tiers';
+    let sql = 'SELECT * FROM student_tier';
     const params = [];
     const where = [];
     if (courseId) { where.push('course_id = ?'); params.push(courseId); }
@@ -225,7 +225,7 @@ router.post('/student-tiers', async (req, res) => {
     if (!courseId || !studentId) return res.status(400).json({ success: false, message: 'courseId/studentId 必填' });
     const tierId = id || `tier-${Date.now()}`;
     await pool.execute(
-      'REPLACE INTO student_tiers (id, course_id, student_id, tier, score, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+      'REPLACE INTO student_tier (id, course_id, student_id, tier, score, created_at) VALUES (?, ?, ?, ?, ?, ?)',
       [tierId, courseId, studentId, tier || 'basic', score ?? 0, createdAt || '']
     );
     res.json({ success: true, id: tierId });
@@ -241,7 +241,7 @@ router.put('/student-tiers/:id', async (req, res) => {
     if (score !== undefined) { sets.push('score = ?'); params.push(score); }
     if (sets.length === 0) return res.json({ success: true });
     params.push(req.params.id);
-    await pool.execute(`UPDATE student_tiers SET ${sets.join(', ')} WHERE id = ?`, params);
+    await pool.execute(`UPDATE student_tier SET ${sets.join(', ')} WHERE id = ?`, params);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -249,7 +249,7 @@ router.put('/student-tiers/:id', async (req, res) => {
 /** DELETE /api/teaching/student-tiers/:id - 删除分层记录 */
 router.delete('/student-tiers/:id', async (req, res) => {
   try {
-    await pool.execute('DELETE FROM student_tiers WHERE id = ?', [req.params.id]);
+    await pool.execute('DELETE FROM student_tier WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
