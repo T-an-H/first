@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
 import { saveEvaluation as apiSaveEval, deleteEvaluation as apiDeleteEval, submitTeacherEval as apiSubmitEval, saveEvalConfig as apiSaveConfig, saveEvalReminders as apiSaveReminders, updateEvalReminder as apiUpdateReminder } from '@/api'
-import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig } from '@/api'
+import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, createStudents, authHeaders } from '@/api'
 import {
   javaListEnrollments, javaListGroups, javaListFiles, javaListEvaluations, javaGetGradeConfig,
   javaListCourses, javaListStudents, javaListSchedules, javaListGrades, javaListExamScores,
@@ -480,7 +480,7 @@ export const useAppStore = defineStore('app', () => {
       saveToStorage('teachers', teachers.value)
     }
     // 同步到数据库
-    fetch(`http://localhost:3000/api/courses/${id}`, { method: 'DELETE' }).catch(() => {})
+    fetch(`http://localhost:3000/api/courses/${id}`, { method: 'DELETE', headers: authHeaders() }).catch(() => {})
   }
 
   function addCategory(category: Category) {
@@ -735,6 +735,8 @@ export const useAppStore = defineStore('app', () => {
   function addStudent(student: Student) {
     students.value = [...students.value, student]
     saveToStorage('students', students.value)
+    // 教师端导入/新增学生同步落库（fire-and-forget，失败静默不阻塞 UI；真实登录后写入 course_db）
+    createStudents([student]).catch(() => {})
   }
 
   function updateStudent(id: string, data: Partial<Student>) {

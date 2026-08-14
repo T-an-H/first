@@ -1397,9 +1397,12 @@
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none" />
               </div>
               <div>
-                <label class="text-xs text-gray-500 block mb-1">学号</label>
-                <input v-model="addStudentForm.studentId" placeholder="可选，输入学号（留空将自动生成）"
+                <label class="text-xs text-gray-500 block mb-1">学号 <span class="text-red-500">*</span></label>
+                <input v-model="addStudentForm.studentId" placeholder="请输入学号（必填）"
                   class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 outline-none" />
+                <p v-if="addStudentSidDuplicate" class="mt-1 text-xs text-red-500">
+                  学号与课程内学员「{{ addStudentSidDuplicate.name }}」重复，无法添加
+                </p>
               </div>
               <div>
                 <label class="text-xs text-gray-500 block mb-1">所属班级</label>
@@ -1423,7 +1426,7 @@
               </div>
               <div class="flex gap-2 pt-2">
                 <button @click="showAddStudentModal = false" class="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">取消</button>
-                <button @click="saveAddStudent" :disabled="!addStudentForm.name.trim()"
+                <button @click="saveAddStudent" :disabled="!addStudentForm.name.trim() || !addStudentForm.studentId.trim() || !!addStudentSidDuplicate"
                   class="flex-1 px-4 py-2 text-sm text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-lg">加入课程</button>
               </div>
             </div>
@@ -1903,6 +1906,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { authHeaders } from '@/api'
 import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
@@ -2248,7 +2252,7 @@ async function saveAddClass() {
       try {
         await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
         })
       } catch {}
@@ -2256,7 +2260,7 @@ async function saveAddClass() {
     try {
       await fetch(`http://localhost:3000/api/teaching/students/${student!.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ className }),
       })
     } catch {}
@@ -2267,7 +2271,7 @@ async function saveAddClass() {
     try {
       await fetch('http://localhost:3000/api/schedules/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           schedules: [{
             courseId: courseId.value,
@@ -2316,11 +2320,29 @@ const addStudentGroupCandidates = computed(() => {
   })
 })
 
+/** 新增学生时学号重复检查：查找本课程内已有学员中学号相同者（含 id 即学号的历史数据） */
+const addStudentSidDuplicate = computed(() => {
+  const sid = addStudentForm.value.studentId.trim()
+  if (!sid) return null
+  return (
+    enrolledStudents.value.find((e) => e.student?.studentId === sid || e.student?.id === sid)
+      ?.student || null
+  )
+})
+
 async function saveAddStudent() {
   if (!courseId.value) return
   const name = addStudentForm.value.name.trim()
   if (!name) return
   const sid = addStudentForm.value.studentId.trim()
+  if (!sid) {
+    alert('请输入学号')
+    return
+  }
+  if (addStudentSidDuplicate.value) {
+    alert(`学号与课程内学员「${addStudentSidDuplicate.value.name}」重复，无法添加`)
+    return
+  }
   const targetClass = addStudentForm.value.className.trim()
   // 查找已有学生（按学号/ID 或姓名）
   let student = sid
@@ -2367,7 +2389,7 @@ async function saveAddStudent() {
   try {
     await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
     })
   } catch {}
@@ -2384,7 +2406,7 @@ async function saveAddStudent() {
       try {
         await fetch('http://localhost:3000/api/teaching/groups/bulk', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ groups: [{ id: group.id, courseId: courseId.value, name: group.name, memberIds }] }),
         })
       } catch {}
@@ -3418,7 +3440,7 @@ async function handleExcelImport(event: Event) {
     }
     // 同步到 MySQL
     if (scores.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/scores/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ scores }) }) } catch {}
+      try { await fetch('http://localhost:3000/api/teaching/scores/bulk', { method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify({ scores }) }) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生的成绩`)
     input.value = ''
@@ -4264,7 +4286,7 @@ async function handleImportStudentsExcel(event: Event) {
     }
     // 同步到 MySQL
     if (enrollments.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/enrollments/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ enrollments }) }) } catch {}
+      try { await fetch('http://localhost:3000/api/teaching/enrollments/bulk', { method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify({ enrollments }) }) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生`)
   } catch (err) {
@@ -4578,13 +4600,13 @@ async function confirmQuickAddToClass() {
   try {
     await fetch(`http://localhost:3000/api/teaching/students/${quickAddClassStudentId.value}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ className: quickAddClassSelected.value }),
     })
     if (changedGroups.length > 0) {
       await fetch('http://localhost:3000/api/teaching/groups/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ groups: changedGroups }),
       })
     }
@@ -4723,7 +4745,7 @@ async function handleImportGroupsExcel(event: Event) {
     }
     // 同步到 MySQL
     if (groups.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ groups }) }) } catch {}
+      try { await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify({ groups }) }) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 个分组`)
   } catch (err) {

@@ -362,6 +362,14 @@ const finalTopCourses = computed(() => {
   return courseScores.sort((a, b) => b.score - a.score).slice(0, 6)
 })
 
+/** 课程成绩雷达图数据：期末成绩最高的 6 门课程（label 过长截断，避免雷达图标签重叠） */
+const careerRadarData = computed(() =>
+  finalTopCourses.value.map((t) => ({
+    label: t.title.length > 8 ? t.title.slice(0, 8) + '…' : t.title,
+    value: t.score,
+  }))
+)
+
 const careerRecommendations = computed(() => {
   const top6 = finalTopCourses.value
   if (top6.length === 0) return []
@@ -460,7 +468,8 @@ function renderProfile(root: HTMLElement) {
 
   const s = student.value
   const enrs = myEnrollments.value
-  const rd = radarData.value
+  // 课程成绩雷达图数据源：优先取期末成绩最高的 6 门课程（职业分析），无期末成绩时回退平时评价能力雷达图
+  const rd = careerRadarData.value.length > 0 ? careerRadarData.value : radarData.value
   const recs = careerRecommendations.value
 
   // 页面标题
@@ -521,7 +530,7 @@ function renderProfile(root: HTMLElement) {
     hoverOverlay.append('span').attr('class', 'text-white font-medium text-sm bg-brand-600 px-3 py-1 rounded-full shadow-lg').text('点击查看详情')
   } else {
     radarCard.append('p').attr('class', 'text-gray-400 text-center py-12')
-      .html('暂无平时成绩数据<br />完成课程评价后将生成能力雷达图')
+      .html('暂无期末成绩与平时评价数据<br />期末成绩发布后，系统将自动取成绩最高的 6 门课程生成课程成绩雷达图')
   }
 
   // 素质评价雷达图（取素质评价分最高的 5 门课程，与课程成绩雷达图并排）
@@ -547,48 +556,6 @@ function renderProfile(root: HTMLElement) {
     qualityRadarCard.append('div').attr('class', 'text-center py-8')
       .append('p').attr('class', 'text-gray-400').text('暂无素质评价数据')
     qualityRadarCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1').text('完成素质评价打分后将生成雷达图')
-  }
-
-  // 职业分析板块：期末成绩最高 6 门课程 + 与 1000 职业表匹配的 3 个推荐职业
-  const top6 = finalTopCourses.value
-  const recs2 = careerRecommendations.value
-  const careerCard = container.append('div').attr('class', 'bg-white rounded-xl p-6 border border-indigo-400/20 shadow-sm')
-  const careerTitle = careerCard.append('h3').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
-  renderIcon(careerTitle, 'briefcase').attr('class', 'w-5 h-5 text-indigo-600')
-  careerTitle.append('span').text('职业分析')
-
-  if (top6.length === 0) {
-    careerCard.append('p').attr('class', 'text-gray-400 text-center py-8').text('暂无期末成绩数据')
-    careerCard.append('p').attr('class', 'text-center text-sm text-gray-300 mt-1')
-      .text('期末成绩发布后，系统将自动取成绩最高的 6 门课程，与 1000 个职业对照匹配，推荐最契合的 3 个职业')
-  } else {
-    // 最高的 6 门课程
-    careerCard.append('p').attr('class', 'text-sm font-medium text-gray-700 mb-2')
-      .text(`期末成绩最高的 ${top6.length} 门课程`)
-    const chipRow = careerCard.append('div').attr('class', 'flex flex-wrap gap-2 mb-5')
-    top6.forEach((t) => {
-      const chip = chipRow.append('span').attr('class', 'px-2.5 py-1 text-xs rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200')
-      chip.append('span').text(t.title)
-      chip.append('span').attr('class', 'ml-1 font-bold').text(`${t.score}分`)
-    })
-    // 推荐职业
-    if (recs2.length > 0) {
-      careerCard.append('p').attr('class', 'text-sm font-medium text-gray-700 mb-2').text('为您推荐的职业匹配')
-      recs2.forEach((rec) => {
-        const card = careerCard.append('div').attr('class', 'p-4 bg-gradient-to-br from-indigo-400/5 to-indigo-400/10 rounded-lg')
-        const header = card.append('div').attr('class', 'flex items-center gap-2 mb-2')
-        renderIcon(header, rec.icon as any).attr('class', 'w-5 h-5 text-indigo-600')
-        header.append('span').attr('class', 'font-semibold text-gray-900').text(rec.title)
-        header.append('span').attr('class', 'ml-auto text-sm font-bold text-indigo-600').text(`${rec.matchScore}%`)
-        card.append('p').attr('class', 'text-sm text-gray-600 mb-3').text(rec.description)
-        const tagRow = card.append('div').attr('class', 'flex flex-wrap gap-1')
-        rec.tags.forEach((tag) => {
-          tagRow.append('span').attr('class', 'px-2 py-1 text-xs bg-indigo-600/15 text-gray-800 rounded-full').text(tag)
-        })
-      })
-    } else {
-      careerCard.append('p').attr('class', 'text-gray-400 text-center py-4').text('暂未找到与您课程高度匹配的职业')
-    }
   }
 
   // 增值评价板块
@@ -826,7 +793,7 @@ function renderProfile(root: HTMLElement) {
     const courseAnalysisCol = modalGrid.append('div')
     const courseAnalysisTitle = courseAnalysisCol.append('h4').attr('class', 'text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2')
     renderIcon(courseAnalysisTitle, 'bookOpen').attr('class', 'w-5 h-5 text-brand-600')
-    courseAnalysisTitle.append('span').text('课程分析')
+    courseAnalysisTitle.append('span').text(careerRadarData.value.length > 0 ? `期末成绩最高的 ${finalTopCourses.value.length} 门课程` : '课程分析')
 
     const courseList = courseAnalysisCol.append('div').attr('class', 'space-y-4')
     rd.forEach((data) => {
