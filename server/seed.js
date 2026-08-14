@@ -70,9 +70,9 @@ async function seed() {
     for (const s of testStudents) {
       try {
         await pool.execute(
-          `INSERT INTO students (student_id, name, password, phone, email, class_name, department, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [s.student_id, s.name, s.password, s.phone, s.email, s.class_name, s.department, s.status]
+          `INSERT INTO students (id, student_id, name, password, phone, email, class_name, department, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [s.student_id, s.student_id, s.name, s.password, s.phone, s.email, s.class_name, s.department, s.status]
         );
         inserted++;
       } catch (err) {
