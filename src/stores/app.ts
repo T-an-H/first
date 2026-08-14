@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
-import { saveEvaluation as apiSaveEval, deleteEvaluation as apiDeleteEval, submitTeacherEval as apiSubmitEval, saveEvalConfig as apiSaveConfig, saveEvalReminders as apiSaveReminders, updateEvalReminder as apiUpdateReminder } from '@/api'
-import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, createStudents, authHeaders } from '@/api'
+import { javaUpdateEvalReminder as apiUpdateReminder } from '@/api'
+import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, javaUpdateFile, javaDeleteCourse, javaAddCourse, javaUpdateCourse, javaAddSchedule, javaUpdateSchedule, javaDeleteSchedule, javaAddStudent, javaUpdateStudent, javaDeleteStudent, javaAddGrade, javaUpdateGrade, javaDeleteGrade, javaAddExamScore, javaUpdateExamScore, javaDeleteExamScore, javaAddTodo, javaUpdateTodo, javaDeleteTodo, javaAddNote, javaUpdateNote, javaDeleteNote, javaAddEvaluation, javaUpdateEvaluation, javaDeleteEvaluation, javaSaveEvalConfig, javaScoreQualityEvaluation, javaAddDetailedGrade, javaUpdateDetailedGrade, javaDeleteDetailedGrade } from '@/api'
 import {
   javaListEnrollments, javaListGroups, javaListFiles, javaListEvaluations, javaGetGradeConfig,
   javaListCourses, javaListStudents, javaListSchedules, javaListGrades, javaListExamScores,
@@ -478,7 +478,7 @@ export const useAppStore = defineStore('app', () => {
       saveToStorage('teachers', teachers.value)
     }
     // 同步到数据库
-    fetch(`http://localhost:3000/api/courses/${id}`, { method: 'DELETE', headers: authHeaders() }).catch(() => {})
+    javaDeleteCourse(id).catch(() => {})
   }
 
   function addCategory(category: Category) {
@@ -500,6 +500,7 @@ export const useAppStore = defineStore('app', () => {
     schedules.value = [...schedules.value, schedule]
     saveToStorage('schedules', schedules.value)
     recalculateProgress(schedule.courseId)
+    javaAddSchedule(schedule).catch(() => {})
   }
 
   function updateSchedule(id: string, data: Partial<Schedule>) {
@@ -507,6 +508,7 @@ export const useAppStore = defineStore('app', () => {
     schedules.value = schedules.value.map((s) => (s.id === id ? { ...s, ...data } : s))
     saveToStorage('schedules', schedules.value)
     if (old) recalculateProgress(old.courseId)
+    javaUpdateSchedule(id, data).catch(() => {})
   }
 
   function deleteSchedule(id: string) {
@@ -514,6 +516,7 @@ export const useAppStore = defineStore('app', () => {
     schedules.value = schedules.value.filter((s) => s.id !== id)
     saveToStorage('schedules', schedules.value)
     if (old) recalculateProgress(old.courseId)
+    javaDeleteSchedule(id).catch(() => {})
   }
 
   function addEnrollment(enrollment: Enrollment) {
@@ -542,6 +545,7 @@ export const useAppStore = defineStore('app', () => {
     }
     grades.value = [...grades.value, grade]
     saveToStorage('grades', grades.value)
+    javaAddGrade(grade).catch(() => {})
   }
 
   function updateGrade(id: string, data: Partial<Grade>) {
@@ -555,11 +559,13 @@ export const useAppStore = defineStore('app', () => {
     }
     grades.value = grades.value.map((g) => (g.id === id ? { ...g, ...data } : g))
     saveToStorage('grades', grades.value)
+    javaUpdateGrade(id, data).catch(() => {})
   }
 
   function deleteGrade(id: string) {
     grades.value = grades.value.filter((g) => g.id !== id)
     saveToStorage('grades', grades.value)
+    javaDeleteGrade(id).catch(() => {})
   }
 
   function addCloudFile(file: CloudFile) {
@@ -574,6 +580,7 @@ export const useAppStore = defineStore('app', () => {
       f.id === id ? normalizeCloudFile({ ...f, ...data }) : f
     )
     saveToStorage('cloudFiles', cloudFiles.value)
+    javaUpdateFile(id, data).catch(() => {})
   }
 
   function deleteCloudFile(id: string) {
@@ -585,32 +592,38 @@ export const useAppStore = defineStore('app', () => {
   function addTodo(todo: TodoItem) {
     todos.value = [...todos.value, { ...todo, createdBy: currentUser.value || '未知' }]
     saveToStorage('todos', todos.value)
+    javaAddTodo({ ...todo, createdBy: currentUser.value || '未知' }).catch(() => {})
   }
 
   function updateTodo(id: string, data: Partial<TodoItem>) {
     todos.value = todos.value.map((t) => (t.id === id ? { ...t, ...data } : t))
     saveToStorage('todos', todos.value)
     generateAutoTodos()
+    javaUpdateTodo(id, data).catch(() => {})
   }
 
   function deleteTodo(id: string) {
     todos.value = todos.value.filter((t) => t.id !== id)
     saveToStorage('todos', todos.value)
+    javaDeleteTodo(id).catch(() => {})
   }
 
   function addNote(note: Note) {
     notes.value = [...notes.value, { ...note, createdBy: currentUser.value || '未知' }]
     saveToStorage('notes', notes.value)
+    javaAddNote({ ...note, createdBy: currentUser.value || '未知' }).catch(() => {})
   }
 
   function updateNote(id: string, data: Partial<Note>) {
     notes.value = notes.value.map((n) => (n.id === id ? { ...n, ...data } : n))
     saveToStorage('notes', notes.value)
+    javaUpdateNote(id, data).catch(() => {})
   }
 
   function deleteNote(id: string) {
     notes.value = notes.value.filter((n) => n.id !== id)
     saveToStorage('notes', notes.value)
+    javaDeleteNote(id).catch(() => {})
   }
 
   // ====== 作业系统 ======
@@ -675,7 +688,7 @@ export const useAppStore = defineStore('app', () => {
     }
     evaluations.value = [...evaluations.value, ev]
     saveToStorage('evaluations', evaluations.value)
-    apiSaveEval(ev).catch(() => {})
+    javaAddEvaluation(ev).catch(() => {})
   }
 
   function updateEvaluation(id: string, data: Partial<Evaluation>) {
@@ -689,13 +702,13 @@ export const useAppStore = defineStore('app', () => {
     }
     evaluations.value = evaluations.value.map((e) => (e.id === id ? { ...e, ...data } : e))
     saveToStorage('evaluations', evaluations.value)
-    if (ev) apiSaveEval({ ...ev, ...data } as Evaluation).catch(() => {})
+    if (ev) javaUpdateEvaluation(id, data).catch(() => {})
   }
 
   function deleteEvaluation(id: string) {
     evaluations.value = evaluations.value.filter((e) => e.id !== id)
     saveToStorage('evaluations', evaluations.value)
-    apiDeleteEval(id).catch(() => {})
+    javaDeleteEvaluation(id).catch(() => {})
   }
 
   function setEvalConfig(config: EvaluationConfig) {
@@ -706,7 +719,7 @@ export const useAppStore = defineStore('app', () => {
       evalConfigs.value = [...evalConfigs.value, config]
     }
     saveToStorage('evalConfigs', evalConfigs.value)
-    apiSaveConfig(config).catch(() => {})
+    javaSaveEvalConfig(config).catch(() => {})
   }
 
   function addStudentGroup(group: StudentGroup) {
@@ -718,18 +731,19 @@ export const useAppStore = defineStore('app', () => {
   function addStudent(student: Student) {
     students.value = [...students.value, student]
     saveToStorage('students', students.value)
-    // 教师端导入/新增学生同步落库（fire-and-forget，失败静默不阻塞 UI；真实登录后写入 course_db）
-    createStudents([student]).catch(() => {})
+    javaAddStudent(student).catch(() => {})
   }
 
   function updateStudent(id: string, data: Partial<Student>) {
     students.value = students.value.map((s) => (s.id === id ? { ...s, ...data } : s))
     saveToStorage('students', students.value)
+    javaUpdateStudent(id, data).catch(() => {})
   }
 
   function deleteStudent(id: string) {
     students.value = students.value.filter((s) => s.id !== id)
     saveToStorage('students', students.value)
+    javaDeleteStudent(id).catch(() => {})
   }
 
   function updateStudentGroup(id: string, data: Partial<StudentGroup>) {
@@ -843,7 +857,7 @@ export const useAppStore = defineStore('app', () => {
       teacherSubmittedEvals.value = [...teacherSubmittedEvals.value, key]
       saveToStorage('teacherSubmittedEvals', teacherSubmittedEvals.value)
     }
-    apiSubmitEval({ courseId, studentId, sessionNumber: session, type }).catch(() => {})
+    // 评价内容本身已通过 addEvaluation/updateEvaluation 落库，这里仅记录本地提交状态
   }
 
   /** 检查某条教师评价是否已提交 */
@@ -865,6 +879,7 @@ export const useAppStore = defineStore('app', () => {
   function addExamScore(score: import('@/types').ExamScore) {
     examScores.value.push(score)
     saveToStorage('examScores', examScores.value)
+    javaAddExamScore(score).catch(() => {})
   }
 
   function updateExamScore(id: string, updates: Partial<import('@/types').ExamScore>) {
@@ -872,6 +887,7 @@ export const useAppStore = defineStore('app', () => {
     if (idx !== -1) {
       examScores.value[idx] = { ...examScores.value[idx], ...updates }
       saveToStorage('examScores', examScores.value)
+      javaUpdateExamScore(id, updates).catch(() => {})
     }
   }
 
@@ -884,6 +900,11 @@ export const useAppStore = defineStore('app', () => {
       return s
     })
     saveToStorage('examScores', examScores.value)
+    for (const s of examScores.value) {
+      if (s.courseId === courseId && s.examName === examName && s.status === 'submitted') {
+        javaUpdateExamScore(s.id, { status: 'submitted', gradedAt: s.gradedAt }).catch(() => {})
+      }
+    }
   }
 
   function getExamScoresForCourse(courseId: string, examName?: string): import('@/types').ExamScore[] {
@@ -1536,11 +1557,13 @@ export const useAppStore = defineStore('app', () => {
   function addDetailedGrade(dg: DetailedGrade) {
     detailedGrades.value = [...detailedGrades.value, dg]
     saveToStorage('detailedGrades', detailedGrades.value)
+    javaAddDetailedGrade(dg).catch(() => {})
   }
 
   function updateDetailedGrade(id: string, data: Partial<DetailedGrade>) {
     detailedGrades.value = detailedGrades.value.map((d) => (d.id === id ? { ...d, ...data } : d))
     saveToStorage('detailedGrades', detailedGrades.value)
+    javaUpdateDetailedGrade(id, data).catch(() => {})
   }
 
   /** 将教师评价同步到详细成绩表，实现实时成绩更新 */
@@ -1562,6 +1585,11 @@ export const useAppStore = defineStore('app', () => {
       })
     }
     saveToStorage('detailedGrades', detailedGrades.value)
+    for (const dg of detailedGrades.value) {
+      if (dg.courseId === courseId) {
+        javaUpdateDetailedGrade(dg.id, dg).catch(() => {})
+      }
+    }
   }
 
   function getDetailedGrades(courseId: string): DetailedGrade[] {
@@ -1634,6 +1662,8 @@ export const useAppStore = defineStore('app', () => {
         : q
     )
     saveToStorage('qualityEvaluations', qualityEvaluations.value)
+    const updated = qualityEvaluations.value.find((q) => q.id === id)
+    if (updated) javaScoreQualityEvaluation(id, updated).catch(() => {})
   }
 
   /** 获取某课程所有素质评价 */

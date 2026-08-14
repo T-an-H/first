@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -94,5 +95,25 @@ public class GradeController {
     public Result<Void> deleteGrade(@PathVariable String id) {
         gradeService.removeById(id);
         return Result.ok();
+    }
+
+    /**
+     * POST /api/teaching/scores/bulk  批量导入/保存成绩（循环单条保存，Excel 导入用）
+     * body: [ { studentId, courseId, score, semester?, comment?, totalScore? }, ... ]
+     */
+    @PostMapping("/scores/bulk")
+    public Result<List<Grade>> addScoresBulk(@RequestBody List<Grade> grades) {
+        List<Grade> saved = new ArrayList<>();
+        long base = System.currentTimeMillis();
+        for (int i = 0; i < grades.size(); i++) {
+            Grade g = grades.get(i);
+            if (!StringUtils.hasText(g.getId())) {
+                g.setId("grade-" + base + "-" + i);
+            }
+            if (g.getScore() == null) g.setScore(java.math.BigDecimal.ZERO);
+            gradeService.save(g);
+            saved.add(g);
+        }
+        return Result.ok(saved);
     }
 }

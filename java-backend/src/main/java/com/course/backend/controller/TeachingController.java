@@ -6,12 +6,14 @@ import com.course.backend.entity.CourseFile;
 import com.course.backend.entity.Enrollment;
 import com.course.backend.entity.Evaluation;
 import com.course.backend.entity.GradeConfig;
+import com.course.backend.entity.Student;
 import com.course.backend.entity.StudentGroup;
 import com.course.backend.service.CourseFileService;
 import com.course.backend.service.EnrollmentService;
 import com.course.backend.service.EvaluationService;
 import com.course.backend.service.GradeConfigService;
 import com.course.backend.service.StudentGroupService;
+import com.course.backend.service.StudentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -24,7 +26,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * 教学数据接口：选课 / 分组 / 课程资源 / 成绩配置 / 评价
@@ -40,6 +47,7 @@ public class TeachingController {
     private final CourseFileService courseFileService;
     private final GradeConfigService gradeConfigService;
     private final EvaluationService evaluationService;
+    private final StudentService studentService;
 
     // ==================== 选课记录 ====================
 
@@ -91,6 +99,53 @@ public class TeachingController {
     public Result<Void> deleteEnrollment(@PathVariable String id) {
         enrollmentService.removeById(id);
         return Result.ok();
+    }
+
+    /**
+     * POST /api/teaching/enrollments/bulk  批量新增选课（循环单条保存）
+     * body: [ { studentId, courseId, scheduleId?, enrollDate?, progress?, status? }, ... ]
+     */
+    @PostMapping("/enrollments/bulk")
+    public Result<List<Enrollment>> addEnrollmentsBulk(@RequestBody List<Enrollment> enrollments) {
+        List<Enrollment> saved = new ArrayList<>();
+        long base = System.currentTimeMillis();
+        for (int i = 0; i < enrollments.size(); i++) {
+            Enrollment e = enrollments.get(i);
+            if (!StringUtils.hasText(e.getId())) {
+                e.setId("enr-" + base + "-" + i);
+            }
+            if (e.getProgress() == null) e.setProgress(0);
+            if (!StringUtils.hasText(e.getStatus())) e.setStatus("enrolled");
+            enrollmentService.save(e);
+            saved.add(e);
+        }
+        return Result.ok(saved);
+    }
+
+    /**
+     * GET /api/teaching/enrollments/students?courseId=xxx  课程下全部学生（复用 enrollment → student）
+     * 用于替代 GET /courses/{id}/students
+     */
+    @GetMapping("/enrollments/students")
+    public Result<List<Student>> listEnrollmentStudents(@RequestParam String courseId) {
+        QueryWrapper<Enrollment> qw = new QueryWrapper<>();
+        qw.eq("course_id", courseId);
+        List<Enrollment> enrollments = enrollmentService.list(qw);
+        List<String> studentIds = enrollments.stream()
+                .map(Enrollment::getStudentId)
+                .filter(StringUtils::hasText)
+                .distinct()
+                .collect(Collectors.toList());
+        if (studentIds.isEmpty()) {
+            return Result.ok(Collections.emptyList());
+        }
+        Map<String, Student> studentMap = studentService.listByIds(studentIds).stream()
+                .collect(Collectors.toMap(Student::getId, s -> s));
+        List<Student> students = studentIds.stream()
+                .map(studentMap::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return Result.ok(students);
     }
 
     // ==================== 分组 ====================
@@ -146,6 +201,25 @@ public class TeachingController {
         return Result.ok();
     }
 
+    /**
+     * POST /api/teaching/groups/bulk  批量新建分组（循环单条保存）
+     * body: [ { courseId, name, memberIds? }, ... ]
+     */
+    @PostMapping("/groups/bulk")
+    public Result<List<StudentGroup>> addGroupsBulk(@RequestBody List<StudentGroup> groups) {
+        List<StudentGroup> saved = new ArrayList<>();
+        long base = System.currentTimeMillis();
+        for (int i = 0; i < groups.size(); i++) {
+            StudentGroup g = groups.get(i);
+            if (!StringUtils.hasText(g.getId())) {
+                g.setId("grp-" + base + "-" + i);
+            }
+            studentGroupService.save(g);
+            saved.add(g);
+        }
+        return Result.ok(saved);
+    }
+
     // ==================== 课程资源 ====================
 
     /**
@@ -179,6 +253,17 @@ public class TeachingController {
     public Result<Void> deleteFile(@PathVariable String id) {
         courseFileService.removeById(id);
         return Result.ok();
+    }
+
+    /**
+     * PUT /api/teaching/files/{id}  更新课程资源（重命名/改可见范围等）
+     * body 只需传要修改的字段，如 { name: "新文件名" }
+     */
+    @PutMapping("/files/{id}")
+    public Result<CourseFile> updateFile(@PathVariable String id, @RequestBody CourseFile file) {
+        file.setId(id);
+        courseFileService.updateById(file);
+        return Result.ok(courseFileService.getById(id));
     }
 
     // ==================== 成绩权重配置 ====================

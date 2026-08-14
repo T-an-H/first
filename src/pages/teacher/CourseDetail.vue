@@ -1812,6 +1812,7 @@ import {
 import type { EvalTemplate, EvalType, Evaluation, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, ClipboardList, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
+import { javaListEnrollmentStudents, javaBulkEnrollments, javaBulkSchedules, javaBulkScores, javaBulkGroups, javaUpdateStudent } from '@/api'
 import * as echarts from 'echarts'
 
 const route = useRoute()
@@ -2081,11 +2082,10 @@ const taskStatusBadge = (s: string) => {
 // 从数据库加载课程学员
 onMounted(async () => {
   try {
-    const res = await fetch(`http://localhost:3000/api/courses/${courseId.value}/students`)
-    const data = await res.json()
-    if (data.success && data.students.length > 0) {
+    const students = await javaListEnrollmentStudents(courseId.value)
+    if (students && students.length > 0) {
       // 更新 store.students 为数据库数据
-      for (const s of data.students) {
+      for (const s of students) {
         const existing = store.students.findIndex((x) => x.studentId === s.studentId)
         if (existing >= 0) {
           store.students[existing] = { ...store.students[existing], ...s }
@@ -2095,7 +2095,7 @@ onMounted(async () => {
       }
       // 同步 enrollments（避免重复）
       const existingIds = new Set(store.enrollments.map((e) => e.studentId))
-      for (const s of data.students) {
+      for (const s of students) {
         if (!existingIds.has(s.id)) {
           store.enrollments.push({
             id: `enr-db-${s.id}-${courseId.value}`,
@@ -2375,40 +2375,26 @@ async function saveAddClass() {
         enrollDate: getNow().toISOString().split('T')[0],
       })
       try {
-        await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
-        })
+        await javaBulkEnrollments([{ id: enrId, studentId: student!.id, courseId: courseId.value }])
       } catch {}
     }
     try {
-      await fetch(`http://localhost:3000/api/teaching/students/${student!.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ className }),
-      })
+      await javaUpdateStudent(student!.id, { className })
     } catch {}
   }
 
   // 同步到课程管理：为该班级创建排课记录
   if (course && addClassMembers.value.length > 0) {
     try {
-      await fetch('http://localhost:3000/api/schedules/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({
-          schedules: [{
-            courseId: courseId.value,
-            title: course.title,
-            teacher: course.teacher || '',
-            className,
-            room: '待定',
-            startDate: new Date().toISOString().split('T')[0],
-            timeSlot: '09:00-11:00',
-          }],
-        }),
-      })
+      await javaBulkSchedules([{
+        courseId: courseId.value,
+        title: course.title,
+        teacher: course.teacher || '',
+        className,
+        room: '待定',
+        startDate: new Date().toISOString().split('T')[0],
+        timeSlot: '09:00-11:00',
+      }])
     } catch {}
   }
 
@@ -2512,11 +2498,7 @@ async function saveAddStudent() {
   })
   // 同步到 MySQL
   try {
-    await fetch('http://localhost:3000/api/teaching/enrollments/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ enrollments: [{ id: enrId, studentId: student!.id, courseId: courseId.value }] }),
-    })
+    await javaBulkEnrollments([{ id: enrId, studentId: student!.id, courseId: courseId.value }])
   } catch {}
   // 若选择了分组，将学生加入该分组（不选分组则保持未分组）
   const targetGroupId = addStudentForm.value.groupId
@@ -2529,11 +2511,7 @@ async function saveAddStudent() {
       joinedGroupName = group.name
       // 同步分组到 MySQL
       try {
-        await fetch('http://localhost:3000/api/teaching/groups/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ groups: [{ id: group.id, courseId: courseId.value, name: group.name, memberIds }] }),
-        })
+        await javaBulkGroups([{ id: group.id, courseId: courseId.value, name: group.name, memberIds }])
       } catch {}
     }
   }
@@ -3565,7 +3543,7 @@ async function handleExcelImport(event: Event) {
     }
     // 同步到 MySQL
     if (scores.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/scores/bulk', { method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify({ scores }) }) } catch {}
+      try { await javaBulkScores(scores) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生的成绩`)
     input.value = ''
@@ -4411,7 +4389,7 @@ async function handleImportStudentsExcel(event: Event) {
     }
     // 同步到 MySQL
     if (enrollments.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/enrollments/bulk', { method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify({ enrollments }) }) } catch {}
+      try { await javaBulkEnrollments(enrollments) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 名学生`)
   } catch (err) {
@@ -4723,17 +4701,9 @@ async function confirmQuickAddToClass() {
   }
   // 同步到 MySQL：班级归属 + 分组成员变更
   try {
-    await fetch(`http://localhost:3000/api/teaching/students/${quickAddClassStudentId.value}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ className: quickAddClassSelected.value }),
-    })
+    await javaUpdateStudent(quickAddClassStudentId.value, { className: quickAddClassSelected.value })
     if (changedGroups.length > 0) {
-      await fetch('http://localhost:3000/api/teaching/groups/bulk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ groups: changedGroups }),
-      })
+      await javaBulkGroups(changedGroups)
     }
   } catch {}
   showQuickAddClassModal.value = false
@@ -4870,7 +4840,7 @@ async function handleImportGroupsExcel(event: Event) {
     }
     // 同步到 MySQL
     if (groups.length > 0) {
-      try { await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: {'Content-Type':'application/json', ...authHeaders()}, body: JSON.stringify({ groups }) }) } catch {}
+      try { await javaBulkGroups(groups) } catch {}
     }
     alert(`导入成功！共导入 ${imported} 个分组`)
   } catch (err) {

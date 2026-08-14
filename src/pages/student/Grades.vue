@@ -125,7 +125,7 @@ import * as d3 from 'd3'
 import * as echarts from 'echarts'
 import StatCard from '@/components/StatCard.vue'
 import Modal from '@/components/Modal.vue'
-import { fetchStudentScores } from '@/api'
+import { javaFetchStudentScores, javaListCourses } from '@/api'
 
 // 使用 Icons 映射创建 Vue 组件，替代 lucide-vue-next
 function iconView(name: keyof typeof Icons) {
@@ -244,22 +244,21 @@ function updateChart() {
 onMounted(async () => {
   // 先确保课程数据已加载（让课程名称可以正确显示）
   try {
-    const res = await fetch('http://localhost:3000/api/courses')
-    const data = await res.json()
-    if (data.success) store.courses = data.courses
+    const courses = await javaListCourses()
+    if (courses && courses.length > 0) store.courses = courses
   } catch { /* ignore */ }
 
   const s = store.students.find((x) => x.name === store.currentUser || x.name === store.currentDisplayName)
   if (s?.id) {
     try {
-      const res = await fetchStudentScores(s.id)
-      if (res.success && res.scores.length > 0) {
+      const scores = await javaFetchStudentScores(s.id)
+      if (scores && scores.length > 0) {
         // 清除该学生的旧 mock 成绩
         store.grades = store.grades.filter((g) => g.studentId !== s.id)
 
         // 将数据库成绩转换为 Grade 格式
         const byCourse = new Map<string, { scores: any[]; totalScore: number }>()
-        for (const sc of res.scores) {
+        for (const sc of scores) {
           if (!byCourse.has(sc.courseId)) byCourse.set(sc.courseId, { scores: [], totalScore: 0 })
           byCourse.get(sc.courseId)!.scores.push(sc)
         }

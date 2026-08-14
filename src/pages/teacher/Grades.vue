@@ -275,7 +275,7 @@ import { BarChart3, ChevronDown, ChevronUp, ChevronRight, Download, Upload, Load
 import ScoreDetail from '@/components/ScoreDetail.vue'
 import type { DetailedGrade, Enrollment } from '@/types'
 import { getNow } from '@/lib/date'
-import { fetchCourseScores, fetchTeacherCourses } from '@/api'
+import { javaListExamScores } from '@/api'
 
 const store = useAppStore()
 
@@ -301,17 +301,15 @@ watch(() => selectedCourse.value, async (courseId) => {
   if (!courseId || courseId === 'all') return
   loadingScores.value = true
   try {
-    const res = await fetchCourseScores(courseId)
-    if (res.success) {
-      dbScores.value = res.scores
-      // 回填到 store 供其他组件使用
-      for (const s of res.scores) {
-        const existing = store.examScores.findIndex((x: any) => x.id === s.id)
-        if (existing >= 0) {
-          store.examScores[existing] = s
-        } else {
-          store.examScores.push(s)
-        }
+    const scores = await javaListExamScores()
+    dbScores.value = (scores || []).filter((s: any) => s.courseId === courseId)
+    // 回填到 store 供其他组件使用
+    for (const s of dbScores.value) {
+      const existing = store.examScores.findIndex((x: any) => x.id === s.id)
+      if (existing >= 0) {
+        store.examScores[existing] = s
+      } else {
+        store.examScores.push(s)
       }
     }
   } catch { /* ignore */ } finally {
@@ -320,11 +318,7 @@ watch(() => selectedCourse.value, async (courseId) => {
 })
 
 onMounted(async () => {
-  // 加载教师课程
-  try {
-    const res = await fetchTeacherCourses(store.currentUser || '')
-    if (res.success) store.courses = res.courses
-  } catch { /* ignore */ }
+  // 教师课程已由 store.initFromDatabase 从数据库加载，无需再请求 Express
 })
 
 const GRADE_COLORS = [

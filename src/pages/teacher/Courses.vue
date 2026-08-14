@@ -418,7 +418,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { authHeaders } from '@/api'
+import { javaBulkGroups } from '@/api'
 
 import {
   BookOpen, ChevronDown, ChevronUp, User, Users, ClipboardCheck,
@@ -1308,7 +1308,7 @@ async function handleImportGroups() {
       // 同步新分组到 MySQL（合并更新已由 updateStudentGroup 落库）
       if (newGroups.length > 0) {
         try {
-          await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ groups: newGroups }) })
+          await javaBulkGroups(newGroups)
         } catch {}
       }
       alert(`成功导入 ${imported} 个分组${updated ? `，其中 ${updated} 个已有分组已合并更新` : ''}`)

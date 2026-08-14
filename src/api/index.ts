@@ -352,6 +352,19 @@ export async function javaListEnrollments(courseId?: string) {
   return javaRequest(`/teaching/enrollments${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`)
 }
 
+/** GET /teaching/enrollments/students?courseId= 返回课程下全部学生 */
+export async function javaListEnrollmentStudents(courseId: string) {
+  return javaRequest(`/teaching/enrollments/students?courseId=${encodeURIComponent(courseId)}`)
+}
+
+/** POST /teaching/enrollments/bulk 批量选课（body 为裸数组） */
+export async function javaBulkEnrollments(enrollments: any[]) {
+  return javaRequest('/teaching/enrollments/bulk', {
+    method: 'POST',
+    body: JSON.stringify(enrollments),
+  })
+}
+
 export async function javaAddEnrollment(enrollment: any) {
   return javaRequest('/teaching/enrollments', {
     method: 'POST',
@@ -390,6 +403,14 @@ export async function javaUpdateGroup(id: string, data: any) {
 
 export async function javaDeleteGroup(id: string) {
   return javaRequest(`/teaching/groups/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** POST /teaching/groups/bulk 批量分组（body 为裸数组） */
+export async function javaBulkGroups(groups: any[]) {
+  return javaRequest('/teaching/groups/bulk', {
+    method: 'POST',
+    body: JSON.stringify(groups),
+  })
 }
 
 export async function javaListFiles(courseId?: string) {
@@ -434,8 +455,8 @@ export async function javaListCourses() {
   return javaRequest('/courses')
 }
 
-export async function javaListStudents() {
-  return javaRequest('/students')
+export async function javaListStudents(keyword?: string) {
+  return javaRequest(`/students${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''}`)
 }
 
 export async function javaListSchedules() {
@@ -512,4 +533,164 @@ export async function javaListMentors() {
 
 export async function javaListLeaders() {
   return javaRequest('/base-data/leaders')
+}
+
+// ============================================================
+// Java 后端写接口封装（教师端操作落库，无作业模块）
+// ============================================================
+
+// 待办
+export async function javaAddTodo(todo: any) {
+  return javaRequest('/teaching/todos', { method: 'POST', body: JSON.stringify(todo) })
+}
+export async function javaUpdateTodo(id: string, data: any) {
+  return javaRequest(`/teaching/todos/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteTodo(id: string) {
+  return javaRequest(`/teaching/todos/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 笔记
+export async function javaAddNote(note: any) {
+  return javaRequest('/teaching/notes', { method: 'POST', body: JSON.stringify(note) })
+}
+export async function javaUpdateNote(id: string, data: any) {
+  return javaRequest(`/teaching/notes/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteNote(id: string) {
+  return javaRequest(`/teaching/notes/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+
+// 课程评价（互评/教师评价）
+export async function javaAddEvaluation(ev: any) {
+  return javaRequest('/teaching/evaluations', { method: 'POST', body: JSON.stringify(ev) })
+}
+export async function javaUpdateEvaluation(id: string, data: any) {
+  return javaRequest(`/teaching/evaluations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteEvaluation(id: string) {
+  return javaRequest(`/teaching/evaluations/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 评价方案配置
+export async function javaSaveEvalConfig(config: any) {
+  return javaRequest('/teaching/eval-configs', { method: 'POST', body: JSON.stringify(config) })
+}
+
+// 素质评价（打分）
+export async function javaScoreQualityEvaluation(id: string, data: any) {
+  return javaRequest(`/teaching/quality-evaluations/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+// 成绩明细/总评
+export async function javaAddDetailedGrade(dg: any) {
+  return javaRequest('/teaching/detailed-grades', { method: 'POST', body: JSON.stringify(dg) })
+}
+export async function javaUpdateDetailedGrade(id: string, data: any) {
+  return javaRequest(`/teaching/detailed-grades/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteDetailedGrade(id: string) {
+  return javaRequest(`/teaching/detailed-grades/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 综合成绩
+export async function javaAddGrade(grade: any) {
+  return javaRequest('/teaching/grades', { method: 'POST', body: JSON.stringify(grade) })
+}
+export async function javaUpdateGrade(id: string, data: any) {
+  return javaRequest(`/teaching/grades/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteGrade(id: string) {
+  return javaRequest(`/teaching/grades/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 考试/项目成绩
+export async function javaAddExamScore(exam: any) {
+  return javaRequest('/teaching/exam-scores', { method: 'POST', body: JSON.stringify(exam) })
+}
+export async function javaUpdateExamScore(id: string, data: any) {
+  return javaRequest(`/teaching/exam-scores/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteExamScore(id: string) {
+  return javaRequest(`/teaching/exam-scores/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+/** POST /teaching/scores/bulk 批量成绩（body 为裸数组） */
+export async function javaBulkScores(scores: any[]) {
+  return javaRequest('/teaching/scores/bulk', {
+    method: 'POST',
+    body: JSON.stringify(scores),
+  })
+}
+
+/** GET /teaching/scores/student/{studentId} 按学生查成绩（返回 Grade 裸数组） */
+export async function javaFetchStudentScores(studentId: string) {
+  return javaRequest(`/teaching/scores/student/${encodeURIComponent(studentId)}`)
+}
+
+// 课程
+export async function javaAddCourse(course: any) {
+  return javaRequest('/courses', { method: 'POST', body: JSON.stringify(course) })
+}
+export async function javaUpdateCourse(id: string, data: any) {
+  return javaRequest(`/courses/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteCourse(id: string) {
+  return javaRequest(`/courses/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 排课
+export async function javaAddSchedule(schedule: any) {
+  return javaRequest('/schedules', { method: 'POST', body: JSON.stringify(schedule) })
+}
+export async function javaUpdateSchedule(id: string, data: any) {
+  return javaRequest(`/schedules/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteSchedule(id: string) {
+  return javaRequest(`/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+/** POST /schedules/bulk 批量排课 */
+export async function javaBulkSchedules(schedules: any[]) {
+  return javaRequest('/schedules/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ schedules }),
+  })
+}
+
+// 学生
+export async function javaAddStudent(student: any) {
+  return javaRequest('/students', { method: 'POST', body: JSON.stringify(student) })
+}
+export async function javaUpdateStudent(id: string, data: any) {
+  return javaRequest(`/students/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteStudent(id: string) {
+  return javaRequest(`/students/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 评价提醒
+export async function javaAddEvalReminder(reminder: any) {
+  return javaRequest('/teaching/eval-reminders', { method: 'POST', body: JSON.stringify(reminder) })
+}
+export async function javaUpdateEvalReminder(id: string, data: any) {
+  return javaRequest(`/teaching/eval-reminders/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteEvalReminder(id: string) {
+  return javaRequest(`/teaching/eval-reminders/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 学生分层
+export async function javaAddStudentTier(tier: any) {
+  return javaRequest('/teaching/student-tiers', { method: 'POST', body: JSON.stringify(tier) })
+}
+export async function javaUpdateStudentTier(id: string, data: any) {
+  return javaRequest(`/teaching/student-tiers/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+export async function javaDeleteStudentTier(id: string) {
+  return javaRequest(`/teaching/student-tiers/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// 云盘文件更新（重命名等）
+export async function javaUpdateFile(id: string, data: any) {
+  return javaRequest(`/teaching/files/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
 }
