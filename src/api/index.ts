@@ -279,6 +279,19 @@ export async function javaListEnrollments(courseId?: string) {
   return javaRequest(`/teaching/enrollments${courseId ? `?courseId=${encodeURIComponent(courseId)}` : ''}`)
 }
 
+/** GET /teaching/enrollments/students?courseId= 返回课程下全部学生 */
+export async function javaListEnrollmentStudents(courseId: string) {
+  return javaRequest(`/teaching/enrollments/students?courseId=${encodeURIComponent(courseId)}`)
+}
+
+/** POST /teaching/enrollments/bulk 批量选课（body 为裸数组） */
+export async function javaBulkEnrollments(enrollments: any[]) {
+  return javaRequest('/teaching/enrollments/bulk', {
+    method: 'POST',
+    body: JSON.stringify(enrollments),
+  })
+}
+
 export async function javaAddEnrollment(enrollment: any) {
   return javaRequest('/teaching/enrollments', {
     method: 'POST',
@@ -317,6 +330,14 @@ export async function javaUpdateGroup(id: string, data: any) {
 
 export async function javaDeleteGroup(id: string) {
   return javaRequest(`/teaching/groups/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** POST /teaching/groups/bulk 批量分组（body 为裸数组） */
+export async function javaBulkGroups(groups: any[]) {
+  return javaRequest('/teaching/groups/bulk', {
+    method: 'POST',
+    body: JSON.stringify(groups),
+  })
 }
 
 export async function javaListFiles(courseId?: string) {
@@ -361,8 +382,8 @@ export async function javaListCourses() {
   return javaRequest('/courses')
 }
 
-export async function javaListStudents() {
-  return javaRequest('/students')
+export async function javaListStudents(keyword?: string) {
+  return javaRequest(`/students${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''}`)
 }
 
 export async function javaListSchedules() {
@@ -535,6 +556,18 @@ export async function javaUpdateExamScore(id: string, data: any) {
 export async function javaDeleteExamScore(id: string) {
   return javaRequest(`/teaching/exam-scores/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
+/** POST /teaching/scores/bulk 批量成绩（body 为裸数组） */
+export async function javaBulkScores(scores: any[]) {
+  return javaRequest('/teaching/scores/bulk', {
+    method: 'POST',
+    body: JSON.stringify(scores),
+  })
+}
+
+/** GET /teaching/scores/student/{studentId} 按学生查成绩（返回 Grade 裸数组） */
+export async function javaFetchStudentScores(studentId: string) {
+  return javaRequest(`/teaching/scores/student/${encodeURIComponent(studentId)}`)
+}
 
 // 课程
 export async function javaAddCourse(course: any) {
@@ -556,6 +589,13 @@ export async function javaUpdateSchedule(id: string, data: any) {
 }
 export async function javaDeleteSchedule(id: string) {
   return javaRequest(`/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+/** POST /schedules/bulk 批量排课 */
+export async function javaBulkSchedules(schedules: any[]) {
+  return javaRequest('/schedules/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ schedules }),
+  })
 }
 
 // 学生

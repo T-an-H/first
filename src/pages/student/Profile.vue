@@ -8,6 +8,7 @@ import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
 import { getNow } from '@/lib/date'
+import { javaListStudents, javaListSchedules } from '@/api'
 
 const store = useAppStore()
 const student = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
@@ -83,16 +84,14 @@ async function loadMySchedules() {
   try {
     const studentName = store.currentDisplayName || store.currentUser
     if (!studentName) return
-    // 1. 查询学生信息获取班级
-    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
-    const stuData = await stuRes.json()
-    const myInfo = stuData.students?.[0]
+    // 1. 查询学生信息获取班级（Java：GET /students?keyword= 返回裸数组）
+    const students = await javaListStudents(studentName)
+    const myInfo = students?.[0]
     if (!myInfo?.className) return
-    // 2. 按班级加载排课（与课表页面 Schedule.vue 数据源一致）
-    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
-    const schData = await schRes.json()
-    if (schData.success) {
-      dbSchedules.value = schData.schedules
+    // 2. 按班级加载排课（Java：GET /schedules 返回全部，按 className 前端过滤）
+    const schedules = await javaListSchedules()
+    if (schedules) {
+      dbSchedules.value = schedules.filter((s: any) => s.className === myInfo.className)
     }
   } catch (e) {
     console.error('加载课表失败:', e)

@@ -469,7 +469,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { Plus, Search, CalendarX, AlertTriangle, Upload, RefreshCw, BookOpen, ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
 import type { Schedule, Course, Department } from '@/types'
-import { bulkImportSchedules, updateCourse as apiUpdateCourse, updateSchedule as apiUpdateSchedule, deleteSchedule as apiDeleteSchedule } from '@/api'
+import { javaBulkSchedules, javaUpdateCourse as apiUpdateCourse, javaUpdateSchedule as apiUpdateSchedule, javaDeleteSchedule as apiDeleteSchedule } from '@/api'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
@@ -1012,8 +1012,8 @@ function handleSave() {
     mentor,
   }))
 
-  // 发送到后端
-  const doSave = bulkImportSchedules(newSchedules)
+  // 发送到后端（Java 8080，body 为裸数组）
+  const doSave = javaBulkSchedules(newSchedules)
 
   doSave
     .then(() => {
@@ -1118,9 +1118,9 @@ async function handleFileChange(e: Event) {
       return
     }
 
-    const res = await bulkImportSchedules(schedules)
+    await javaBulkSchedules(schedules)
     await loadSchedules()
-    importMsg.value = { success: true, text: res.message || `成功导入 ${schedules.length} 条排课记录` }
+    importMsg.value = { success: true, text: `成功导入 ${schedules.length} 条排课记录` }
     setTimeout(() => { importMsg.value = null }, 5000)
   } catch (e: any) {
     importMsg.value = { success: false, text: '导入失败：' + (e.message || '未知错误') }

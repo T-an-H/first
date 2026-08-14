@@ -6,7 +6,7 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
-import { fetchSchedules, fetchStudents } from '@/api'
+import { javaListStudents, javaListSchedules } from '@/api'
 import { renderIcon } from '@/utils/d3-renderer'
 import { isVirtualToday, getVirtualMonday, getTodayStart, getSemesterOf } from '@/lib/date'
 
@@ -30,14 +30,14 @@ async function loadMySchedules() {
     const studentName = store.currentDisplayName || store.currentUser
     if (!studentName) return
 
-    // 从 students API 查询学生信息
-    const stuRes = await fetchStudents({ search: studentName, pageSize: 1 })
-    const myInfo = stuRes.students?.[0]
+    // 从 Java 后端查询学生信息（GET /students?keyword= 返回裸数组）
+    const students = await javaListStudents(studentName)
+    const myInfo = students?.[0]
 
-    // 2. 按班级加载排课
+    // 2. 按班级加载排课（GET /schedules 返回全部，按 className 前端过滤）
     if (myInfo?.className) {
-      const schRes = await fetchSchedules({ class: myInfo.className })
-      remoteSchedules = schRes.schedules ?? []
+      const schedules = await javaListSchedules()
+      remoteSchedules = schedules.filter((s: any) => s.className === myInfo.className)
     }
   } catch (e) {
     console.error('加载课表失败:', e)

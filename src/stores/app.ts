@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
-import { updateEvalReminder as apiUpdateReminder } from '@/api'
+import { javaUpdateEvalReminder as apiUpdateReminder } from '@/api'
 import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, javaUpdateFile, javaDeleteCourse, javaAddCourse, javaUpdateCourse, javaAddSchedule, javaUpdateSchedule, javaDeleteSchedule, javaAddStudent, javaUpdateStudent, javaDeleteStudent, javaAddGrade, javaUpdateGrade, javaDeleteGrade, javaAddExamScore, javaUpdateExamScore, javaDeleteExamScore, javaAddTodo, javaUpdateTodo, javaDeleteTodo, javaAddNote, javaUpdateNote, javaDeleteNote, javaAddOnlineDoc, javaUpdateOnlineDoc, javaDeleteOnlineDoc, javaAddEvaluation, javaUpdateEvaluation, javaDeleteEvaluation, javaSaveEvalConfig, javaScoreQualityEvaluation, javaAddDetailedGrade, javaUpdateDetailedGrade, javaDeleteDetailedGrade } from '@/api'
 import {
   javaListEnrollments, javaListGroups, javaListFiles, javaListEvaluations, javaGetGradeConfig,
