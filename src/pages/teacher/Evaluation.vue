@@ -24,7 +24,7 @@
             {{ getCourseConfig(course.id) ? EvalTemplateLabels[getCourseConfig(course.id).template] : '未配置' }}
           </span>
           <span v-if="getCourseConfig(course.id)" class="text-xs px-2 py-0.5 rounded-full bg-brand-400/10 text-brand-600 border border-brand-400">
-            {{ EvalFrequencyLabels[getCourseConfig(course.id).frequency] }} ({{ store.getEvalSessions(course.id) }}次)
+            每两学时一次 ({{ store.getEvalSessions(course.id) }}次)
           </span>
         </div>
       </button>
@@ -40,37 +40,10 @@
           >
             <div class="flex items-center gap-2">
               <Settings class="w-5 h-5 text-gray-400" />
-              <h2 class="font-semibold text-gray-900">评价方案配置</h2>
+              <h2 class="font-semibold text-gray-900">评价模板</h2>
             </div>
-            <div class="flex items-center gap-3">
-              <!-- 当前配置摘要 -->
-              <span class="text-xs text-gray-400">
-                {{ selectedConfig ? EvalTemplateLabels[selectedConfig.template] : '未配置' }} ·
-                {{ selectedConfig ? EvalFrequencyLabels[selectedConfig.frequency] : '默认频率' }}
-              </span>
-              <span class="text-xs text-gray-400 hover:text-brand-600">{{ showSettings ? '收起 ▲' : '展开 ▼' }}</span>
-            </div>
+            <span class="text-xs text-gray-400 hover:text-brand-600">{{ showSettings ? '收起 ▲' : '展开 ▼' }}</span>
           </button>
-
-          <!-- 自动隐藏信息 -->
-          <div class="flex flex-wrap gap-2 mt-3 mb-1">
-            <template v-for="t in ALL_EVAL_TYPES" :key="t">
-              <span v-if="!selectedConfig || !TEMPLATE_EVAL_TYPES[selectedConfig.template].includes(t)"
-                class="text-xs px-2.5 py-1 rounded-full bg-brand-400/10 text-gray-400/60 border border-brand-400/30">
-                {{ EvalTypeLabels[t] }} ✗
-              </span>
-              <span v-else-if="(t === 'intra_group' || t === 'inter_group') && !courseHasGroups || t === 'mentor' && selectedConfig && !selectedConfig.hasMentor"
-                class="text-xs px-2.5 py-1 rounded-full bg-brand-400/10 text-gray-400 border border-brand-400/50">
-                <EyeOff class="w-3 h-3 inline mr-0.5" />
-                {{ EvalTypeLabels[t] }}（自动隐藏）
-              </span>
-              <span v-else
-                :class="`text-xs px-2.5 py-1 rounded-full border ${EvalTypeColors[t]}`">
-                <Eye class="w-3 h-3 inline mr-0.5" />
-                {{ EvalTypeLabels[t] }}
-              </span>
-            </template>
-          </div>
 
           <template v-if="showSettings">
             <div class="border-t border-brand-400/20 mt-3 pt-4 space-y-4">
@@ -91,60 +64,6 @@
                         {{ EvalTypeLabels[et] }}
                       </span>
                     </div>
-                  </button>
-                </div>
-              </div>
-
-              <!-- 评价频率 -->
-              <div>
-                <p class="text-sm font-medium text-gray-800 mb-2">评价频率</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <button
-                    v-for="freq in EVAL_FREQUENCY_KEYS" :key="freq"
-                    @click="handleSetConfig({ frequency: freq })"
-                    :class="`text-left p-3 rounded-lg border transition-all ${selectedConfig?.frequency === freq ? 'border-brand-400 bg-brand-400/10' : 'border-brand-400/30 bg-white hover:border-brand-400'}`"
-                  >
-                    <span class="text-sm font-medium text-gray-900">{{ EvalFrequencyLabels[freq] }}</span>
-                    <p class="text-xs text-gray-400 mt-0.5">{{ EvalFrequencyDescs[freq] }}</p>
-                    <span class="text-xs text-brand-600 mt-0.5 block">
-                      共 {{ selectedCourse ? store.getEvalSessions(selectedCourse) : 0 }} 次评价
-                    </span>
-                  </button>
-                </div>
-                <div v-if="selectedConfig?.frequency === 'custom'" class="mt-2">
-                  <label class="text-xs text-gray-400">自定义评价次数：</label>
-                  <input type="number" min="1" max="20"
-                    :value="selectedConfig?.customSessions || 3"
-                    @change="(e) => handleSetConfig({ customSessions: parseInt((e.target as HTMLInputElement).value) || 3 })"
-                    class="ml-2 w-16 px-2 py-1 border border-brand-400/30 rounded-lg text-sm" />
-                </div>
-              </div>
-
-              <!-- 企业导师参与 -->
-              <div class="flex items-center gap-3">
-                <label class="text-sm font-medium text-gray-800">企业导师参与评价</label>
-                <button
-                  @click="handleSetConfig({ hasMentor: !selectedConfig?.hasMentor })"
-                  :class="`relative w-10 h-5 rounded-full transition-colors ${selectedConfig?.hasMentor ? 'bg-brand-600' : 'bg-brand-400/10'}`"
-                >
-                  <span :class="`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${selectedConfig?.hasMentor ? 'left-5.5' : 'left-0.5'}`" />
-                </button>
-                <span class="text-xs text-gray-400">
-                  {{ selectedConfig?.hasMentor ? '已启用' : '已禁用' }}——
-                  {{ selectedConfig?.hasMentor ? '学生端将显示企业导师评价卡片' : '学生端自动隐藏企业导师评价' }}
-                </span>
-              </div>
-
-              <!-- 逾期处理规则 -->
-              <div>
-                <p class="text-sm font-medium text-gray-800 mb-2">逾期未评处理规则</p>
-                <div class="flex gap-3">
-                  <button
-                    v-for="rule in OVERDUE_RULE_KEYS" :key="rule"
-                    @click="handleSetConfig({ overdueRule: rule })"
-                    :class="`px-4 py-2 rounded-lg border text-sm transition-all ${selectedConfig?.overdueRule === rule ? 'border-brand-400 bg-brand-400/10 text-gray-800 font-medium' : 'border-brand-400/30 bg-white text-gray-400 hover:border-brand-400'}`"
-                  >
-                    {{ OverdueRuleLabels[rule] }}
                   </button>
                 </div>
               </div>
@@ -271,11 +190,10 @@ import { ref, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
 import {
   BookOpen, Settings, Users, AlertTriangle, ClipboardCheck,
-  Eye, EyeOff, RefreshCw
+  RefreshCw
 } from 'lucide-vue-next'
-import { EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES, EvalTypeLabels, EvalTypeColors,
-  EvalFrequencyLabels, EvalFrequencyDescs, OverdueRuleLabels } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, OverdueRule } from '@/types'
+import { EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES, EvalTypeLabels } from '@/types'
+import type { EvalTemplate, EvalType, Evaluation } from '@/types'
 import { getNow } from '@/lib/date'
 
 const store = useAppStore()
@@ -287,10 +205,7 @@ const LEVEL_OPTIONS = [
   { label: 'D (及格)', range: [60, 69], color: 'bg-brand-600/15 text-gray-800 border-brand-400' },
 ]
 
-const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
 const EVAL_TEMPLATE_KEYS = Object.keys(EvalTemplateLabels) as EvalTemplate[]
-const EVAL_FREQUENCY_KEYS = Object.keys(EvalFrequencyLabels) as EvalFrequency[]
-const OVERDUE_RULE_KEYS = Object.keys(OverdueRuleLabels) as OverdueRule[]
 
 const selectedCourse = ref<string | null>(null)
 const showSettings = ref(false)
@@ -350,11 +265,11 @@ const handleSetConfig = (updates: Partial<import('@/types').EvaluationConfig>) =
   const config = {
     courseId: selectedCourse.value,
     template: existing?.template || 'standard',
-    frequency: existing?.frequency || 'biweekly',
     hasMentor: existing?.hasMentor ?? false,
     overdueRule: existing?.overdueRule || 'average',
     ...existing,
     ...updates,
+    frequency: 'biweekly', // 固定：每两学时一次，不可配置
   }
   store.setEvalConfig(config)
 }

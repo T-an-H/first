@@ -1,18 +1,19 @@
 <template>
   <div>
-    <!-- 无配置 -->
-    <div v-if="!config" class="bg-brand-400/10 rounded-lg p-4 text-center text-sm text-gray-400">该课程尚未配置评价方案</div>
+    <!-- 无配置且未开课 -->
+    <div v-if="!effectiveConfig" class="bg-brand-400/10 rounded-lg p-4 text-center text-sm text-gray-400">该课程尚未配置评价方案，开课后将默认按最全方案实施</div>
     <div v-else-if="enabledTypes.length === 0" class="bg-brand-400/10 rounded-lg p-4 text-center text-sm text-gray-400">当前课程配置下无可用的评价类型</div>
     <div v-else class="space-y-3">
       <!-- 配置标签 -->
       <div class="flex items-center gap-2 flex-wrap mb-2">
-        <span class="text-xs px-2 py-0.5 rounded-full bg-brand-600/15 text-brand-600 border border-brand-400">{{ EvalTemplateLabels[config.template] }}</span>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-brand-600/15 text-brand-600 border border-brand-400">{{ EvalTemplateLabels[effectiveConfig.template] }}</span>
+        <span v-if="isDefaultScheme" class="text-[10px] px-1.5 py-0.5 rounded bg-brand-400/10 text-gray-400">教师未配置，默认按最全方案</span>
         <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-600 border border-cyan-200">
-          {{ EvalFrequencyLabels[config.frequency] }}
+          每两学时一次
           <span class="ml-1 text-[10px] text-cyan-400">（共{{ totalSessions }}次）</span>
         </span>
         <span v-if="!courseHasGroups" class="text-[10px] px-1.5 py-0.5 rounded bg-brand-400/10 text-gray-400">组内/组间互评自动隐藏（未分组）</span>
-        <span v-if="!config.hasMentor" class="text-[10px] px-1.5 py-0.5 rounded bg-brand-400/10 text-gray-400">企业导师评价自动隐藏（无企业参与）</span>
+        <span v-if="!effectiveConfig.hasMentor" class="text-[10px] px-1.5 py-0.5 rounded bg-brand-400/10 text-gray-400">企业导师评价自动隐藏（无企业参与）</span>
       </div>
 
       <!-- 评价场次列表 -->
@@ -114,8 +115,8 @@ import {
   AlertTriangle, User, Users, Building2, GraduationCap, Briefcase,
   CheckCircle, ChevronRight, Lock
 } from 'lucide-vue-next'
-import type { EvalType, EvalAnomaly } from '@/types'
-import { EvalTypeLabels, EvalTypeColors, EvalTemplateLabels, EvalFrequencyLabels, TEMPLATE_EVAL_TYPES } from '@/types'
+import type { EvalType, EvalAnomaly, EvaluationConfig } from '@/types'
+import { EvalTypeLabels, EvalTypeColors, EvalTemplateLabels, TEMPLATE_EVAL_TYPES } from '@/types'
 import Modal from './Modal.vue'
 import { getNow } from '@/lib/date'
 
@@ -132,15 +133,36 @@ const config = computed(() => store.evalConfigs.find((c) => c.courseId === props
 const totalSessions = computed(() => store.getEvalSessions(props.courseId))
 const courseHasGroups = computed(() => store.hasGroups(props.courseId))
 
+// 课程是否已开课（无开始日期视为已开课）
+const course = computed(() => store.courses.find((c) => c.id === props.courseId))
+const courseStarted = computed(() => {
+  const sd = course.value?.startDate
+  if (!sd) return true
+  return new Date(sd).getTime() <= getNow().getTime()
+})
+
+// 生效评价配置：
+// 教师已配置 → 按教师配置；未配置但课程已开课 → 默认按最全方案（全评价 all）实施
+const effectiveConfig = computed<EvaluationConfig | null>(() => {
+  if (config.value) return config.value
+  if (courseStarted.value) {
+    return { courseId: props.courseId, template: 'all', hasMentor: true, overdueRule: 'average', frequency: 'biweekly' }
+  }
+  return null
+})
+
+// 是否走默认最全方案（教师未配置，开课后兜底）
+const isDefaultScheme = computed(() => !!effectiveConfig.value && !config.value)
+
 watch(() => props.courseId, () => {
   store.generateEvalReminders(props.courseId)
 }, { immediate: true })
 
-const baseEnabledTypes = computed(() => config.value ? TEMPLATE_EVAL_TYPES[config.value.template] : [])
+const baseEnabledTypes = computed(() => effectiveConfig.value ? TEMPLATE_EVAL_TYPES[effectiveConfig.value.template] : [])
 const enabledTypes = computed(() =>
   baseEnabledTypes.value.filter((t) => {
     if ((t === 'intra_group' || t === 'inter_group') && !courseHasGroups.value) return false
-    if (t === 'mentor' && !config.value?.hasMentor) return false
+    if (t === 'mentor' && !effectiveConfig.value?.hasMentor) return false
     return true
   })
 )

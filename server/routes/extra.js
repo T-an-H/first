@@ -1,7 +1,7 @@
 /**
- * 教师端扩展数据路由：待办 / 笔记 / 在线文档 / AI分层
+ * 教师端扩展数据路由：待办 / 笔记 / AI分层
  *
- * 对应新增数据库表：todos、notes、online_docs、student_tiers
+ * 对应新增数据库表：todos、notes、student_tiers
  * （建表脚本见 server/sql/schema_extra.sql，数据库 course_platform）
  * 与 Java 后端(course_db, 8080) 的接口路径保持一致：/api/teaching/...
  */
@@ -127,68 +127,6 @@ router.put('/notes/:id', async (req, res) => {
 router.delete('/notes/:id', async (req, res) => {
   try {
     await pool.execute('DELETE FROM note WHERE id = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-});
-
-// ==================== 在线文档 (Online Docs) ====================
-
-/** GET /api/teaching/online-docs?createdBy=xxx - 文档列表 */
-router.get('/online-docs', async (req, res) => {
-  try {
-    const { createdBy } = req.query;
-    let sql = 'SELECT * FROM online_doc';
-    const params = [];
-    if (createdBy) { sql += ' WHERE created_by = ?'; params.push(createdBy); }
-    sql += ' ORDER BY last_edited_at DESC';
-    const [rows] = await pool.execute(sql, params);
-    res.json({ success: true, docs: rows.map((r) => ({
-      id: r.id,
-      title: r.title,
-      content: r.content || '',
-      createdBy: r.created_by || '',
-      createdAt: r.created_at || '',
-      lastEditedAt: r.last_edited_at || '',
-      lastEditedBy: r.last_edited_by || '',
-    })) });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-});
-
-/** POST /api/teaching/online-docs - 新建文档 */
-router.post('/online-docs', async (req, res) => {
-  try {
-    const { id, title, content, createdBy, createdAt, lastEditedAt, lastEditedBy } = req.body;
-    if (!title) return res.status(400).json({ success: false, message: 'title 必填' });
-    const docId = id || `doc-${Date.now()}`;
-    const now = lastEditedAt || createdAt || new Date().toISOString();
-    await pool.execute(
-      'INSERT INTO online_doc (id, title, content, created_by, created_at, last_edited_at, last_edited_by) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [docId, title, content || '', createdBy || '', createdAt || now, now, lastEditedBy || createdBy || '']
-    );
-    res.json({ success: true, id: docId });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-});
-
-/** PUT /api/teaching/online-docs/:id - 更新文档 */
-router.put('/online-docs/:id', async (req, res) => {
-  try {
-    const { title, content, lastEditedAt, lastEditedBy } = req.body;
-    const sets = []; const params = [];
-    if (title !== undefined) { sets.push('title = ?'); params.push(title); }
-    if (content !== undefined) { sets.push('content = ?'); params.push(content); }
-    if (lastEditedAt !== undefined) { sets.push('last_edited_at = ?'); params.push(lastEditedAt); }
-    if (lastEditedBy !== undefined) { sets.push('last_edited_by = ?'); params.push(lastEditedBy); }
-    if (sets.length === 0) return res.json({ success: true });
-    params.push(req.params.id);
-    await pool.execute(`UPDATE online_doc SET ${sets.join(', ')} WHERE id = ?`, params);
-    res.json({ success: true });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
-});
-
-/** DELETE /api/teaching/online-docs/:id - 删除文档 */
-router.delete('/online-docs/:id', async (req, res) => {
-  try {
-    await pool.execute('DELETE FROM online_doc WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });

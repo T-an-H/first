@@ -42,19 +42,7 @@
               </button>
             </div>
 
-            <!-- 逾期未测，自动分配基础层 -->
-            <div v-else-if="secondClassStarted && !tierFinalized" class="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
-              <XCircle class="w-12 h-12 mx-auto mb-3 text-red-400" />
-              <h3 class="text-lg font-semibold text-red-700 mb-2">测试窗口已关闭</h3>
-              <p class="text-sm text-red-600 mb-4">第二节课已开始，AI 分层测试逾期未完成，已自动分配到基础层</p>
-              <div class="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-lg shadow-sm">
-                <Layers class="w-4 h-4 text-brand-600" />
-                <span class="text-sm font-bold text-gray-800">基础层</span>
-              </div>
-              <p class="text-xs text-gray-400 mt-4">本学期不可修改，后续任务、资源、作业将根据基础层进行适配</p>
-            </div>
-
-            <!-- 已分层 → 永久锁定展示 -->
+            <!-- 已分层 / 逾期自动分配 → 永久锁定展示 -->
             <div v-else>
               <!-- 当前层级 -->
               <div>
@@ -73,15 +61,16 @@
                     </div>
                     <div class="text-right">
                       <p class="text-xs text-gray-400">分层测试得分</p>
-                      <p class="text-2xl font-bold text-blue-600">{{ myTierScore }}</p>
-                      <p class="text-xs text-gray-400">/ {{ totalQuestions * 10 }}分</p>
+                      <p class="text-2xl font-bold text-blue-600">{{ isAutoAssigned ? '—' : myTierScore }}</p>
+                      <p class="text-xs text-gray-400">{{ isAutoAssigned ? '未参加测试' : `/ ${totalQuestions * 10}分` }}</p>
                     </div>
                   </div>
 
                   <!-- 锁定提示 -->
                   <div class="mt-3 flex items-center gap-2 px-3 py-2 bg-brand-400/10/80 rounded-lg text-xs text-gray-400">
                     <Lock class="w-3.5 h-3.5" />
-                    <span>AI 分层结果已锁定，本学期不可更改。后续任务、资源、作业将根据 {{ tierLabel }} 进行适配</span>
+                    <span v-if="isAutoAssigned">AI 分层测试窗口已关闭，未完成测试，系统已自动分配层级。本学期不可更改，后续任务、资源、作业将根据 {{ tierLabel }} 进行适配</span>
+                    <span v-else>AI 分层结果已锁定，本学期不可更改。后续任务、资源、作业将根据 {{ tierLabel }} 进行适配</span>
                   </div>
                 </div>
               </div>
@@ -312,23 +301,107 @@
 
           <!-- ===== 任务 ===== -->
           <div v-if="activeTab === 'tasks'" class="space-y-4">
-            <h3 class="text-sm font-semibold text-gray-800">课程任务</h3>
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold text-gray-800">课程任务</h3>
+              <span class="text-xs text-gray-400">完成教师布置的任务并上传成果，教师/导师评分</span>
+            </div>
             <div class="space-y-2">
-              <div v-for="task in courseTasks" :key="task.id"
-                class="flex items-center justify-between p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5">
-                <div class="flex items-center gap-3">
-                  <CheckCircle v-if="task.completed" class="w-5 h-5 text-emerald-500" />
-                  <Circle v-else class="w-5 h-5 text-gray-400/60" />
-                  <div>
-                    <p class="text-sm font-medium text-gray-900">{{ task.title }}</p>
-                    <p v-if="task.dueDate" class="text-xs text-gray-400">截止：{{ task.dueDate }}</p>
+              <div v-for="task in courseTasks" :key="task.id" @click="openStudentTask(task)"
+                class="flex items-center justify-between p-3 rounded-lg border border-brand-400/20 hover:bg-brand-400/5 cursor-pointer transition-colors">
+                <div class="flex items-center gap-3 min-w-0">
+                  <CheckCircle v-if="myTaskScore(task.id) !== undefined" class="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                  <Circle v-else class="w-5 h-5 text-gray-400/60 flex-shrink-0" />
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ task.title }}</p>
+                    <p v-if="task.description" class="text-xs text-gray-400 mt-0.5 truncate">{{ task.description }}</p>
+                    <p v-else class="text-xs text-gray-300 mt-0.5">暂无介绍</p>
                   </div>
                 </div>
-                <span v-if="task.score !== undefined" class="text-sm font-bold text-blue-600">{{ task.score }}分</span>
+                <span v-if="myTaskScore(task.id) !== undefined" class="text-sm font-bold text-blue-600 flex-shrink-0">{{ myTaskScore(task.id) }}分</span>
+                <span v-else-if="hasSubmittedTask(task.id)" class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200 flex-shrink-0">已提交 · 待评分</span>
+                <span v-else class="text-xs px-2 py-0.5 rounded-full bg-gray-50 text-gray-400 border border-gray-200 flex-shrink-0">未提交</span>
               </div>
-              <div v-if="courseTasks.length === 0" class="text-center py-8 text-gray-400">暂无任务</div>
+              <div v-if="courseTasks.length === 0" class="text-center py-8 text-gray-400">教师暂未布置任务</div>
             </div>
           </div>
+
+          <!-- ===== 任务详情弹窗：学生提交资料 + 查看评分 ===== -->
+          <Teleport to="body">
+            <div v-if="showStudentTaskModal && selectedStudentTask" class="fixed inset-0 z-50 flex items-center justify-center">
+              <div class="absolute inset-0 bg-black/40" @click="closeStudentTask" />
+              <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-6">
+                <div class="flex items-start justify-between gap-4 mb-4">
+                  <div class="min-w-0">
+                    <h3 class="text-lg font-semibold text-gray-900 leading-tight">{{ selectedStudentTask.title }}</h3>
+                    <p class="text-xs text-gray-400 mt-1 whitespace-pre-wrap">{{ selectedStudentTask.description || '暂无介绍' }}</p>
+                  </div>
+                  <button @click="closeStudentTask" class="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0">
+                    <X class="w-5 h-5" />
+                  </button>
+                </div>
+
+                <!-- 教师提供的文档资料（只读） -->
+                <div v-if="selectedStudentTask.attachments?.length" class="mb-4">
+                  <p class="text-xs font-medium text-gray-500 mb-1.5">教师提供的文档资料</p>
+                  <ul class="space-y-1.5">
+                    <li v-for="(f, i) in selectedStudentTask.attachments" :key="i"
+                      class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                      <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+                      <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <!-- 我的得分 -->
+                <div class="border-t border-gray-100 pt-4 mb-4">
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs font-medium text-gray-500">我的得分</p>
+                    <span v-if="myTaskScore(selectedStudentTask.id) !== undefined"
+                      class="px-3 py-1 rounded-full text-sm font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      {{ myTaskScore(selectedStudentTask.id) }} 分
+                    </span>
+                    <span v-else class="text-xs text-gray-400">尚未评分</span>
+                  </div>
+                  <p v-if="mySubmissionAttachments.length > 0" class="text-xs text-gray-400 mt-2">
+                    已提交 {{ mySubmissionAttachments.length }} 个文件，可重新上传更新
+                  </p>
+                </div>
+
+                <!-- 提交资料区 -->
+                <div class="border-t border-gray-100 pt-4">
+                  <p class="text-xs font-medium text-gray-500 mb-1.5">提交我的成果</p>
+                  <div
+                    class="border border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-brand-400/60 hover:bg-brand-400/5 transition-colors"
+                    @click="studentTaskFileInput?.click()" @dragover.prevent @drop.prevent="onStudentTaskDrop">
+                    <Upload class="w-5 h-5 mx-auto text-gray-400 mb-1" />
+                    <p class="text-xs text-gray-500">点击或拖拽文件到此处上传</p>
+                    <p class="text-[10px] text-gray-400 mt-0.5">支持 PDF / Word / PPT / Excel / 文本 / 压缩包</p>
+                  </div>
+                  <input ref="studentTaskFileInput" type="file" class="hidden" multiple
+                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.rar,.7z" @change="onStudentTaskChange" />
+                  <ul v-if="studentTaskAttachments.length" class="mt-2 space-y-1.5">
+                    <li v-for="(f, i) in studentTaskAttachments" :key="i"
+                      class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                      <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                      <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+                      <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+                      <button @click="removeStudentTaskFile(i)" class="text-gray-400 hover:text-red-500 flex-shrink-0" title="移除">
+                        <X class="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  </ul>
+                  <div class="flex items-center justify-end gap-2 mt-4">
+                    <button @click="closeStudentTask" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">关闭</button>
+                    <button @click="submitStudentTask" :disabled="studentTaskAttachments.length === 0"
+                      class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg disabled:opacity-50">
+                      提交
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Teleport>
 
           <!-- ===== 资源 ===== -->
           <div v-if="activeTab === 'resources'" class="space-y-4">
@@ -800,6 +873,7 @@ import {
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
 import StudentHomework from '@/components/Homework/StudentHomework.vue'
+import { listTasks, listTaskSubmissions, submitTask } from '@/api'
 import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile } from '@/types'
 import Modal from '@/components/Modal.vue'
 import { getNow } from '@/lib/date'
@@ -822,6 +896,7 @@ onMounted(() => {
   if (myStudent.value) {
     store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
   }
+  loadCourseTasks()
 })
 
 // 路由 query 变化时切换 tab（红点溯源：同一页面内二次跳转）
@@ -850,31 +925,125 @@ const myGrade = computed(() =>
   store.grades.find((g) => g.courseId === courseId && g.studentId === myStudent.value?.id)
 )
 
-// ===== 任务（按层级区分） =====
-const courseTasks = computed(() => {
-  const tier = tierFinalized.value ? myTier.value : 'basic'
-  const basicTasks = [
-    { id: '1', title: '完成第1章基础概念学习', dueDate: '2025-03-15', completed: true, score: 85 },
-    { id: '2', title: '完成第2章基础知识练习', dueDate: '2025-03-22', completed: true, score: 78 },
-    { id: '3', title: '完成第3章基础巩固任务', dueDate: '2025-03-29', completed: false },
-    { id: '4', title: '完成第4章基础应用练习', dueDate: '2025-04-05', completed: false },
-  ]
-  const advancedTasks = [
-    { id: '1', title: '完成第1章核心概念深入学习', dueDate: '2025-03-15', completed: true, score: 92 },
-    { id: '2', title: '完成第2章进阶实践项目', dueDate: '2025-03-22', completed: true, score: 88 },
-    { id: '3', title: '完成第3章拓展分析任务', dueDate: '2025-03-29', completed: false },
-    { id: '4', title: '完成第4章综合应用项目', dueDate: '2025-04-05', completed: false },
-  ]
-  const excellentTasks = [
-    { id: '1', title: '完成第1章高阶理论探究', dueDate: '2025-03-15', completed: true, score: 97 },
-    { id: '2', title: '完成第2章创新实践项目', dueDate: '2025-03-22', completed: true, score: 95 },
-    { id: '3', title: '完成第3章跨章节整合任务', dueDate: '2025-03-29', completed: false },
-    { id: '4', title: '完成开源项目贡献任务', dueDate: '2025-04-05', completed: false },
-  ]
-  if (tier === 'excellent') return excellentTasks
-  if (tier === 'advanced') return advancedTasks
-  return basicTasks
-})
+// ===== 任务（教师布置，学生上传资料，教师/导师评分） =====
+const courseTasks = ref<any[]>([])
+/** 我的得分缓存：taskId → score（从提交记录中读取） */
+const taskScoresByTask = ref<Record<string, number>>({})
+/** 我的已提交附件：taskId → 附件列表 */
+const myTaskSubmittedFiles = ref<Record<string, { name: string; size: number }[]>>({})
+
+async function loadCourseTasks() {
+  if (!myStudent.value) return
+  try {
+    const res = await listTasks(courseId)
+    courseTasks.value = (res.tasks || []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      description: t.description || '',
+      attachments: t.attachments || [],
+    }))
+    // 逐个任务读取我的提交与评分
+    for (const t of courseTasks.value) {
+      try {
+        const sres = await listTaskSubmissions(t.id)
+        const my = (sres.submissions || []).find((s: any) => s.studentId === myStudent.value!.id)
+        if (my) {
+          if (my.score != null) taskScoresByTask.value[t.id] = Number(my.score)
+          if (Array.isArray(my.attachments) && my.attachments.length > 0) {
+            myTaskSubmittedFiles.value[t.id] = my.attachments
+          }
+        }
+      } catch {}
+    }
+  } catch (e) {
+    console.error('加载课程任务失败:', e)
+  }
+}
+
+function myTaskScore(taskId: string): number | undefined {
+  return taskScoresByTask.value[taskId]
+}
+
+/** 是否已提交（未评分）：用于任务行展示"已提交·待评分"状态 */
+function hasSubmittedTask(taskId: string): boolean {
+  const files = myTaskSubmittedFiles.value[taskId]
+  return Array.isArray(files) && files.length > 0
+}
+
+// ---- 学生任务详情弹窗 ----
+const showStudentTaskModal = ref(false)
+const selectedStudentTask = ref<any>(null)
+const studentTaskFileInput = ref<HTMLInputElement | null>(null)
+const studentTaskAttachments = ref<{ name: string; size: number }[]>([])
+/** 当前任务的我的已提交附件（仅展示用） */
+const mySubmissionAttachments = computed(() =>
+  selectedStudentTask.value ? (myTaskSubmittedFiles.value[selectedStudentTask.value.id] || []) : []
+)
+
+async function openStudentTask(task: any) {
+  selectedStudentTask.value = task
+  studentTaskAttachments.value = []
+  showStudentTaskModal.value = true
+}
+
+function closeStudentTask() {
+  showStudentTaskModal.value = false
+  selectedStudentTask.value = null
+  studentTaskAttachments.value = []
+}
+
+function onStudentTaskChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    for (const file of Array.from(input.files)) {
+      studentTaskAttachments.value.push({ name: file.name, size: file.size })
+    }
+  }
+  input.value = ''
+}
+
+function onStudentTaskDrop(e: DragEvent) {
+  if (e.dataTransfer?.files) {
+    for (const file of Array.from(e.dataTransfer.files)) {
+      studentTaskAttachments.value.push({ name: file.name, size: file.size })
+    }
+  }
+}
+
+function removeStudentTaskFile(i: number) {
+  studentTaskAttachments.value.splice(i, 1)
+}
+
+async function submitStudentTask() {
+  if (!selectedStudentTask.value || !myStudent.value) return
+  if (studentTaskAttachments.value.length === 0) {
+    alert('请先选择要提交的文件')
+    return
+  }
+  try {
+    await submitTask(selectedStudentTask.value.id, {
+      studentId: myStudent.value.id,
+      attachments: studentTaskAttachments.value,
+    })
+    myTaskSubmittedFiles.value[selectedStudentTask.value.id] = [...studentTaskAttachments.value]
+    alert('提交成功！等待教师/导师评分')
+    closeStudentTask()
+  } catch (e: any) {
+    alert(`提交失败：${e.message || e}`)
+  }
+}
+
+function formatFileSize(bytes: number) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let v = bytes
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`
+}
 
 // ===== 资源（从store获取课程关联资源） =====
 const courseResources = computed(() => store.getCourseCloudFiles(courseId))
@@ -892,14 +1061,15 @@ const myTierScore = computed(() => tierRecord.value?.score ?? 0)
 const tierFinalized = computed(() => tierRecord.value !== null)
 const firstClassEnded = computed(() => store.isFirstClassStarted(courseId))
 const secondClassStarted = computed(() => store.isSecondClassStarted(courseId))
-// 是否逾期自动分配（score=0 且第二节课已开始）
+// 是否逾期自动分配（第二节课已开始且得分为 0 = 未参加测试）
 const isAutoAssigned = computed(() =>
-  tierFinalized.value && secondClassStarted.value && myTierScore.value === 0
+  secondClassStarted.value && myTierScore.value === 0
 )
 
 const tierLabel = computed(() => {
   const map = { basic: '基础层', advanced: '进阶层', excellent: '卓越层' }
-  return tierFinalized.value ? map[myTier.value] : '未分层'
+  // 未分层时 myTier 回退 basic（逾期自动分配场景），同样展示"基础层"
+  return map[myTier.value]
 })
 
 const tierBadgeClass = computed(() => {
@@ -1620,12 +1790,6 @@ const evalDimensions = computed(() => {
 
   return dims
 })
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-}
 
 function getFileTypeName(type: string): string {
   const extMap: Record<string, string> = {
