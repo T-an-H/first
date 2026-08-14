@@ -55,7 +55,8 @@ public class EvalConfigController {
             return Result.fail(400, "courseId 不能为空");
         }
         if (!StringUtils.hasText(config.getTemplate())) config.setTemplate("all");
-        if (!StringUtils.hasText(config.getFrequency())) config.setFrequency("biweekly");
+        // 评价频率固定为每两学时一次（次数由课程总学时自动计算），忽略传入频率
+        config.setFrequency("biweekly");
         if (!StringUtils.hasText(config.getOverdueRule())) config.setOverdueRule("average");
         if (config.getHasMentor() == null) config.setHasMentor(false);
         evalConfigService.saveOrUpdate(config);

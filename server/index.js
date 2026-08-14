@@ -15,6 +15,7 @@ import courseRoutes from './routes/courses.js';
 import teachingRoutes from './routes/teaching.js';
 import evalRoutes from './routes/eval.js';
 import extraRoutes from './routes/extra.js';
+import taskRoutes from './routes/tasks.js';
 
 const app = express();
 const PORT = 3000;
@@ -67,6 +68,9 @@ app.use('/api/teaching', (req, res, next) => {
 
 // 评价管理路由
 app.use('/api/eval', evalRoutes);
+
+// 课程任务路由（教师布置/学生提交/教师导师评分）
+app.use('/api/tasks', taskRoutes);
 
 // 教师端扩展数据路由（待办/笔记/在线文档/AI分层）——写操作要求教师及以上角色
 app.use('/api/teaching', (req, res, next) => {
