@@ -286,7 +286,7 @@
 <script setup lang="ts">
 import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
 import { BookOpen, Mic, MicOff, Plus, Sparkles, X, Trash2 } from 'lucide-vue-next'
-import { API_BASE } from '@/api'
+import { API_BASE, authHeaders } from '@/api'
 
 const props = defineProps<{ courseId: string }>()
 
@@ -413,7 +413,7 @@ async function addChapter() {
   try {
     const res = await fetch(`${API}/chapter`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ courseId: props.courseId, title: newChapterTitle.value.trim() }),
     })
     const data = await res.json()
@@ -432,7 +432,7 @@ async function addChapter() {
 async function deleteChapter(id: string, title: string) {
   if (!confirm(`确认删除章节「${title}」？`)) return
   try {
-    const res = await fetch(`${API}/chapter/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${API}/chapter/${id}`, { method: 'DELETE', headers: authHeaders() })
     const data = await res.json()
     if (data.success) {
       chapters.value = chapters.value.filter(c => c.id !== id)
@@ -465,7 +465,7 @@ async function aiGenerate() {
     const chapter = chapters.value.find(c => c.id === createForm.value.chapterId)
     const res = await fetch(`${API}/generate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         courseId: props.courseId,
         chapterId: createForm.value.chapterId || null,
@@ -501,9 +501,9 @@ async function publishGeneratedHomeworks() {
   if (!firstHw) return
   try {
     const shouldPublishAll = generatedGroups.value.length > 1
-    const requestInit: RequestInit = { method: 'POST' }
+    const requestInit: RequestInit = { method: 'POST', headers: authHeaders() }
     if (shouldPublishAll) {
-      requestInit.headers = { 'Content-Type': 'application/json' }
+      requestInit.headers = { 'Content-Type': 'application/json', ...authHeaders() }
       requestInit.body = JSON.stringify({ publishAll: true })
     }
 
@@ -552,7 +552,7 @@ function closeCreateDialog() {
 async function publishHomework(id: string) {
   if (!confirm('确认发布此作业？发布后学生将立即看到。')) return
   try {
-    const res = await fetch(`${API}/${id}/publish`, { method: 'POST' })
+    const res = await fetch(`${API}/${id}/publish`, { method: 'POST', headers: authHeaders() })
     const data = await res.json()
     if (data.success) {
       showToast('发布成功！')
@@ -578,7 +578,7 @@ async function viewHomework(id: string) {
 async function confirmDelete(id: string) {
   if (!confirm('确认删除此作业？（此操作不可恢复）')) return
   try {
-    const res = await fetch(`${API}/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${API}/${id}`, { method: 'DELETE', headers: authHeaders() })
     const data = await res.json()
     if (data.success) loadHomeworks()
   } catch (e) { console.error('删除失败:', e) }

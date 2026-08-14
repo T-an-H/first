@@ -497,6 +497,7 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { authHeaders } from '@/api'
 
 import {
   BookOpen, ChevronDown, ChevronUp, User, Users, ClipboardCheck,
@@ -1363,15 +1364,37 @@ async function handleImportGroups() {
     }
 
     if (groups.length > 0) {
-      groups.forEach(g => {
-        store.addStudentGroup({
-          id: `grp-${selectedCourseId.value}-${Date.now()}-${Math.random()}`,
-          courseId: selectedCourseId.value!,
-          name: g.name,
-          memberIds: g.memberIds,
-        })
-      })
-      alert(`成功导入 ${groups.length} 个分组`)
+      let imported = 0
+      let updated = 0
+      const newGroups: any[] = []
+      for (const g of groups) {
+        const existing = store.studentGroups.find(
+          (grp) => grp.courseId === selectedCourseId.value && grp.name === g.name
+        )
+        if (existing) {
+          // 二次导入同名组：合并成员（去重），更新原分组信息
+          const merged = Array.from(new Set([...existing.memberIds, ...g.memberIds]))
+          store.updateStudentGroup(existing.id, { memberIds: merged })
+          updated++
+        } else {
+          const gid = `group-${selectedCourseId.value}-${Date.now()}-${imported}`
+          store.addStudentGroup({
+            id: gid,
+            courseId: selectedCourseId.value!,
+            name: g.name,
+            memberIds: Array.from(new Set(g.memberIds)),
+          })
+          newGroups.push({ id: gid, courseId: selectedCourseId.value, name: g.name, memberIds: Array.from(new Set(g.memberIds)) })
+        }
+        imported++
+      }
+      // 同步新分组到 MySQL（合并更新已由 updateStudentGroup 落库）
+      if (newGroups.length > 0) {
+        try {
+          await fetch('http://localhost:3000/api/teaching/groups/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() }, body: JSON.stringify({ groups: newGroups }) })
+        } catch {}
+      }
+      alert(`成功导入 ${imported} 个分组${updated ? `，其中 ${updated} 个已有分组已合并更新` : ''}`)
     } else {
       alert('未识别到有效分组数据，请确保 Excel 包含"组名"和"成员姓名"列')
     }

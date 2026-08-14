@@ -217,7 +217,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen } from 'lucide-vue-next'
-import { API_BASE } from '@/api'
+import { API_BASE, authHeaders } from '@/api'
 
 const props = defineProps<{ courseId: string; studentId: string; tier?: string }>()
 
@@ -322,7 +322,7 @@ async function submitAnswers() {
 
     const res = await fetch(`${API}/${currentHomework.id}/submit`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ studentId: props.studentId, answers: answerList }),
     })
     const data = await res.json()
