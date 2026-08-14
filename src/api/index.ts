@@ -23,10 +23,14 @@ async function request(url: string, options: RequestOptions = {}) {
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  if (token) headers.Authorization = `Bearer ${token}`
+
   const config: RequestInit = {
-    headers: { 'Content-Type': 'application/json' },
-    signal: controller.signal,
     ...fetchOptions,
+    headers: { ...headers, ...(fetchOptions.headers as Record<string, string> | undefined) },
+    signal: controller.signal,
   }
 
   try {
@@ -58,10 +62,14 @@ async function javaRequest(url: string, options: RequestOptions = {}) {
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
 
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  if (token) headers.Authorization = `Bearer ${token}`
+
   const config: RequestInit = {
-    headers: { 'Content-Type': 'application/json' },
-    signal: controller.signal,
     ...fetchOptions,
+    headers: { ...headers, ...(fetchOptions.headers as Record<string, string> | undefined) },
+    signal: controller.signal,
   }
 
   try {
@@ -112,6 +120,20 @@ export async function fetchStudents(params: Record<string, any> = {}) {
     Object.entries(params).flatMap(([key, value]) => (value == null ? [] : [[key, String(value)]])),
   ).toString()
   return request(`/students${query ? `?${query}` : ''}`)
+}
+
+/** POST /api/teaching/students/bulk - 教师端批量导入学生（落库 course_db.student） */
+export async function createStudents(students: any[]) {
+  return request('/teaching/students/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ students }),
+  })
+}
+
+/** 从 localStorage 读取登录 token，返回鉴权请求头（供组件内散落 fetch 使用） */
+export function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 export async function fetchClasses() {

@@ -5,6 +5,7 @@
  */
 import express from 'express';
 import cors from 'cors';
+import { authMiddleware, requireTeacher } from './middleware/auth.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import studentRoutes from './routes/students.js';
@@ -28,6 +29,10 @@ app.use(cors({
 
 // 解析 JSON 请求体
 app.use(express.json());
+
+// ====== 鉴权中间件 ======
+// 写接口（POST/PUT/DELETE）校验 JWT，登录/注册/健康检查等公开接口与读接口放行
+app.use('/api', authMiddleware);
 
 // ====== 路由 ======
 
@@ -54,14 +59,20 @@ app.use('/api/categories', categoryRoutes);
 // 课程数据路由
 app.use('/api/courses', courseRoutes);
 
-// 教学数据路由（选课/成绩/分组）
-app.use('/api/teaching', teachingRoutes);
+// 教学数据路由（选课/成绩/分组）——写操作要求教师及以上角色
+app.use('/api/teaching', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'OPTIONS') return next();
+  return requireTeacher(req, res, next);
+}, teachingRoutes);
 
 // 评价管理路由
 app.use('/api/eval', evalRoutes);
 
-// 教师端扩展数据路由（待办/笔记/在线文档/AI分层）
-app.use('/api/teaching', extraRoutes);
+// 教师端扩展数据路由（待办/笔记/在线文档/AI分层）——写操作要求教师及以上角色
+app.use('/api/teaching', (req, res, next) => {
+  if (req.method === 'GET' || req.method === 'OPTIONS') return next();
+  return requireTeacher(req, res, next);
+}, extraRoutes);
 
 // ====== 启动服务器 ======
 app.listen(PORT, () => {

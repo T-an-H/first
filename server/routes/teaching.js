@@ -32,6 +32,46 @@ router.post('/enrollments/bulk', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
+// ==================== 学生导入 (Students) ====================
+
+/** POST /api/teaching/students/bulk - 批量导入学生（教师端 Excel/加人，落库 student 表） */
+router.post('/students/bulk', async (req, res) => {
+  try {
+    const { students } = req.body;
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.json({ success: true, inserted: 0, skipped: 0 });
+    }
+
+    let inserted = 0, skipped = 0;
+    for (const s of students) {
+      if (!s || !s.name) { skipped++; continue; }
+      const id = s.id || `stu-${Date.now()}-${inserted}`;
+      const [exist] = await pool.execute('SELECT id FROM student WHERE id = ?', [id]);
+      if (exist.length > 0) { skipped++; continue; }
+      await pool.execute(
+        `INSERT INTO student (id, name, password, student_id, class_name, department, phone, email, avatar, join_date, status, enrollment_score)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          s.name,
+          s.password || '666666',
+          s.studentId || '',
+          s.className || '',
+          s.department || '',
+          s.phone || '',
+          s.email || '',
+          s.avatar || '',
+          s.joinDate || null,
+          s.status || 'active',
+          s.enrollmentScore ?? null,
+        ]
+      );
+      inserted++;
+    }
+    res.json({ success: true, message: `导入 ${inserted} 名学生${skipped ? `，跳过 ${skipped} 条` : ''}`, inserted, skipped });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 /** PUT /api/teaching/students/:id - 更新学生信息（如设置班级） */
 router.put('/students/:id', async (req, res) => {
   try {

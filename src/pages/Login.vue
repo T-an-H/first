@@ -144,34 +144,50 @@ const handleLogin = async () => {
   loading.value = true
   error.value = ''
 
-  // 直接使用 Mock 登录（演示模式），无需后端
-  const mock = MOCK_USERS[account.value.trim()]
-  if (!mock || mock.password !== password.value.trim()) {
-    error.value = '账号或密码错误'
-    loading.value = false
-    return
-  }
-  localStorage.setItem('isDemoMode', 'true')
-  let role = mock.role
-  if (role === 'teacher' && mock.sub_role) role = mock.sub_role
+  const loginAccount = account.value.trim()
 
-  // 检测双重角色：领导是否同时是授课教师/企业导师
-  let isTeacherFromDb = false
-  let isMentorFromDb = false
-  if (mock.sub_role === 'leader') {
-    const leaderData = store.leaders.find(l => l.name === mock.name)
-    if (leaderData?.asTeacher) isTeacherFromDb = true
-    if (leaderData?.asMentor) isMentorFromDb = true
-  }
-
-  // 登录账号存 currentUser（与数据库 course_db 的 teacher/createdBy 等 owner 字段一致），显示名单独存
-  store.login(account.value.trim(), role as any, isTeacherFromDb, isMentorFromDb, mock.name)
-  router.push(mockPortal(mock.role, mock.sub_role))
-
-  // 后台静默尝试连接后端（不阻塞登录）
-  unifiedLogin(account.value, password.value).then(res => {
+  // 1) 优先真实登录（Express /api/user/login，返回 JWT，写操作鉴权依赖该 token）
+  try {
+    const res = await unifiedLogin(loginAccount, password.value.trim())
     localStorage.setItem('token', res.token)
     localStorage.setItem('userInfo', JSON.stringify(res.user))
-  }).catch(() => {})
+    localStorage.removeItem('isDemoMode')
+
+    // 检测双重角色：领导是否同时是授课教师/企业导师
+    let isTeacherFromDb = false
+    let isMentorFromDb = false
+    if (res.user.sub_role === 'leader') {
+      const leaderData = store.leaders.find(l => l.name === res.user.name)
+      if (leaderData?.asTeacher) isTeacherFromDb = true
+      if (leaderData?.asMentor) isMentorFromDb = true
+    }
+
+    const role = res.user.role === 'teacher' && res.user.sub_role ? res.user.sub_role : res.user.role
+    store.login(loginAccount, role as any, isTeacherFromDb, isMentorFromDb, res.user.name)
+    router.push(res.portal || mockPortal(res.user.role, res.user.sub_role))
+  } catch (e) {
+    // 2) 后端不可用 / 账号未录入时回退 Mock 演示模式
+    const mock = MOCK_USERS[loginAccount]
+    if (!mock || mock.password !== password.value.trim()) {
+      error.value = '账号或密码错误'
+      return
+    }
+    localStorage.setItem('isDemoMode', 'true')
+    let role = mock.role
+    if (role === 'teacher' && mock.sub_role) role = mock.sub_role
+
+    let isTeacherFromDb = false
+    let isMentorFromDb = false
+    if (mock.sub_role === 'leader') {
+      const leaderData = store.leaders.find(l => l.name === mock.name)
+      if (leaderData?.asTeacher) isTeacherFromDb = true
+      if (leaderData?.asMentor) isMentorFromDb = true
+    }
+
+    store.login(loginAccount, role as any, isTeacherFromDb, isMentorFromDb, mock.name)
+    router.push(mockPortal(mock.role, mock.sub_role))
+  } finally {
+    loading.value = false
+  }
 }
 </script>
