@@ -2,18 +2,18 @@ import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
 import { javaUpdateEvalReminder as apiUpdateReminder } from '@/api'
-import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, javaUpdateFile, javaDeleteCourse, javaAddCourse, javaUpdateCourse, javaAddSchedule, javaUpdateSchedule, javaDeleteSchedule, javaAddStudent, javaUpdateStudent, javaDeleteStudent, javaAddGrade, javaUpdateGrade, javaDeleteGrade, javaAddExamScore, javaUpdateExamScore, javaDeleteExamScore, javaAddTodo, javaUpdateTodo, javaDeleteTodo, javaAddNote, javaUpdateNote, javaDeleteNote, javaAddOnlineDoc, javaUpdateOnlineDoc, javaDeleteOnlineDoc, javaAddEvaluation, javaUpdateEvaluation, javaDeleteEvaluation, javaSaveEvalConfig, javaScoreQualityEvaluation, javaAddDetailedGrade, javaUpdateDetailedGrade, javaDeleteDetailedGrade } from '@/api'
+import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, javaUpdateFile, javaDeleteCourse, javaAddCourse, javaUpdateCourse, javaAddSchedule, javaUpdateSchedule, javaDeleteSchedule, javaAddStudent, javaUpdateStudent, javaDeleteStudent, javaAddGrade, javaUpdateGrade, javaDeleteGrade, javaAddExamScore, javaUpdateExamScore, javaDeleteExamScore, javaAddTodo, javaUpdateTodo, javaDeleteTodo, javaAddNote, javaUpdateNote, javaDeleteNote, javaAddEvaluation, javaUpdateEvaluation, javaDeleteEvaluation, javaSaveEvalConfig, javaScoreQualityEvaluation, javaAddDetailedGrade, javaUpdateDetailedGrade, javaDeleteDetailedGrade } from '@/api'
 import {
   javaListEnrollments, javaListGroups, javaListFiles, javaListEvaluations, javaGetGradeConfig,
   javaListCourses, javaListStudents, javaListSchedules, javaListGrades, javaListExamScores,
   javaListEvalConfigs, javaListEvalReminders, javaListDetailedGrades, javaListQualityEvaluations,
-  javaListHomework, javaListHomeworkSubmissions, javaListTodos, javaListNotes, javaListOnlineDocs,
+  javaListHomework, javaListHomeworkSubmissions, javaListTodos, javaListNotes,
   javaListStudentTiers, javaListCategories, javaListDepartments, javaListDepartmentClasses,
   javaListTeachers, javaListMentors, javaListLeaders,
 } from '@/api'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
-  CloudFile, TodoItem, OnlineDoc, Note, Evaluation, EvaluationConfig,
+  CloudFile, TodoItem, Note, Evaluation, EvaluationConfig,
   StudentGroup, EvalAnomaly, EvalReminder, GradeWeightConfig, DetailedGrade,
   Mentor, Leader, AITierQuestion, StudentTierRecord, EvalType,
   Homework, HomeworkSubmission, Department, QualityEvaluation, QualityEvalFile, QualityEvalSubmission
@@ -63,7 +63,7 @@ try {
     const resetKeys = [
       'departments', 'departmentClasses', 'categories', 'courses',
       'schedules', 'students', 'enrollments', 'teachers', 'grades',
-      'cloudFiles', 'todos', 'onlineDocs', 'notes',
+      'cloudFiles', 'todos', 'notes',
       'evaluations', 'evalConfigs', 'studentGroups', 'evalReminders',
       'gradeConfigs', 'detailedGrades', 'homework', 'homeworkSubmissions',
       'examScores', 'examWeights', 'teacherSubmittedEvals', 'lockedSessions',
@@ -90,7 +90,6 @@ export const useAppStore = defineStore('app', () => {
   const hasLegacyCloudFiles = loadedCloudFiles.some((file) => !file.visibilityScope)
   const cloudFiles = ref<CloudFile[]>(loadedCloudFiles.map(normalizeCloudFile))
   const todos = ref<TodoItem[]>(loadFromStorage<TodoItem[]>('todos', []))
-  const onlineDocs = ref<OnlineDoc[]>(loadFromStorage<OnlineDoc[]>('onlineDocs', []))
   const notes = ref<Note[]>(loadFromStorage<Note[]>('notes', []))
   const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', []))
   const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', []))
@@ -203,7 +202,7 @@ export const useAppStore = defineStore('app', () => {
       const [
         dbCourses, dbStudents, dbSchedules, dbEnrollments, dbGrades, dbExamScores,
         dbEvaluations, dbEvalConfigs, dbEvalReminders, dbGroups, dbFiles, dbDetailedGrades,
-        dbQualityEvals, dbHomework, dbHomeworkSubmissions, dbTodos, dbNotes, dbOnlineDocs,
+        dbQualityEvals, dbHomework, dbHomeworkSubmissions, dbTodos, dbNotes,
         dbStudentTiers, dbCategories, dbDepartments, dbDepartmentClasses, dbTeachers,
         dbMentors, dbLeaders,
       ] = await Promise.all([
@@ -211,7 +210,7 @@ export const useAppStore = defineStore('app', () => {
         javaListGrades(), javaListExamScores(), javaListEvaluations(), javaListEvalConfigs(),
         javaListEvalReminders(), javaListGroups(), javaListFiles(), javaListDetailedGrades(),
         javaListQualityEvaluations(), javaListHomework(), javaListHomeworkSubmissions(),
-        javaListTodos(), javaListNotes(), javaListOnlineDocs(), javaListStudentTiers(),
+        javaListTodos(), javaListNotes(), javaListStudentTiers(),
         javaListCategories(), javaListDepartments(), javaListDepartmentClasses(),
         javaListTeachers(), javaListMentors(), javaListLeaders(),
       ])
@@ -233,7 +232,6 @@ export const useAppStore = defineStore('app', () => {
       if (Array.isArray(dbHomeworkSubmissions)) { homeworkSubmissions.value = dbHomeworkSubmissions; saveToStorage('homeworkSubmissions', dbHomeworkSubmissions) }
       if (Array.isArray(dbTodos)) { todos.value = dbTodos; saveToStorage('todos', dbTodos) }
       if (Array.isArray(dbNotes)) { notes.value = dbNotes; saveToStorage('notes', dbNotes) }
-      if (Array.isArray(dbOnlineDocs)) { onlineDocs.value = dbOnlineDocs; saveToStorage('onlineDocs', dbOnlineDocs) }
       if (Array.isArray(dbStudentTiers)) {
         const tierMap: Record<string, StudentTierRecord> = {}
         dbStudentTiers.forEach((t: any) => {
@@ -608,24 +606,6 @@ export const useAppStore = defineStore('app', () => {
     todos.value = todos.value.filter((t) => t.id !== id)
     saveToStorage('todos', todos.value)
     javaDeleteTodo(id).catch(() => {})
-  }
-
-  function addOnlineDoc(doc: OnlineDoc) {
-    onlineDocs.value = [...onlineDocs.value, doc]
-    saveToStorage('onlineDocs', onlineDocs.value)
-    javaAddOnlineDoc(doc).catch(() => {})
-  }
-
-  function updateOnlineDoc(id: string, data: Partial<OnlineDoc>) {
-    onlineDocs.value = onlineDocs.value.map((d) => (d.id === id ? { ...d, ...data } : d))
-    saveToStorage('onlineDocs', onlineDocs.value)
-    javaUpdateOnlineDoc(id, data).catch(() => {})
-  }
-
-  function deleteOnlineDoc(id: string) {
-    onlineDocs.value = onlineDocs.value.filter((d) => d.id !== id)
-    saveToStorage('onlineDocs', onlineDocs.value)
-    javaDeleteOnlineDoc(id).catch(() => {})
   }
 
   function addNote(note: Note) {
@@ -1304,38 +1284,17 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /**
-   * 获取某课程的评价次数 — 基于实际排课数量计算
-   * 每 2 节课对应 1 次评价，确保不会产生无对应排课的幻影场次
+   * 获取某课程的评价次数 — 由课程总学时决定
+   * 默认每 2 学时进行 1 次评价（与固定频率"每两学时一次"保持一致）
    */
   function getEvalSessions(courseId: string): number {
     const course = courses.value.find((c) => c.id === courseId)
     if (!course) return 1
 
-    const scheduleCount = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .length
+    const duration = Number(course.duration)
+    if (!duration || duration <= 0) return 1
 
-    // 无排课 → 1 次默认评价
-    if (scheduleCount === 0) return 1
-
-    // 每 2 节课对应 1 次评价轮次
-    const sessionsBySchedule = Math.max(1, Math.ceil(scheduleCount / 2))
-
-    const config = evalConfigs.value.find((c) => c.courseId === courseId)
-    if (!config) return sessionsBySchedule
-
-    switch (config.frequency) {
-      case 'biweekly':
-        return sessionsBySchedule
-      case 'per_unit':
-        return Math.min(sessionsBySchedule, 3)
-      case 'project_milestone':
-        return Math.min(sessionsBySchedule, 3)
-      case 'custom':
-        return Math.min(config.customSessions || 3, scheduleCount, sessionsBySchedule)
-      default:
-        return sessionsBySchedule
-    }
+    return Math.max(1, Math.ceil(duration / 2))
   }
 
   function hasGroups(courseId: string): boolean {
@@ -1635,6 +1594,15 @@ export const useAppStore = defineStore('app', () => {
 
   function getDetailedGrades(courseId: string): DetailedGrade[] {
     return detailedGrades.value.filter((d) => d.courseId === courseId)
+  }
+
+  /** 从 Java 后端刷新评价记录（任务评分后调用，使任务评分进入平时成绩计算） */
+  async function refreshEvaluations(courseId?: string) {
+    const dbEvaluations = await javaListEvaluations(courseId)
+    if (Array.isArray(dbEvaluations)) {
+      evaluations.value = dbEvaluations
+      saveToStorage('evaluations', dbEvaluations)
+    }
   }
 
   function calcTotalScore(courseId: string, dg: DetailedGrade): number {
@@ -2239,7 +2207,7 @@ export const useAppStore = defineStore('app', () => {
   return {
     // state
     courses, categories, students, schedules, enrollments, teachers, grades,
-    cloudFiles, todos, onlineDocs, notes,
+    cloudFiles, todos, notes,
     evaluations, evalConfigs, studentGroups, evalReminders,
     gradeConfigs, detailedGrades,
     homework, homeworkSubmissions,
@@ -2261,7 +2229,6 @@ export const useAppStore = defineStore('app', () => {
     addGrade, updateGrade, deleteGrade,
     addCloudFile, updateCloudFile, deleteCloudFile,
     addTodo, updateTodo, deleteTodo,
-    addOnlineDoc, updateOnlineDoc, deleteOnlineDoc,
     addNote, updateNote, deleteNote,
     addHomework, updateHomework, deleteHomework,
     getCourseHomework, getCourseCloudFiles,
@@ -2283,7 +2250,7 @@ export const useAppStore = defineStore('app', () => {
     checkEvalReminders,
     recalculateProgress,
     saveGradeConfig, getGradeConfig,
-    addDetailedGrade, updateDetailedGrade, getDetailedGrades, syncEvalToDetailedGrade,
+    addDetailedGrade, updateDetailedGrade, getDetailedGrades, syncEvalToDetailedGrade, refreshEvaluations,
     calcTotalScore,
     // 素质评价
     qualityEvaluations, submitQualityEvaluation, scoreQualityEvaluation,

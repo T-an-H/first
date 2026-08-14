@@ -248,6 +248,57 @@ export async function updateEvalReminder(id: string, status: string) {
   })
 }
 
+// ============================================================
+// 课程任务（教师布置 / 学生提交 / 教师导师评分）
+// ============================================================
+
+/** GET /api/tasks?courseId=xxx - 任务列表（含已评人数与平均分） */
+export async function listTasks(courseId: string) {
+  return request(`/tasks?courseId=${encodeURIComponent(courseId)}`)
+}
+
+/** POST /api/tasks - 新增任务（教师） */
+export async function createTask(data: any) {
+  return request('/tasks', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** PUT /api/tasks/:id - 更新任务（教师） */
+export async function updateTask(id: string, data: any) {
+  return request(`/tasks/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+/** DELETE /api/tasks/:id - 删除任务（教师，级联删除提交记录） */
+export async function deleteTask(id: string) {
+  return request(`/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** GET /api/tasks/:id/submissions - 某任务全部提交 */
+export async function listTaskSubmissions(taskId: string) {
+  return request(`/tasks/${encodeURIComponent(taskId)}/submissions`)
+}
+
+/** POST /api/tasks/:id/submissions - 学生提交/更新提交 */
+export async function submitTask(taskId: string, data: any) {
+  return request(`/tasks/${encodeURIComponent(taskId)}/submissions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** PUT /api/tasks/submissions/:id - 评分（教师 或 导师且课程开启导师参与） */
+export async function gradeTaskSubmission(submissionId: string, score: number) {
+  return request(`/tasks/submissions/${encodeURIComponent(submissionId)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ score }),
+  })
+}
+
 export async function fetchCourseScores(courseId: string) {
   return request(`/teaching/scores/${courseId}`)
 }
@@ -452,10 +503,6 @@ export async function javaListNotes() {
   return javaRequest('/teaching/notes')
 }
 
-export async function javaListOnlineDocs() {
-  return javaRequest('/teaching/online-docs')
-}
-
 export async function javaListStudentTiers() {
   return javaRequest('/teaching/student-tiers')
 }
@@ -514,16 +561,6 @@ export async function javaDeleteNote(id: string) {
   return javaRequest(`/teaching/notes/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
-// 在线文档
-export async function javaAddOnlineDoc(doc: any) {
-  return javaRequest('/teaching/online-docs', { method: 'POST', body: JSON.stringify(doc) })
-}
-export async function javaUpdateOnlineDoc(id: string, data: any) {
-  return javaRequest(`/teaching/online-docs/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
-}
-export async function javaDeleteOnlineDoc(id: string) {
-  return javaRequest(`/teaching/online-docs/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
 
 // 课程评价（互评/教师评价）
 export async function javaAddEvaluation(ev: any) {

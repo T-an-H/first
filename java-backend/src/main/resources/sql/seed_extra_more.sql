@@ -26,16 +26,6 @@ INSERT IGNORE INTO note (id, title, content, created_by, attachments) VALUES
 ('note-10', '项目答辩评分要点',   '功能完整性 30 分、代码质量 30 分、答辩表现 40 分。',        'mentor-zhang', NULL);
 
 -- ------------------------------------------------------------
--- 在线文档 online_doc：新增 5 条
--- ------------------------------------------------------------
-INSERT IGNORE INTO online_doc (id, title, content, created_by, last_edited_by, last_edited_at) VALUES
-('doc-6',  '企业项目实践指南',   '第一章 项目需求对接；第二章 企业规范；第三章 交付与验收。',           'mentor-zhang', 'mentor-zhang', '2026-08-15 10:00:00'),
-('doc-7',  '项目评审标准',       '维度：需求实现 40%、代码质量 30%、创新性 20%、答辩 10%。',             'mentor-zhang', 'mentor-zhang', '2026-08-16 14:30:00'),
-('doc-8',  '学院教学改革方案',   '推进产教融合，引入企业真实项目进课堂，实行双导师制。',               'leader-liu',   'leader-liu',   '2026-08-17 09:00:00'),
-('doc-9',  '课程质量评估报告',   '本学期 10 门课程学生满意度 91%，毕业设计选题企业化率 85%。',         'leader-liu',   'leader-liu',   '2026-08-18 16:00:00'),
-('doc-10', '校企合作计划书',     '与 3 家企业共建实训基地，覆盖前端、大数据、安全方向。',               'mentor-zhang', 'leader-liu',   '2026-08-19 11:20:00');
-
--- ------------------------------------------------------------
 -- 云盘 course_file：新增 5 条（上传人导师/领导，关联真实课程 course-1/2/5）
 -- ------------------------------------------------------------
 INSERT IGNORE INTO course_file (id, course_id, name, size, type, data_url, uploaded_at, uploaded_by, visibility_scope, visible_to_class_names) VALUES

@@ -1,6 +1,6 @@
 -- ============================================================
 -- Express 后端(course_platform) 教师端扩展数据表
--- 新增表：todos / notes / online_docs / student_tiers
+-- 新增表：todos / notes / student_tiers
 -- 补充：eval_reminders（eval.js 已引用，确保存在）
 -- 执行方式: mysql -uroot -p < schema_extra.sql 或 Navicat 整段执行
 -- 幂等：IF NOT EXISTS，可重复执行
@@ -36,20 +36,6 @@ CREATE TABLE IF NOT EXISTS notes (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '笔记';
 
 -- ------------------------------------------------------------
--- 在线文档 online_docs
--- ------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS online_docs (
-  id             VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 doc-xxx）',
-  title          VARCHAR(255) NOT NULL COMMENT '文档标题',
-  content        LONGTEXT     NULL COMMENT '文档内容',
-  created_by     VARCHAR(64)  DEFAULT '' COMMENT '创建人',
-  created_at     VARCHAR(64)  DEFAULT '' COMMENT '创建时间',
-  last_edited_at VARCHAR(64)  DEFAULT '' COMMENT '最后编辑时间',
-  last_edited_by VARCHAR(64)  DEFAULT '' COMMENT '最后编辑人',
-  PRIMARY KEY (id)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '在线文档';
-
--- ------------------------------------------------------------
 -- AI 分层记录 student_tiers
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS student_tiers (
@@ -77,3 +63,38 @@ CREATE TABLE IF NOT EXISTS eval_reminders (
   PRIMARY KEY (id),
   KEY idx_course (course_id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '评价提醒';
+
+-- ------------------------------------------------------------
+-- 课程任务 course_task（教师端布置每节课教学成果）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS course_task (
+  id          VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 task-xxx）',
+  course_id   VARCHAR(64)  NOT NULL COMMENT '课程ID',
+  title       VARCHAR(255) NOT NULL COMMENT '任务标题',
+  description TEXT         NULL COMMENT '简单介绍',
+  attachments TEXT         NULL COMMENT '教师附件（JSON数组 [{name,size}]）',
+  created_by  VARCHAR(64)  DEFAULT '' COMMENT '创建人',
+  created_at  VARCHAR(64)  DEFAULT '' COMMENT '创建时间',
+  updated_at  VARCHAR(64)  DEFAULT '' COMMENT '更新时间',
+  PRIMARY KEY (id),
+  KEY idx_task_course (course_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '课程任务';
+
+-- ------------------------------------------------------------
+-- 任务提交 course_task_submission（学生上传资料，教师/导师评分）
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS course_task_submission (
+  id          VARCHAR(64)  NOT NULL COMMENT '主键（前端生成，如 sub-xxx）',
+  task_id     VARCHAR(64)  NOT NULL COMMENT '任务ID',
+  student_id  VARCHAR(64)  NOT NULL COMMENT '学生ID（内部id）',
+  attachments TEXT         NULL COMMENT '学生上传资料（JSON数组 [{name,size}]）',
+  score       DECIMAL(5,1) NULL COMMENT '评分 0-100',
+  graded_by   VARCHAR(64)  DEFAULT '' COMMENT '评分人（教师/导师名称）',
+  status      VARCHAR(16)  NOT NULL DEFAULT 'submitted' COMMENT 'submitted/graded',
+  created_at  VARCHAR(64)  DEFAULT '' COMMENT '提交时间',
+  updated_at  VARCHAR(64)  DEFAULT '' COMMENT '更新时间',
+  PRIMARY KEY (id),
+  KEY idx_sub_task (task_id),
+  KEY idx_sub_student (student_id),
+  UNIQUE KEY uk_task_student (task_id, student_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '任务提交';

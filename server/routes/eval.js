@@ -28,7 +28,9 @@ router.get('/config/:courseId', async (req, res) => {
 /** POST /api/eval/config - 保存评价配置 */
 router.post('/config', async (req, res) => {
   try {
-    const { courseId, template, frequency, customSessions, hasMentor, overdueRule } = req.body;
+    const { courseId, template, customSessions, hasMentor, overdueRule } = req.body;
+    // 评价频率固定为每两学时一次（由课程总学时自动计算次数），后端强制，忽略传入频率
+    const frequency = 'biweekly';
     await pool.execute(
       'REPLACE INTO eval_config (course_id, template, frequency, custom_sessions, has_mentor, overdue_rule) VALUES (?, ?, ?, ?, ?, ?)',
       [courseId, template, frequency, customSessions || null, hasMentor ? 1 : 0, overdueRule]

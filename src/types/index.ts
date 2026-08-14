@@ -252,16 +252,6 @@ export interface TodoItem {
   createdBy: string;
 }
 
-export interface OnlineDoc {
-  id: string;
-  title: string;
-  content: string;
-  createdBy: string;
-  createdAt: string;
-  lastEditedAt: string;
-  lastEditedBy: string;
-}
-
 export interface Note {
   id: string;
   title: string;

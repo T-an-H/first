@@ -2,7 +2,7 @@
   <div class="space-y-6">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">额外功能</h1>
-      <p class="text-gray-400 mt-1">云盘 · 待办 · 在线文档 · 笔记</p>
+      <p class="text-gray-400 mt-1">云盘 · 待办 · 笔记</p>
     </div>
 
     <div class="flex gap-1 bg-brand-400/10 p-1 rounded-xl">
@@ -24,18 +24,16 @@
     <div class="bg-white rounded-xl p-6 border border-brand-400/30 shadow-sm">
       <CloudDrive v-if="activeTab === 'cloud'" />
       <TodoList v-else-if="activeTab === 'todos'" />
-      <OnlineDocs v-else-if="activeTab === 'docs'" />
       <Notes v-else-if="activeTab === 'notes'" />
     </div>
   </div>
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { Cloud, CheckCircle, FileText, Edit3 } from 'lucide-vue-next'
+import { Cloud, CheckCircle, Edit3 } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
 import CloudDrive from './ExtraFeatures/CloudDrive.vue'
 import TodoList from './ExtraFeatures/TodoList.vue'
-import OnlineDocs from './ExtraFeatures/OnlineDocs.vue'
 import Notes from './ExtraFeatures/Notes.vue'
 
 const store = useAppStore()
@@ -49,7 +47,6 @@ const hasPendingReminders = computed(() => {
 const tabs = [
   { id: 'cloud', label: '云盘', icon: Cloud },
   { id: 'todos', label: '待办', icon: CheckCircle },
-  { id: 'docs', label: '在线文档', icon: FileText },
   { id: 'notes', label: '笔记', icon: Edit3 },
 ]
 

@@ -39,46 +39,9 @@
     <div v-if="activeTab === 'comments'" class="space-y-6">
       <!-- 评价方案配置（始终展开） -->
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <Settings class="w-5 h-5 text-gray-400" />
-            <h2 class="font-semibold text-gray-900">评价方案配置</h2>
-          </div>
-          <div class="flex items-center gap-3">
-            <span v-if="evalConfigLocked || isViewOnly" class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 border border-gray-200">
-              <Lock class="w-3 h-3 inline mr-0.5" />仅查看
-            </span>
-            <span class="text-xs text-gray-400">
-              {{ selectedConfig ? EvalTemplateLabels[selectedConfig.template] : '默认方案' }} ·
-              {{ selectedConfig ? EvalFrequencyLabels[selectedConfig.frequency] : '默认频率' }}
-            </span>
-          </div>
-        </div>
-
-        <!-- 锁定提示 -->
-        <div v-if="evalConfigLocked" class="mt-3 flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
-          <Lock class="w-3.5 h-3.5 text-gray-400" />
-          <span v-if="selectedConfig">评价方案已在第一节课开始前配置完成，已锁定不可修改。</span>
-          <span v-else>第一节课已开始，评价方案未配置，现按默认方案实施，已锁定不可修改。</span>
-        </div>
-
-        <!-- 评价类型标签（始终展示） -->
-        <div class="flex flex-wrap gap-2 mt-3">
-          <template v-for="t in ALL_EVAL_TYPES" :key="t">
-            <span v-if="!selectedConfig || !TEMPLATE_EVAL_TYPES[selectedConfig.template].includes(t)"
-              class="text-xs px-2.5 py-1 rounded-full bg-gray-100 text-gray-300 border border-gray-200">
-              {{ EvalTypeLabels[t] }} ✗
-            </span>
-            <span v-else-if="(t === 'intra_group' || t === 'inter_group') && !courseHasGroups || t === 'mentor' && selectedConfig && !selectedConfig.hasMentor"
-              class="text-xs px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 border border-brand-200">
-              <EyeOff class="w-3 h-3 inline mr-0.5" />
-              {{ EvalTypeLabels[t] }}（自动隐藏）
-            </span>
-            <span v-else :class="`text-xs px-2.5 py-1 rounded-full border ${EvalTypeColors[t]}`">
-              <Eye class="w-3 h-3 inline mr-0.5" />
-              {{ EvalTypeLabels[t] }}
-            </span>
-          </template>
+        <div class="flex items-center gap-2">
+          <Settings class="w-5 h-5 text-gray-400" />
+          <h2 class="font-semibold text-gray-900">评价模板</h2>
         </div>
 
         <!-- 教师可编辑：直接展示配置界面 -->
@@ -99,37 +62,12 @@
               </div>
             </div>
 
-            <div>
-              <p class="text-sm font-medium text-gray-700 mb-2">评价频率</p>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <button v-for="freq in EVAL_FREQUENCY_KEYS" :key="freq"
-                  @click="handleSetConfig({ frequency: freq })"
-                  :class="`text-left p-3 rounded-lg border transition-all ${selectedConfig?.frequency === freq ? 'border-cyan-300 bg-cyan-50' : 'border-gray-200 bg-white hover:border-gray-300'}`">
-                  <span class="text-sm font-medium text-gray-900">{{ EvalFrequencyLabels[freq] }}</span>
-                  <p class="text-xs text-gray-400 mt-0.5">{{ EvalFrequencyDescs[freq] }}</p>
-                  <span class="text-xs text-cyan-500 mt-0.5 block">共 {{ courseId ? store.getEvalSessions(courseId) : 0 }} 次评价</span>
-                </button>
-              </div>
-              <div v-if="selectedConfig?.frequency === 'custom'" class="mt-2">
-                <label class="text-xs text-gray-500">自定义评价次数：</label>
-                <input type="number" min="1" max="20"
-                  :value="selectedConfig?.customSessions || 3"
-                  @change="(e) => handleSetConfig({ customSessions: parseInt((e.target as HTMLInputElement).value) || 3 })"
-                  class="ml-2 w-16 px-2 py-1 border border-gray-200 rounded-lg text-sm" />
-              </div>
-            </div>
-
           </div>
         </template>
 
         <!-- 只读/锁定展示：完整展示当前生效方案（仅保留已选中的选项） -->
         <template v-else>
           <div class="border-t border-gray-100 mt-3 pt-4 space-y-4">
-            <div v-if="!selectedConfig" class="flex items-center gap-1.5 text-xs text-gray-400">
-              <EyeOff class="w-3.5 h-3.5" />
-              <span>未配置自定义方案，按以下默认方案实施</span>
-            </div>
-
             <!-- 评价模板 -->
             <div>
               <p class="text-sm font-medium text-gray-700 mb-2">评价模板</p>
@@ -147,240 +85,196 @@
                 </div>
               </div>
             </div>
-
-            <!-- 评价频率 -->
-            <div>
-              <p class="text-sm font-medium text-gray-700 mb-2">评价频率</p>
-              <div class="p-3 rounded-lg border border-cyan-200 bg-cyan-50/60">
-                <div class="flex items-center justify-between gap-2">
-                  <span class="text-sm font-medium text-gray-900">{{ EvalFrequencyLabels[activeEvalConfig.frequency] }}</span>
-                  <span class="text-xs text-cyan-600">共 {{ courseId ? store.getEvalSessions(courseId) : 0 }} 次评价</span>
-                </div>
-                <p class="text-xs text-gray-500 mt-0.5">{{ EvalFrequencyDescs[activeEvalConfig.frequency] }}</p>
-              </div>
-            </div>
-
           </div>
         </template>
       </div>
 
-      <!-- 评价管理（合并批量评价 + 逐次评价） -->
+      <!-- 任务管理（布置每节课教学成果，学生上传资料，教师评价给分） -->
       <div v-if="!isReadOnly" class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
-            <ClipboardCheck class="w-5 h-5 text-gray-400" />
-            <h2 class="font-semibold text-gray-900">评价管理</h2>
-            <span class="text-xs text-gray-400">{{ enrolledStudents.length }}名学生</span>
+            <ClipboardList class="w-5 h-5 text-gray-400" />
+            <h2 class="font-semibold text-gray-900">任务管理</h2>
+            <span class="text-xs text-gray-400">{{ filteredTasks.length }}个任务</span>
           </div>
-          <button v-if="!isViewOnly" @click="handleProcessOverdue" class="text-xs flex items-center gap-1 px-3 py-1.5 bg-purple-50 text-purple-600 border border-purple-200 rounded-lg hover:bg-purple-100">
-            <RefreshCw class="w-3 h-3" />
-            处理逾期自评
+        </div>
+
+        <!-- 顶部：搜索框 + 新增任务 -->
+        <div class="flex items-center gap-3 mb-4">
+          <div class="relative flex-1 max-w-sm">
+            <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input v-model="taskSearch" type="text" placeholder="搜索任务标题…"
+              class="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400/30" />
+          </div>
+          <button v-if="!isViewOnly" @click="openTaskModal()"
+            class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors">
+            <Plus class="w-4 h-4" /> 新增任务
           </button>
         </div>
 
-        <!-- 轮次 + 类型选择器 -->
-        <div class="flex flex-wrap items-center gap-2 mb-4 pb-3 border-b border-gray-100">
-          <span class="text-xs text-gray-500 font-medium">评价轮次：</span>
-          <button v-for="s in totalSessions" :key="s"
-            @click="handleSessionSelect(s)"
-            :disabled="isSessionDisabled(s)"
-            :title="getSessionTitle(s)"
-            :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${selectedBatchSession === s ? 'bg-blue-50 text-blue-600 border-blue-300 font-medium' : isSessionDisabled(s) ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`">
-            第{{ s }}次
-            <span v-if="store.isSessionLocked(courseId || '', s)" class="ml-1">🔒</span>
-            <span v-else-if="!isSessionTime(s)" class="ml-1 text-gray-300">⏳</span>
-          </button>
+        <!-- 任务列表 -->
+        <div v-if="filteredTasks.length === 0" class="text-center py-8 text-gray-400 text-sm">
+          {{ taskSearch ? '没有匹配的任务' : '暂无任务，点击右上角"新增任务"布置每节课需达成的教学成果' }}
         </div>
-
-        <!-- 轮次状态提示 -->
-        <div v-if="store.isSessionLocked(courseId || '', selectedBatchSession)" class="flex items-center gap-2 px-3 py-2 mb-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500">
-          <EyeOff class="w-3.5 h-3.5 text-gray-400" />
-          <span>该轮次已锁定，评价不可修改。上一轮次结束后自动锁定并处理逾期。</span>
-        </div>
-        <div v-else-if="!isSessionTime(selectedBatchSession)" class="flex items-center gap-2 px-3 py-2 mb-3 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-700">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          <span>{{ selectedBatchSession === 1 ? '第一节课已开始，评价已开启' : '该轮次尚未到开启时间' }}</span>
-        </div>
-        <div v-else-if="isFinalSessionExpired" class="flex items-center gap-2 px-3 py-2 mb-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-500">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
-          <span>课程已结束，最终评价已截止。</span>
-        </div>
-
-        <!-- 搜索 + 过滤 + 弹窗查看 -->
-        <div class="mb-3 flex flex-wrap items-center gap-2">
-          <div class="relative max-w-xs flex-1 min-w-[180px]">
-            <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input v-model="evalStudentSearch" type="text" placeholder="搜索学生姓名..."
-              class="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-          </div>
-          <select v-model="evalFilterClass"
-            class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
-            <option value="">全部班级</option>
-            <option v-for="opt in evalClassOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-          <select v-model="evalFilterGroup"
-            class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none bg-white">
-            <option value="">全部分组</option>
-            <option v-for="opt in evalGroupOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
-          </select>
-        </div>
-
-        <!-- 班级卡片列表 -->
-        <div v-if="filteredEvalTableSections.length > 0">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div v-for="(classBlock, ci) in filteredEvalTableSections" :key="ci"
-              @click="selectedEvalClass = classBlock.className; showEvalPopup = true"
-              class="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-md cursor-pointer transition-all">
-              <div class="flex items-center justify-between">
-                <div>
-                  <span class="text-sm font-semibold text-gray-800">班级 {{ classBlock.className || '未分班' }}</span>
-                  <span class="text-xs text-gray-400 ml-2">{{ classBlock.groups.reduce((a, g) => a + g.students.length, 0) }}人</span>
-                </div>
-                <ChevronRight class="w-4 h-4 text-gray-400" />
+        <div v-else class="space-y-3">
+          <div v-for="task in filteredTasks" :key="task.id" @click="openTaskDetail(task)"
+            class="group flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-brand-400/40 hover:bg-brand-400/5 transition-colors cursor-pointer">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <CheckCircle class="w-4 h-4" :class="task.status === 'completed' ? 'text-emerald-500' : 'text-blue-500'" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-medium text-gray-900 truncate">{{ task.title }}</p>
+                <span :class="taskStatusBadge(task.status || 'active')">{{ taskStatusLabel(task.status || 'active') }}</span>
               </div>
-              <div class="mt-2 flex flex-wrap gap-1.5">
-                <span v-for="(group, gi) in classBlock.groups" :key="gi"
-                  class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                  {{ group.groupName }} ({{ group.students.length }}人)
-                </span>
+              <p v-if="task.description" class="text-xs text-gray-400 mt-0.5 truncate">{{ task.description }}</p>
+              <div class="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                <span class="inline-flex items-center gap-1"><Calendar class="w-3 h-3" />截止 {{ task.dueDate || '未设置' }}</span>
+                <span>提交 {{ task.submittedCount }}/{{ task.totalStudents || 0 }}</span>
+                <span v-if="task.attachments?.length">文档 {{ task.attachments.length }} 个</span>
+                <span v-if="task.submittedCount > 0">平均分 {{ task.avgScore ?? '—' }}</span>
               </div>
             </div>
+            <div v-if="!isViewOnly" class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+              <button @click.stop="openTaskModal(task)" class="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50" title="编辑">
+                <Pencil class="w-4 h-4" />
+              </button>
+              <button @click.stop="deleteTask(task.id)" class="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50" title="删除">
+                <Trash2 class="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
-        <div v-else class="text-center py-8 text-gray-400">
-          {{ evalStudentSearch ? '未找到匹配的学生' : '该课程暂无学生' }}
         </div>
       </div>
 
-      <!-- 评价管理弹窗 -->
-      <Teleport to="body">
-        <div v-if="showEvalPopup" class="fixed inset-0 z-50 flex items-center justify-center">
-          <div class="absolute inset-0 bg-black/50" @click="closeEvalPopup()" />
-          <div class="relative bg-white rounded-xl shadow-2xl max-w-6xl w-full mx-4 max-h-[85vh] flex flex-col">
-            <!-- 头部 -->
-            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 class="text-lg font-semibold text-gray-800">班级 {{ selectedEvalClass }} - 评价管理</h3>
-              <button @click="closeEvalPopup()" class="text-gray-400 hover:text-gray-600">
-                <X class="w-5 h-5" />
+      <!-- 新增/编辑任务弹窗 -->
+      <div v-if="showTaskModal" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" @click="closeTaskModal" />
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">{{ editingTaskId ? '编辑任务' : '新增任务' }}</h3>
+            <button @click="closeTaskModal" class="p-1 text-gray-400 hover:text-gray-600">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">任务标题 <span class="text-red-500">*</span></label>
+              <input v-model="taskForm.title" type="text" placeholder="例如：第1节 完成XX并上传成果"
+                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400/30" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">简单介绍</label>
+              <textarea v-model="taskForm.description" rows="3" placeholder="简单介绍本节课需达成的教学成果、提交内容与要求"
+                class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-400/30 resize-none" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">文档资料</label>
+              <div
+                class="border border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-brand-400/60 hover:bg-brand-400/5 transition-colors"
+                @click="taskFileInput?.click()" @dragover.prevent @drop.prevent="onTaskFileDrop">
+                <Upload class="w-5 h-5 mx-auto text-gray-400 mb-1" />
+                <p class="text-xs text-gray-500">点击或拖拽文件到此处上传</p>
+                <p class="text-[10px] text-gray-400 mt-0.5">支持 PDF / Word / PPT / Excel / 文本 / 压缩包</p>
+              </div>
+              <input ref="taskFileInput" type="file" class="hidden" multiple
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.rar,.7z" @change="onTaskFileChange" />
+              <ul v-if="taskForm.attachments.length" class="mt-2 space-y-1.5">
+                <li v-for="(f, i) in taskForm.attachments" :key="i"
+                  class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                  <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                  <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+                  <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+                  <button @click="removeTaskFile(i)" class="text-gray-400 hover:text-red-500 flex-shrink-0" title="移除">
+                    <X class="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-2 mt-6">
+            <button @click="closeTaskModal" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">取消</button>
+            <button @click="saveTask" :disabled="!taskForm.title.trim()"
+              class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg disabled:opacity-50">保存</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务详情 + 评价弹窗 -->
+      <div v-if="showTaskDetailModal && selectedTask" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/40" @click="closeTaskDetail" />
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4 max-h-[85vh] overflow-y-auto p-6">
+          <!-- 头部 -->
+          <div class="flex items-start justify-between gap-4 mb-3">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <ClipboardList class="w-5 h-5 text-blue-500" />
+              </div>
+              <div class="min-w-0">
+                <h3 class="text-lg font-semibold text-gray-900 leading-tight">{{ selectedTask.title }}</h3>
+                <p class="text-xs text-gray-400 mt-1">{{ selectedTask.description || '暂无介绍' }}</p>
+              </div>
+            </div>
+            <button @click="closeTaskDetail" class="p-1 text-gray-400 hover:text-gray-600 flex-shrink-0">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+
+          <!-- 任务信息：进度 + 文档 -->
+          <div class="flex items-center gap-4 mb-3 text-xs text-gray-500 flex-wrap">
+            <span class="inline-flex items-center gap-1"><Users class="w-3.5 h-3.5" />已评 {{ scoredTaskCount }}/{{ selectedTask.totalStudents || 0 }}人</span>
+            <span v-if="selectedTask.attachments?.length" class="inline-flex items-center gap-1"><FileText class="w-3.5 h-3.5" />文档 {{ selectedTask.attachments.length }} 份</span>
+            <span v-if="selectedTask.avgScore !== undefined && selectedTask.avgScore !== null">平均分 {{ selectedTask.avgScore }}</span>
+          </div>
+          <ul v-if="selectedTask.attachments?.length" class="mb-4 space-y-1.5">
+            <li v-for="(f, i) in selectedTask.attachments" :key="i"
+              class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+              <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+              <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+            </li>
+          </ul>
+
+          <!-- 评价管理：按任务给学生给分 -->
+          <div class="border-t border-gray-100 pt-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <ClipboardCheck class="w-5 h-5 text-gray-400" />
+                <h4 class="font-semibold text-gray-900">评价管理</h4>
+                <span class="text-xs text-gray-400">按任务为每位学生打分</span>
+              </div>
+              <button v-if="canGradeTaskUI" @click="setAllTaskScores(90)"
+                class="text-xs px-3 py-1.5 bg-gray-50 text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-100">
+                一键给90分
               </button>
             </div>
-            <!-- 内容 -->
-            <div class="flex-1 overflow-auto px-6 py-4">
-              <div v-if="!currentEvalClassSection" class="text-center py-8 text-gray-400">暂无数据</div>
-              <template v-if="currentEvalClassSection">
-                <div v-for="(group, gi) in currentEvalClassSection.groups" :key="gi" class="mb-4">
-                  <div class="text-xs font-semibold text-gray-600 mb-2 px-1">{{ group.groupName }}（{{ group.students.length }}人）</div>
-                  <table class="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
-                    <thead>
-                      <tr class="bg-gray-50 border-b border-gray-200">
-                        <th class="w-10 py-2 px-2">
-                          <input type="checkbox"
-                            :checked="isGroupSelected(gi)"
-                            @change="toggleGroup(gi)"
-                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                        </th>
-                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs">学生</th>
-                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">自评</th>
-                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">组内</th>
-                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">组间</th>
-                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">教师</th>
-                        <th class="text-center py-2 px-2 text-gray-500 font-medium text-xs w-16">导师</th>
-                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-20">状态</th>
-                        <th class="text-left py-2 px-3 text-gray-500 font-medium text-xs w-24">新评分</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="s in group.students" :key="s.student.id"
-                        class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                        :class="{ 'bg-blue-50/30': selectedStudentIds.includes(s.student.id), 'bg-emerald-50/20': s.submitted }">
-                        <td class="py-2 px-2 text-center">
-                          <input type="checkbox"
-                            v-model="selectedStudentIds"
-                            :value="s.student.id"
-                            :disabled="s.submitted || !canManageEval"
-                            class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                        </td>
-                        <td class="py-2 px-3">
-                          <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                              <span class="text-xs font-medium text-blue-600">{{ s.student.name.charAt(0) }}</span>
-                            </div>
-                            <div>
-                              <p class="font-medium text-gray-900 text-sm">{{ s.student.name }}</p>
-                              <p class="text-xs text-gray-400">{{ s.student.id }}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td class="py-2 px-2 text-center text-xs" :class="s.selfScore !== null ? 'text-blue-600 font-medium' : 'text-gray-300'">{{ s.selfScore !== null ? s.selfScore + '分' : '-' }}</td>
-                        <td class="py-2 px-2 text-center text-xs" :class="s.intraScore !== null ? 'text-emerald-600 font-medium' : 'text-gray-300'">{{ s.intraScore !== null ? s.intraScore + '分' : '-' }}</td>
-                        <td class="py-2 px-2 text-center text-xs" :class="s.interScore !== null ? 'text-purple-600 font-medium' : 'text-gray-300'">{{ s.interScore !== null ? s.interScore + '分' : '-' }}</td>
-                        <td class="py-2 px-2 text-center text-xs" :class="s.teacherScore !== null ? 'text-brand-700 font-medium' : 'text-gray-300'">{{ s.teacherScore !== null ? s.teacherScore + '分' : '-' }}</td>
-                        <td class="py-2 px-2 text-center text-xs" :class="s.mentorScore !== null ? 'text-rose-600 font-medium' : 'text-gray-300'">{{ s.mentorScore !== null ? s.mentorScore + '分' : '-' }}</td>
-                        <td class="py-2 px-3">
-                          <span v-if="s.submitted" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
-                            <CheckCircle class="w-3 h-3" />已提交
-                          </span>
-                          <span v-else-if="s.hasDraft" class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-200">
-                            <Save class="w-3 h-3" />已保存
-                          </span>
-                          <span v-else class="text-xs text-gray-300">-</span>
-                        </td>
-                        <td class="py-2 px-3">
-                          <div v-if="!s.submitted && canManageEval" class="flex items-center gap-1">
-                            <input type="number" min="0" max="100"
-                              :value="evalScoreInputs[s.student.id] ?? ''"
-                              @input="(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (!isNaN(v)) evalScoreInputs[s.student.id] = Math.min(100, Math.max(0, v)); else delete evalScoreInputs[s.student.id] }"
-                              placeholder="分数"
-                              class="w-full max-w-[80px] px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-center focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
-                            <span class="text-xs text-gray-400">分</span>
-                          </div>
-                          <span v-else-if="s.submitted" class="text-xs font-medium text-emerald-600">{{ s.finalScore }}分</span>
-                          <span v-else class="text-xs text-gray-300">-</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+            <div v-if="taskScoreStudents.length === 0" class="text-center py-8 text-gray-400 text-sm">该课程暂无学员</div>
+            <div v-else class="space-y-2 max-h-72 overflow-y-auto pr-1">
+              <div v-for="stu in taskScoreStudents" :key="stu.id"
+                class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100">
+                <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-sm font-semibold text-brand-600 flex-shrink-0">
+                  {{ stu.name.charAt(0) }}
                 </div>
-              </template>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate">{{ stu.name }}</p>
+                  <p class="text-xs text-gray-400">学号 {{ stu.studentId }}</p>
+                </div>
+                <span v-if="taskScores[stu.id] !== undefined"
+                  class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex-shrink-0">
+                  已给 {{ taskScores[stu.id] }} 分
+                </span>
+                <input v-if="canGradeTaskUI" v-model.number="taskScores[stu.id]" type="number" min="0" max="100" placeholder="评分"
+                  class="w-20 px-2 py-1.5 text-sm border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-brand-400/30 flex-shrink-0" />
+              </div>
             </div>
-            <!-- 底部 -->
-            <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap items-start justify-between gap-4">
-              <div class="flex flex-wrap items-center gap-2">
-                <button @click="toggleAllClass"
-                  :disabled="!canManageEval"
-                  :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${!canManageEval || (selectedUnsubmittedCount === 0 && !isAllClassSelected) ? 'opacity-50 cursor-not-allowed' : ''} border-gray-300 text-gray-600 hover:bg-gray-100`">
-                  {{ isAllClassSelected ? '取消全选' : '全选本班' }}
-                </button>
-                <span class="text-xs text-gray-500 font-medium">一键等级评价（选中 {{ selectedUnsubmittedCount }} 名学生）：</span>
-                <div class="flex flex-wrap gap-1.5">
-                  <button v-for="level in LEVEL_OPTIONS" :key="level.label"
-                    @click="handleBatchEval(level.label)"
-                    :class="`text-xs px-3 py-1.5 rounded-lg border transition-all ${level.color} hover:opacity-80 ${selectedUnsubmittedCount === 0 || !canManageEval ? 'opacity-50 cursor-not-allowed' : ''}`"
-                    :disabled="selectedUnsubmittedCount === 0 || !canManageEval">
-                    {{ level.label }} ({{ level.range[0] }}-{{ level.range[1] }}分)
-                  </button>
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button @click="handleSaveEvalScores"
-                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasEvalInputs && canManageEval ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-                  :disabled="!hasEvalInputs || !canManageEval">
-                  <Save class="w-4 h-4" />
-                  保存评分
-                </button>
-                <button @click="handleSubmitAll"
-                  :class="`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${hasSubmittable && canManageEval ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`"
-                  :disabled="!hasSubmittable || !canManageEval">
-                  <CheckCircle class="w-4 h-4" />
-                  提交评价（{{ submittableCount }}人）
-                </button>
-                <button @click="closeEvalPopup()"
-                  class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">关闭</button>
-              </div>
+            <div v-if="canGradeTaskUI" class="flex items-center justify-end gap-2 mt-4">
+              <button @click="closeTaskDetail" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">关闭</button>
+              <button @click="saveTaskScores" class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg">保存评价</button>
             </div>
           </div>
         </div>
-      </Teleport>
+      </div>
+
     </div>
 
     <!-- Tab: 成绩配置（完整权重配置） -->
@@ -1906,17 +1800,17 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { authHeaders, listTasks, createTask, updateTask, deleteTask, listTaskSubmissions, submitTask, gradeTaskSubmission } from '@/api'
 import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
 import TeacherHomework from '@/components/Homework/TeacherHomework.vue'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
-  EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
-  EvalFrequencyDescs, getDefaultGradeConfig
+  EvalTypeLabels, getDefaultGradeConfig
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
-import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
+import type { EvalTemplate, EvalType, Evaluation, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, ClipboardList, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import { javaListEnrollmentStudents, javaBulkEnrollments, javaBulkSchedules, javaBulkScores, javaBulkGroups, javaUpdateStudent } from '@/api'
 import * as echarts from 'echarts'
@@ -1951,6 +1845,239 @@ const isViewOnly = computed(() => {
 const canManageEval = computed(() => !isViewOnly.value || isMentor.value)
 /** 能否添加/管理课程项目：企业导师可以添加项目；领导/其他教师仅查看 */
 const canManageProjects = computed(() => !isViewOnly.value || isMentor.value)
+/**
+ * 能否给任务评分：授课教师可直接评；导师仅当课程评价模板开启了"导师参与"（hasMentor=1）时可查看并评分。
+ * 导师端始终不支持布置/编辑/删除任务（由 isViewOnly 控制按钮显示）。
+ */
+const canGradeTaskUI = computed(() => !isViewOnly.value || (isMentor.value && !!activeEvalConfig.value.hasMentor))
+
+// ===== 任务管理（布置每节课教学成果，学生上传资料，教师评价给分） =====
+interface CourseTask {
+  id: string
+  courseId?: string
+  title: string
+  description?: string
+  dueDate?: string
+  status?: 'pending' | 'active' | 'completed'
+  submittedCount: number
+  totalStudents: number
+  avgScore?: number
+  attachments?: { name: string; size: number }[]
+  scores?: Record<string, number>
+  createdAt?: string
+  createdBy?: string
+}
+/** 任务列表：从后端 /api/tasks 拉取（course_task 表） */
+const taskList = ref<CourseTask[]>([])
+const taskLoading = ref(false)
+const taskSearch = ref('')
+const showTaskModal = ref(false)
+const editingTaskId = ref<string | null>(null)
+const taskForm = ref<CourseTask>({
+  id: '', title: '', description: '', dueDate: '',
+  status: 'active', submittedCount: 0, totalStudents: 0, attachments: [],
+})
+
+/** 从后端加载当前课程的任务列表 */
+async function loadTasks() {
+  if (!courseId.value) return
+  taskLoading.value = true
+  try {
+    const res = await listTasks(courseId.value)
+    const tasks: CourseTask[] = (res.tasks || []).map((t: any) => ({
+      id: t.id,
+      courseId: t.courseId,
+      title: t.title,
+      description: t.description || '',
+      attachments: t.attachments || [],
+      createdAt: t.createdAt,
+      createdBy: t.createdBy,
+      submittedCount: t.submittedCount ?? 0,
+      totalStudents: enrolledStudents.value.length,
+      avgScore: t.avgScore,
+    }))
+    taskList.value = tasks
+  } catch (e) {
+    console.error('加载任务失败:', e)
+  } finally {
+    taskLoading.value = false
+  }
+}
+
+const filteredTasks = computed(() => {
+  const q = taskSearch.value.trim().toLowerCase()
+  if (!q) return taskList.value
+  return taskList.value.filter((t) => t.title.toLowerCase().includes(q))
+})
+
+function openTaskModal(task?: CourseTask) {
+  editingTaskId.value = task?.id ?? null
+  taskForm.value = task
+    ? { ...task }
+    : { id: '', title: '', description: '', dueDate: '', status: 'active', submittedCount: 0, totalStudents: enrolledStudents.value.length, attachments: [] }
+  showTaskModal.value = true
+}
+function closeTaskModal() {
+  showTaskModal.value = false
+}
+async function saveTask() {
+  if (!taskForm.value.title.trim()) return
+  try {
+    const payload = {
+      courseId: courseId.value,
+      title: taskForm.value.title.trim(),
+      description: taskForm.value.description || '',
+      attachments: taskForm.value.attachments || [],
+    }
+    if (editingTaskId.value) {
+      await updateTask(editingTaskId.value, { ...payload, id: editingTaskId.value })
+    } else {
+      await createTask(payload)
+    }
+    closeTaskModal()
+    await loadTasks()
+  } catch (e: any) {
+    alert(`保存任务失败：${e.message || e}`)
+  }
+}
+async function deleteTask(id: string) {
+  if (!confirm('确定删除该任务？删除后学生的提交记录也会一并删除。')) return
+  try {
+    await deleteTask(id)
+    await loadTasks()
+    if (selectedTask.value?.id === id) closeTaskDetail()
+  } catch (e: any) {
+    alert(`删除任务失败：${e.message || e}`)
+  }
+}
+const taskFileInput = ref<HTMLInputElement | null>(null)
+function onTaskFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.files) {
+    for (const file of Array.from(input.files)) {
+      taskForm.value.attachments.push({ name: file.name, size: file.size })
+    }
+  }
+  input.value = ''
+}
+function onTaskFileDrop(e: DragEvent) {
+  if (e.dataTransfer?.files) {
+    for (const file of Array.from(e.dataTransfer.files)) {
+      taskForm.value.attachments.push({ name: file.name, size: file.size })
+    }
+  }
+}
+function removeTaskFile(i: number) {
+  taskForm.value.attachments.splice(i, 1)
+}
+function formatFileSize(bytes: number) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let v = bytes
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return `${v.toFixed(v >= 100 ? 0 : 1)} ${units[i]}`
+}
+
+// ===== 任务详情 + 按任务评价 =====
+const showTaskDetailModal = ref(false)
+const selectedTask = ref<CourseTask | null>(null)
+const taskScores = ref<Record<string, number>>({})
+/** 当前任务的学生提交记录（taskId → submissionId），评分时用于定位提交记录 */
+const taskSubmissions = ref<Record<string, { submissionId: string; score: number | null }>>({})
+
+const taskScoreStudents = computed(() =>
+  enrolledStudents.value.map((e) => ({ id: e.student.id, name: e.student.name, studentId: (e.student as any).studentId || '' }))
+)
+const scoredTaskCount = computed(() => {
+  const t = selectedTask.value
+  if (!t?.scores) return 0
+  return Object.values(t.scores).filter((v) => typeof v === 'number' && v >= 0).length
+})
+
+/** 打开任务详情：加载该任务全部提交，预填已评分 */
+async function openTaskDetail(task: CourseTask) {
+  selectedTask.value = task
+  taskScores.value = { ...(task.scores ?? {}) }
+  taskSubmissions.value = {}
+  showTaskDetailModal.value = true
+  try {
+    const res = await listTaskSubmissions(task.id)
+    const subs = (res.submissions || []) as any[]
+    const byStudent: Record<string, { submissionId: string; score: number | null }> = {}
+    for (const s of subs) {
+      byStudent[s.studentId] = { submissionId: s.id, score: s.score != null ? Number(s.score) : null }
+      if (s.score != null && taskScores.value[s.studentId] === undefined) {
+        taskScores.value[s.studentId] = Number(s.score)
+      }
+    }
+    taskSubmissions.value = byStudent
+    // 用实际提交数回填展示
+    selectedTask.value = { ...task, submittedCount: subs.filter((s) => s.score != null).length }
+  } catch (e) {
+    console.error('加载任务提交失败:', e)
+  }
+}
+function closeTaskDetail() {
+  showTaskDetailModal.value = false
+  selectedTask.value = null
+  taskScores.value = {}
+  taskSubmissions.value = {}
+}
+function setAllTaskScores(score: number) {
+  const next: Record<string, number> = {}
+  for (const stu of taskScoreStudents.value) next[stu.id] = score
+  taskScores.value = { ...taskScores.value, ...next }
+}
+/** 保存评价：对每位有分数的学生，先确保存在提交记录，再落库评分 */
+async function saveTaskScores() {
+  if (!selectedTask.value) return
+  const task = selectedTask.value
+  const entries = Object.entries(taskScores.value).filter(([, v]) => typeof v === 'number' && v >= 0)
+  if (entries.length === 0) {
+    closeTaskDetail()
+    return
+  }
+  try {
+    for (const [studentId, score] of entries) {
+      const clamped = Math.min(100, Math.max(0, score))
+      let submissionId = taskSubmissions.value[studentId]?.submissionId
+      if (!submissionId) {
+        // 学生尚无提交记录：先创建一条空提交，再评分
+        const created = await submitTask(task.id, { studentId, attachments: [] })
+        submissionId = created.id
+      }
+      await gradeTaskSubmission(submissionId, clamped)
+      taskSubmissions.value[studentId] = { submissionId, score: clamped }
+    }
+    // 任务评分作为课程评价（teacher/mentor 类型）进入平时成绩：刷新评价数据并同步到详细成绩
+    if (courseId.value) {
+      try {
+        await store.refreshEvaluations(courseId.value)
+        store.syncEvalToDetailedGrade(courseId.value)
+      } catch (e) {
+        console.error('同步任务评分到成绩失败:', e)
+      }
+    }
+    await loadTasks()
+    closeTaskDetail()
+  } catch (e: any) {
+    alert(`保存评价失败：${e.message || e}`)
+  }
+}
+const TASK_STATUS_LABEL: Record<string, string> = { pending: '未开始', active: '进行中', completed: '已完成' }
+const taskStatusLabel = (s: string) => TASK_STATUS_LABEL[s] ?? s
+const taskStatusBadge = (s: string) => {
+  const map: Record<string, string> = {
+    pending: 'bg-gray-100 text-gray-500 border border-gray-200',
+    active: 'bg-blue-50 text-blue-600 border border-blue-200',
+    completed: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
+  }
+  return `text-[10px] px-1.5 py-0.5 rounded-full ${map[s] ?? map.pending}`
+}
 
 // 从数据库加载课程学员
 onMounted(async () => {
@@ -1988,6 +2115,7 @@ onMounted(async () => {
   ensureWrittenExams()
   normalizeProjectShares()
   syncProjectWeightLocksFromStore()
+  loadTasks()
 })
 
 /** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
@@ -2097,9 +2225,7 @@ const LEVEL_OPTIONS = [
   { label: 'C (中等)', range: [70, 79],  color: 'bg-brand-600/15 text-gray-800 border-brand-600' },
   { label: 'D (及格)', range: [60, 69],  color: 'bg-brand-600/15 text-gray-800 border-brand-600' },
 ]
-const ALL_EVAL_TYPES: EvalType[] = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor']
 const EVAL_TEMPLATE_KEYS = Object.keys(EvalTemplateLabels) as EvalTemplate[]
-const EVAL_FREQUENCY_KEYS = Object.keys(EvalFrequencyLabels) as EvalFrequency[]
 const ExamTypeLabels: Record<string, string> = {
   midterm_exam: '期中考试',
   midterm_project: '期中项目',
@@ -3815,11 +3941,11 @@ const handleSetConfig = (updates: Partial<import('@/types').EvaluationConfig>) =
   const config = {
     courseId: courseId.value,
     template: existing?.template || 'standard',
-    frequency: existing?.frequency || 'biweekly',
     hasMentor: existing?.hasMentor ?? false,
     overdueRule: existing?.overdueRule || 'average',
     ...existing,
     ...updates,
+    frequency: 'biweekly', // 固定：每两学时一次，不可配置
   }
   store.setEvalConfig(config)
   store.markConfigCompleted(courseId.value, 'evalConfig')

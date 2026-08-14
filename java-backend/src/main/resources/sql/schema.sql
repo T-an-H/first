@@ -369,24 +369,7 @@ CREATE TABLE note (
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '笔记';
 
 -- ------------------------------------------------------------
--- 19. 在线文档 online_doc
--- ------------------------------------------------------------
-DROP TABLE IF EXISTS online_doc;
-CREATE TABLE online_doc (
-    id             VARCHAR(64)  NOT NULL COMMENT '主键（前端生成）',
-    title          VARCHAR(255) NOT NULL COMMENT '文档标题',
-    content        LONGTEXT     NULL COMMENT '文档内容',
-    created_by     VARCHAR(64)  DEFAULT '' COMMENT '创建人',
-    last_edited_by VARCHAR(64)  DEFAULT '' COMMENT '最后编辑人',
-    created_at     DATETIME     DEFAULT CURRENT_TIMESTAMP,
-    last_edited_at DATETIME     DEFAULT NULL COMMENT '最后编辑时间',
-    updated_at     DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_created_by (created_by)
-) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = '在线文档';
-
--- ------------------------------------------------------------
--- 20. AI 分层记录 student_tier（一门课程一名学生一条）
+-- 19. AI 分层记录 student_tier（一门课程一名学生一条）
 -- ------------------------------------------------------------
 DROP TABLE IF EXISTS student_tier;
 CREATE TABLE student_tier (
