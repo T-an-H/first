@@ -482,6 +482,19 @@ export async function javaListDepartmentClasses() {
   return javaRequest('/base-data/department-classes')
 }
 
+/** POST /base-data/department-classes 新增班级（管理员端班级管理主数据） */
+export async function javaAddDepartmentClass(data: { departmentId?: string; className: string }) {
+  return javaRequest('/base-data/department-classes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** DELETE /base-data/department-classes/{id} 删除班级 */
+export async function javaDeleteDepartmentClass(id: string) {
+  return javaRequest(`/base-data/department-classes/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
 export async function javaListTeachers() {
   return javaRequest('/base-data/teachers')
 }

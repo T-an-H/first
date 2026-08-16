@@ -277,9 +277,9 @@
               <div v-if="canGradeTaskUI" class="flex items-center gap-2">
                 <input v-model.number="taskBatchScore" type="number" min="0" max="100" placeholder="评分"
                   class="w-16 px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
-                <button @click="applyBatchTaskScores"
-                  class="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100">
-                  一键批量评价
+                <button @click="applyBatchTaskScores" :disabled="taskSelectedStudentIds.length === 0"
+                  :class="`text-xs px-3 py-1.5 rounded-lg border transition-colors ${taskSelectedStudentIds.length ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'}`">
+                  一键批量评价已选（{{ taskSelectedStudentIds.length }} 人）
                 </button>
               </div>
             </div>
@@ -301,13 +301,21 @@
                 <option value="__all__">全部分组</option>
                 <option v-for="g in taskGroupOptions" :key="g.id" :value="g.id">{{ g.name }}（{{ g.memberIds.length }}人）</option>
               </select>
-              <span class="text-xs text-gray-400">显示 {{ taskScoreStudents.length }} 人</span>
+              <span class="text-xs text-gray-400">显示 {{ taskScoreStudents.length }} 人<template v-if="canGradeTaskUI && taskSelectedStudentIds.length"> · 已选 {{ taskSelectedStudentIds.length }} 人</template></span>
+              <label v-if="canGradeTaskUI" class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer select-none">
+                <input type="checkbox" :checked="taskAllOnPageChecked" :indeterminate="taskSomeOnPageChecked"
+                  @change="taskToggleAllOnPage" class="w-3.5 h-3.5 accent-blue-500 cursor-pointer" />
+                当前展示学生全选
+              </label>
             </div>
 
             <div v-if="taskScoreStudents.length === 0" class="text-center py-8 text-gray-400 text-sm">该筛选条件下暂无学员</div>
             <div v-else class="space-y-2 max-h-96 overflow-y-auto pr-1">
               <div v-for="stu in taskScoreStudents" :key="stu.id" class="p-2.5 rounded-lg border border-gray-100">
                 <div class="flex items-center gap-3">
+                  <input v-if="canGradeTaskUI" type="checkbox" :checked="taskSelectedStudentIds.includes(stu.id)"
+                    @change="taskToggleStudent(stu.id)" :title="`选择 ${stu.name}`"
+                    class="w-4 h-4 accent-blue-500 flex-shrink-0 cursor-pointer" />
                   <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-sm font-semibold text-brand-600 flex-shrink-0">
                     {{ stu.name.charAt(0) }}
                   </div>
@@ -1074,6 +1082,9 @@
               </button>
               <button @click.stop="openNewGroupForClass(classData.className)" class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded" title="新建分组">
                 <Plus class="w-3.5 h-3.5" />
+              </button>
+              <button @click.stop="openEditClassModal(classData.className)" class="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded" title="重命名班级">
+                <Pencil class="w-3.5 h-3.5" />
               </button>
               <button @click.stop="handleDeleteClass(classData.className)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded" title="删除班级">
                 <Trash2 class="w-3.5 h-3.5" />
@@ -1894,7 +1905,7 @@ import {
 import type { EvalType, EvalTemplate, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, ClipboardList, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
-import { javaListEnrollmentStudents, javaBulkEnrollments, javaBulkSchedules, javaBulkScores, javaBulkGroups, javaUpdateStudent } from '@/api'
+import { javaListEnrollmentStudents, javaBulkEnrollments, javaBulkSchedules, javaBulkScores, javaBulkGroups, javaUpdateStudent, javaListDepartmentClasses, javaAddDepartmentClass, javaDeleteDepartmentClass } from '@/api'
 import * as echarts from 'echarts'
 
 const route = useRoute()
@@ -2095,6 +2106,30 @@ const taskGroupFilter = ref('__all__')
 const taskSearchKeyword = ref('')
 /** 一键批量评价的分数 */
 const taskBatchScore = ref(90)
+/** 任务评分区勾选：学生 id 集合（支持随意选择 + 当前展示一键全选，用于一键批量评价） */
+const taskSelectedStudentIds = ref<string[]>([])
+function taskToggleStudent(id: string) {
+  taskSelectedStudentIds.value = taskSelectedStudentIds.value.includes(id)
+    ? taskSelectedStudentIds.value.filter((x) => x !== id)
+    : [...taskSelectedStudentIds.value, id]
+}
+/** 当前展示学生是否全部选中（决定"当前展示学生全选"勾选态） */
+const taskAllOnPageChecked = computed(() =>
+  taskScoreStudents.value.length > 0 && taskScoreStudents.value.every((s) => taskSelectedStudentIds.value.includes(s.id))
+)
+/** 当前展示学生是否有部分选中（半选态） */
+const taskSomeOnPageChecked = computed(() =>
+  !taskAllOnPageChecked.value && taskScoreStudents.value.some((s) => taskSelectedStudentIds.value.includes(s.id))
+)
+/** 当前展示学生一键全选/取消全选 */
+function taskToggleAllOnPage() {
+  const ids = new Set(taskScoreStudents.value.map((s) => s.id))
+  if (taskAllOnPageChecked.value) {
+    taskSelectedStudentIds.value = taskSelectedStudentIds.value.filter((x) => !ids.has(x))
+  } else {
+    taskSelectedStudentIds.value = [...new Set([...taskSelectedStudentIds.value, ...ids])]
+  }
+}
 
 const taskClassOptions = computed(() => {
   const set = new Set<string>()
@@ -2198,6 +2233,7 @@ async function openTaskDetail(task: CourseTask) {
   taskGroupFilter.value = '__all__'
   taskSearchKeyword.value = ''
   taskBatchScore.value = 90
+  taskSelectedStudentIds.value = []
   showTaskDetailModal.value = true
   try {
     const [sres, eres] = await Promise.all([listTaskSubmissions(task.id), listTaskEvals(task.id)])
@@ -2229,17 +2265,21 @@ function closeTaskDetail() {
   taskGroupFilter.value = '__all__'
   taskSearchKeyword.value = ''
   taskBatchScore.value = 90
+  taskSelectedStudentIds.value = []
 }
-/** 一键批量评价：将分数应用到当前筛选范围内的全部学生 */
+/** 一键批量评价：将分数应用到已勾选的学生（可先点"当前展示学生全选"再批量填分） */
 function applyBatchTaskScores() {
   const score = Number(taskBatchScore.value)
   if (Number.isNaN(score) || score < 0 || score > 100) {
     alert('请输入 0-100 之间的分数')
     return
   }
-  if (taskScoreStudents.value.length === 0) return
+  if (taskSelectedStudentIds.value.length === 0) {
+    alert('请先勾选需要批量评价的学生（可点"当前展示学生全选"）')
+    return
+  }
   const next: Record<string, number> = {}
-  for (const stu of taskScoreStudents.value) next[stu.id] = score
+  for (const id of taskSelectedStudentIds.value) next[id] = score
   taskScores.value = { ...taskScores.value, ...next }
 }
 /** 保存评价：对每位有分数的学生，先确保存在提交记录，再落库评分 */
@@ -2527,6 +2567,30 @@ async function handleAddClassExcel(e: Event) {
   target.value = ''
 }
 
+/** 确保班级存在于后端班级表（department_class，管理员端「班级管理」主数据）：不存在则创建 */
+async function ensureDepartmentClass(className: string) {
+  if (!className) return
+  try {
+    const dcList: any[] = await javaListDepartmentClasses()
+    const existing = (dcList || []).some((c: any) => c.className === className)
+    if (!existing) await javaAddDepartmentClass({ className })
+  } catch (err) {
+    console.error('同步班级到后端失败（管理员端班级管理将不可见）:', className, err)
+  }
+}
+
+/** 删除后端班级表中的指定班级记录（若存在） */
+async function removeDepartmentClassByName(className: string) {
+  if (!className) return
+  try {
+    const dcList: any[] = await javaListDepartmentClasses()
+    const rec = (dcList || []).find((c: any) => c.className === className)
+    if (rec?.id) await javaDeleteDepartmentClass(rec.id)
+  } catch (err) {
+    console.error('删除后端班级记录失败:', className, err)
+  }
+}
+
 /** 保存新增班级：创建班级并处理导入的成员（匹配/新建学生、分配班级、选课） */
 async function saveAddClass() {
   const className = addClassForm.value.className.trim()
@@ -2597,6 +2661,9 @@ async function saveAddClass() {
       }])
     } catch {}
   }
+
+  // 同步班级到后端班级表（department_class，管理员端「班级管理」主数据）：保证管理员端能看到本课程新建的班级
+  await ensureDepartmentClass(className)
 
   const total = addClassMembers.value.length
   const msg = total > 0
@@ -2715,6 +2782,8 @@ async function saveAddStudent() {
       } catch {}
     }
   }
+  // 若选择了班级，确保该班级同步到后端班级表（管理员端班级管理）
+  if (targetClass) await ensureDepartmentClass(targetClass)
   showAddStudentModal.value = false
   alert(`已将"${name}"加入本课程${joinedGroupName ? `，并加入分组「${joinedGroupName}」` : ''}`)
 }
@@ -2727,7 +2796,7 @@ function openEditClassModal(className: string) {
   editClassName.value = className
   showEditClassModal.value = true
 }
-function handleSaveEditClass() {
+async function handleSaveEditClass() {
   if (!editingOldClassName.value || !editClassName.value.trim()) return
   const newName = editClassName.value.trim()
   // 更新该班级所有学生的 className
@@ -2736,16 +2805,23 @@ function handleSaveEditClass() {
       store.updateStudent(stu.id, { className: newName })
     }
   }
+  // 同步班级表：旧班级名删除、新班级名确保存在（管理员端班级管理随之一致）
+  if (newName !== editingOldClassName.value) {
+    await removeDepartmentClassByName(editingOldClassName.value)
+    await ensureDepartmentClass(newName)
+  }
   showEditClassModal.value = false
   alert(`班级"${editingOldClassName.value}"已重命名为"${newName}"`)
 }
-function handleDeleteClass(className: string) {
+async function handleDeleteClass(className: string) {
   if (!confirm(`确定删除班级"${className}"？该操作只会清空学生的班级信息，不会删除学生。`)) return
   for (const stu of store.students) {
     if (stu.className === className) {
       store.updateStudent(stu.id, { className: '' })
     }
   }
+  // 同步班级表：删除对应班级记录（管理员端班级管理随之消失）
+  await removeDepartmentClassByName(className)
 }
 // 一键分组
 const showOneClickGroup = ref(false)
@@ -3935,7 +4011,7 @@ function handleEditStudent(student: import('@/types').Student) {
 
 }
 
-function handleSaveEditStudent() {
+async function handleSaveEditStudent() {
   if (!editingStudent.value || !editStudentName.value.trim()) return
   const student = editingStudent.value
   const newId = editStudentIdField.value.trim() || student.id
@@ -3945,6 +4021,8 @@ function handleSaveEditStudent() {
   }
   const oldId = student.id
   store.updateStudent(oldId, { name: editStudentName.value.trim(), id: newId, className: editStudentClass.value || '' })
+  // 若修改了班级，确保新班级同步到后端班级表（管理员端班级管理）
+  if (editStudentClass.value) await ensureDepartmentClass(editStudentClass.value)
 
   if (newId !== oldId) {
     store.enrollments.forEach((e) => {
@@ -4371,6 +4449,8 @@ async function confirmQuickAddToClass() {
     }
   }
   store.updateStudent(quickAddClassStudentId.value, { className: quickAddClassSelected.value })
+  // 确保班级同步到后端班级表（管理员端班级管理）
+  await ensureDepartmentClass(quickAddClassSelected.value)
   // 若选择了分组则加入该分组（不选分组则保持未分组）
   if (quickAddClassGroupSelected.value) {
     const group = store.studentGroups.find((g) => g.id === quickAddClassGroupSelected.value)
@@ -4432,9 +4512,13 @@ function toggleAddStudentToClass(studentId: string) {
   }
 }
 
-function confirmAddStudentsToClass() {
+async function confirmAddStudentsToClass() {
   for (const sid of addStudentToClassSelected.value) {
     store.updateStudent(sid, { className: addStudentToClassName.value })
+  }
+  // 确保班级同步到后端班级表（管理员端班级管理）
+  if (addStudentToClassSelected.value.length > 0) {
+    await ensureDepartmentClass(addStudentToClassName.value)
   }
   showAddStudentToClassModal.value = false
   addStudentToClassSelected.value = []

@@ -151,6 +151,10 @@ public class BaseDataController {
         if (!StringUtils.hasText(departmentClass.getId())) {
             departmentClass.setId("class-" + System.currentTimeMillis());
         }
+        // department_id 为 NOT NULL 且无默认值，未指定学院时兜底为空串，避免插入失败
+        if (!StringUtils.hasText(departmentClass.getDepartmentId())) {
+            departmentClass.setDepartmentId("");
+        }
         departmentClassService.save(departmentClass);
         return Result.ok(departmentClass);
     }
