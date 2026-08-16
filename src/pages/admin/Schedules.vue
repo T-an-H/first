@@ -469,7 +469,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { Plus, Search, CalendarX, AlertTriangle, Upload, RefreshCw, BookOpen, ArrowLeft, ArrowRight, X } from 'lucide-vue-next'
 import type { Schedule, Course, Department } from '@/types'
-import { javaBulkSchedules, javaUpdateCourse as apiUpdateCourse, javaUpdateSchedule as apiUpdateSchedule, javaDeleteSchedule as apiDeleteSchedule } from '@/api'
+import { javaBulkSchedules, javaUpdateCourse as apiUpdateCourse, javaUpdateSchedule as apiUpdateSchedule, javaDeleteSchedule as apiDeleteSchedule, javaListSchedules, javaAddCourse, javaAddDepartment } from '@/api'
 import * as XLSX from 'xlsx'
 
 const store = useAppStore()
@@ -536,13 +536,13 @@ function closeCourseModal() {
   showCourseModal.value = false
 }
 
-function handleSaveCourse() {
+async function handleSaveCourse() {
   if (!canSaveCourse.value) return
   if (store.courses.some((c) => c.title === courseForm.value.title.trim())) {
     courseImportMsg.value = { success: false, text: '课程名称已存在，请更换名称' }
     return
   }
-  store.addCourse({
+  const course: Course = {
     id: `course-${Date.now()}`,
     title: courseForm.value.title.trim(),
     description: courseForm.value.description,
@@ -553,8 +553,16 @@ function handleSaveCourse() {
     credits: 0,
     duration: 0,
     status: 'active',
-    createdAt: new Date().toISOString().split('T')[0],
-  })
+    createdAt: new Date().toISOString().replace('Z', ''),
+  }
+  // 先落库后端（刷新后不丢失），成功后再更新前端 store
+  try {
+    await javaAddCourse(course)
+    store.addCourse(course)
+  } catch (err) {
+    alert('课程创建失败：' + (err instanceof Error ? err.message : String(err)))
+    return
+  }
   closeCourseModal()
 }
 
@@ -584,7 +592,7 @@ async function handleCourseFileChange(e: Event) {
     }
 
     const existingTitles = new Set(store.courses.map((c) => c.title))
-    const now = new Date().toISOString().split('T')[0]
+    const now = new Date().toISOString().replace('Z', '')
     let added = 0
     let skipped = 0
 
@@ -598,7 +606,7 @@ async function handleCourseFileChange(e: Event) {
       const credits = Number(row['学分'] || row['credits'] || 0) || 0
       const duration = Number(row['课时'] || row['duration'] || 0) || 0
       const status = String(row['状态'] || 'active').includes('结束') ? 'inactive' : 'active'
-      store.addCourse({
+      const course: Course = {
         id: `course-${Date.now()}-${added}`,
         title,
         description: String(row['描述'] || row['description'] || row['课程描述'] || ''),
@@ -610,7 +618,10 @@ async function handleCourseFileChange(e: Event) {
         duration,
         status: status as any,
         createdAt: now,
-      })
+      }
+      // 先落库后端（刷新后不丢失），成功后再更新前端 store
+      await javaAddCourse(course)
+      store.addCourse(course)
       existingTitles.add(title)
       added++
     }
@@ -664,8 +675,15 @@ onMounted(async () => {
 })
 
 async function loadSchedules() {
-  // 排课数据由 store.initFromDatabase() 从数据库(course_db)拉取，此处直接使用 store
-  dbSchedules.value = store.schedules
+  // 从后端实时拉取最新排课并同步 store，保证删除/修改/新增后列表即时刷新、刷新页面数据一致
+  try {
+    const list: any[] = await javaListSchedules()
+    const arr = Array.isArray(list) ? list : []
+    dbSchedules.value = arr
+    store.replaceSchedules(arr)
+  } catch {
+    dbSchedules.value = store.schedules
+  }
 }
 
 // ====== 搜索 ======
@@ -1163,13 +1181,21 @@ function openAddDeptModal() {
   showDeptModal.value = true
 }
 
-function handleSaveDept() {
+async function handleSaveDept() {
   if (!deptForm.value.name.trim()) return
-  store.addDepartment({
+  const dept: Department = {
     id: `dept-${Date.now()}`,
     name: deptForm.value.name.trim(),
     color: deptForm.value.color,
-  })
+  }
+  // 先落库后端（刷新后不丢失），成功后再更新前端 store
+  try {
+    await javaAddDepartment({ name: dept.name, color: dept.color })
+    store.addDepartment(dept)
+  } catch (err) {
+    alert('学院创建失败：' + (err instanceof Error ? err.message : String(err)))
+    return
+  }
   showDeptModal.value = false
 }
 
@@ -1223,6 +1249,11 @@ async function confirmDeptImport() {
         continue
       }
       const color = String(row['颜色'] || row['color'] || '').trim() || presetColors[store.departments.length % presetColors.length]
+      // 先落库后端（刷新后不丢失），成功后再更新前端 store
+      await javaAddDepartment({
+        name,
+        color: color.startsWith('#') ? color : `#${color}`,
+      })
       store.addDepartment({
         id: `dept-${Date.now()}-${added}`,
         name,
