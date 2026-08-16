@@ -478,6 +478,14 @@ export async function javaListDepartments() {
   return javaRequest('/base-data/departments')
 }
 
+/** POST /base-data/departments 新增学院（落库，刷新后不丢失） */
+export async function javaAddDepartment(data: { name: string; color?: string }) {
+  return javaRequest('/base-data/departments', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 export async function javaListDepartmentClasses() {
   return javaRequest('/base-data/department-classes')
 }
@@ -621,11 +629,11 @@ export async function javaUpdateSchedule(id: string, data: any) {
 export async function javaDeleteSchedule(id: string) {
   return javaRequest(`/schedules/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
-/** POST /schedules/bulk 批量排课 */
+/** POST /schedules/bulk 批量排课（Java 端接口签名要求 JSON 数组） */
 export async function javaBulkSchedules(schedules: any[]) {
   return javaRequest('/schedules/bulk', {
     method: 'POST',
-    body: JSON.stringify({ schedules }),
+    body: JSON.stringify(schedules),
   })
 }
 

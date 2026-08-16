@@ -544,6 +544,14 @@ export const useAppStore = defineStore('app', () => {
     javaDeleteSchedule(id).catch(() => {})
   }
 
+  /** 用后端全量数据覆盖排课（管理员端删除/修改/新增后实时刷新） */
+  function replaceSchedules(list: Schedule[]) {
+    schedules.value = list
+    saveToStorage('schedules', list)
+    const ids = new Set(list.map((s) => s.courseId).filter(Boolean))
+    ids.forEach((id) => recalculateProgress(id))
+  }
+
   function addEnrollment(enrollment: Enrollment) {
     enrollments.value = [...enrollments.value, enrollment]
     saveToStorage('enrollments', enrollments.value)
@@ -1678,7 +1686,7 @@ export const useAppStore = defineStore('app', () => {
     login, logout,
     addCourse, updateCourse, deleteCourse, assignMentorToCourse,
     addCategory, updateCategory, deleteCategory,
-    addSchedule, updateSchedule, deleteSchedule,
+    addSchedule, updateSchedule, deleteSchedule, replaceSchedules,
     addEnrollment, updateEnrollment, deleteEnrollment,
     addGrade, updateGrade, deleteGrade,
     addCloudFile, updateCloudFile, deleteCloudFile,
