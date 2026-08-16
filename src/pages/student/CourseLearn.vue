@@ -1399,8 +1399,18 @@ const totalScore = computed(() => {
   return Math.min(100, base + store.getStudentQualityScore(courseId, myStudent.value.id))
 })
 
+/** 班级平均：仅统计选修本课程、且与我在同一班级的同学（班级一定属于该课程，同班同学=该课程中同班级的有效选课学生） */
 const classAvgScore = computed(() => {
-  const courseGrades = store.grades.filter((g) => g.courseId === courseId)
+  if (!myStudent.value) return 0
+  const myClass = myStudent.value.className || ''
+  if (!myClass) return 0
+  const peerIds = new Set<string>()
+  for (const e of store.enrollments) {
+    if (e.courseId !== courseId || e.status === 'dropped') continue
+    const s = store.students.find((x) => x.id === e.studentId)
+    if (s && s.className === myClass) peerIds.add(s.id)
+  }
+  const courseGrades = store.grades.filter((g) => g.courseId === courseId && peerIds.has(g.studentId))
   if (courseGrades.length === 0) return 0
   return Math.round(courseGrades.reduce((s, g) => s + g.score, 0) / courseGrades.length)
 })

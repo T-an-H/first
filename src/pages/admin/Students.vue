@@ -124,6 +124,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Users, ArrowLeft, ArrowRight, RefreshCw, LoaderCircle, Search } from 'lucide-vue-next'
 import { useAppStore } from '@/stores/app'
+import { javaListDepartmentClasses } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,14 +156,24 @@ const filteredStudents = computed(() => {
 
 async function loadClasses() {
   loading.value = true
-  // 班级数据由 store.initFromDatabase() 从数据库(course_db)拉取，此处从学生数据聚合生成
+  // 班级主数据 = 后端班级表 department_class（教师端/管理员端新增的班级都会同步进来）
+  // 学生数从 store.students（student 表 className）聚合
   const classMap = new Map<string, number>()
   for (const s of store.students) {
     if (s.className) {
       classMap.set(s.className, (classMap.get(s.className) || 0) + 1)
     }
   }
-  classes.value = Array.from(classMap.entries()).map(([name, count]) => ({ name, count }))
+  let dcClassNames: string[] = []
+  try {
+    const dcList: any[] = await javaListDepartmentClasses()
+    dcClassNames = (dcList || []).map((c: any) => c.className).filter(Boolean)
+  } catch {}
+  // 合并：后端班级表为主，student 聚合（如历史遗留未入班级表的班级）兜底
+  const names = new Set([...dcClassNames, ...classMap.keys()])
+  classes.value = Array.from(names)
+    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+    .map((name) => ({ name, count: classMap.get(name) || 0 }))
   loading.value = false
 }
 
