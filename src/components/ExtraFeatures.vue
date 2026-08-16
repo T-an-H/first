@@ -53,8 +53,8 @@ const tabs = [
 const activeTab = ref('cloud')
 
 onMounted(() => {
-  // 扫描所有课程，为已到时间的评价轮次生成待办提醒
-  store.checkAndGenerateSessionReminders()
+  // 任务评价模型：拉取任务评价快照并刷新自动待办（旧版"按次数评价"提醒已废弃）
+  store.refreshTaskEvalInfo()
   // 全自动待办生成
   store.generateAutoTodos()
   // 如果有未完成的待办，默认切换到待办 tab

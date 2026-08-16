@@ -38,6 +38,29 @@ async function canGradeTask(user, taskId) {
   return false;
 }
 
+/** 模板 → 可参与评价的类型（与前端 TEMPLATE_EVAL_TYPES 一致） */
+const TEMPLATE_EVAL_TYPES = {
+  all: ['self', 'intra_group', 'inter_group', 'teacher', 'mentor'],
+  standard: ['self', 'teacher', 'inter_group'],
+  simple: ['self', 'teacher'],
+  project: ['self', 'intra_group', 'teacher', 'mentor'],
+};
+
+/** 查询课程当前评价模板（未配置默认 all） */
+async function getCourseTemplate(courseId) {
+  const [cfg] = await pool.execute('SELECT template FROM eval_config WHERE course_id = ?', [courseId]);
+  const tpl = cfg.length > 0 ? cfg[0].template : 'all';
+  return TEMPLATE_EVAL_TYPES[tpl] ? tpl : 'all';
+}
+
+/** 学生当前可参与的评价类型（按模板；未配置默认 all 全部类型） */
+async function getStudentEvalTypes(taskId) {
+  const [task] = await pool.execute('SELECT course_id FROM course_task WHERE id = ?', [taskId]);
+  if (task.length === 0) return [];
+  const tpl = await getCourseTemplate(task[0].course_id);
+  return TEMPLATE_EVAL_TYPES[tpl] || [];
+}
+
 function requireManager(req, res, next) {
   if (!req.user) return res.status(401).json({ success: false, message: '未登录或登录已过期' });
   if (isManager(req.user)) return next();
@@ -115,7 +138,7 @@ router.put('/submissions/:id', async (req, res) => {
     );
     // 同步写入课程评价表：任务评分作为 teacher/mentor 类型评价（session=0），参与平时成绩计算
     const evalType = req.user.sub_role === 'mentor' ? 'mentor' : 'teacher';
-    const evId = `ev-task-${rows[0].task_id}-${rows[0].student_id}-${evalType}`;
+    const evId = `ev-task-${rows[0].task_id}-${rows[0].student_id}-${evalType}-${req.user.account || req.user.id || ''}`;
     await pool.execute(
       'REPLACE INTO evaluation (id, course_id, student_id, session_number, type, score, evaluator_id, evaluator_name, comment, created_at) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)',
       [evId, taskRows[0].course_id, rows[0].student_id, evalType, Number(score),
@@ -161,6 +184,7 @@ router.get('/:id/submissions', async (req, res) => {
       taskId: r.task_id,
       studentId: r.student_id,
       attachments: parseJson(r.attachments),
+      description: r.description || '',
       score: r.score != null ? Number(r.score) : null,
       gradedBy: r.graded_by || '',
       status: r.status,
@@ -170,11 +194,11 @@ router.get('/:id/submissions', async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-/** POST /api/tasks/:id/submissions - 学生提交/更新提交（登录用户） */
+/** POST /api/tasks/:id/submissions - 学生提交/更新提交（登录用户，支持文字描述 + 上传资料） */
 router.post('/:id/submissions', async (req, res) => {
   try {
     if (!req.user) return res.status(401).json({ success: false, message: '未登录' });
-    const { studentId, attachments } = req.body;
+    const { studentId, attachments, description } = req.body;
     if (!studentId) return res.status(400).json({ success: false, message: 'studentId 必填' });
     const t = now();
     const [exist] = await pool.execute(
@@ -183,17 +207,92 @@ router.post('/:id/submissions', async (req, res) => {
     );
     if (exist.length > 0) {
       await pool.execute(
-        'UPDATE course_task_submission SET attachments = ?, status = ?, updated_at = ? WHERE id = ?',
-        [JSON.stringify(attachments || []), 'submitted', t, exist[0].id]
+        'UPDATE course_task_submission SET attachments = ?, description = ?, status = ?, updated_at = ? WHERE id = ?',
+        [JSON.stringify(attachments || []), description || '', 'submitted', t, exist[0].id]
       );
       return res.json({ success: true, id: exist[0].id, message: '提交已更新' });
     }
     const id = `sub-${Date.now()}`;
     await pool.execute(
-      'INSERT INTO course_task_submission (id, task_id, student_id, attachments, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, req.params.id, studentId, JSON.stringify(attachments || []), 'submitted', t, t]
+      'INSERT INTO course_task_submission (id, task_id, student_id, attachments, description, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, req.params.id, studentId, JSON.stringify(attachments || []), description || '', 'submitted', t, t]
     );
     res.json({ success: true, id, message: '提交成功' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+/**
+ * POST /api/tasks/:id/evals - 任务评价（教师/导师/学生，按课程评价模板校验）
+ * body: { studentId(被评学生), type, score, comment? }
+ * - 教师/领导 → type=teacher
+ * - 导师(has_mentor=1) → type=mentor
+ * - 学生 → type=self/intra_group/inter_group（须在模板允许范围内；self 只能评自己）
+ */
+router.post('/:id/evals', async (req, res) => {
+  try {
+    if (!req.user) return res.status(401).json({ success: false, message: '未登录' });
+    const { studentId, type, score, comment } = req.body;
+    if (!studentId || !type) return res.status(400).json({ success: false, message: '被评学生与评价类型必填' });
+    if (score == null || Number(score) < 0 || Number(score) > 100) {
+      return res.status(400).json({ success: false, message: '评分须在 0-100 之间' });
+    }
+    const [taskRows] = await pool.execute('SELECT course_id FROM course_task WHERE id = ?', [req.params.id]);
+    if (taskRows.length === 0) return res.status(404).json({ success: false, message: '任务不存在' });
+    const courseId = taskRows[0].course_id;
+
+    const isStudent = req.user.role === 'student';
+    let evalType = type;
+    if (req.user.role === 'teacher' && req.user.sub_role === 'mentor') evalType = 'mentor';
+    else if (req.user.role === 'teacher') evalType = 'teacher';
+
+    if (isStudent) {
+      const allowed = await getStudentEvalTypes(req.params.id);
+      if (!allowed.includes(type)) {
+        return res.status(403).json({ success: false, message: '当前评价模板未启用该评价类型' });
+      }
+      if (type === 'self' && studentId !== (req.user.studentRecordId || req.user.id)) {
+        return res.status(403).json({ success: false, message: '自评只能评价自己' });
+      }
+    } else if (req.user.role === 'teacher' && req.user.sub_role === 'mentor') {
+      if (!(await canGradeTask(req.user, req.params.id))) {
+        return res.status(403).json({ success: false, message: '导师仅可在课程开启导师参与时评分' });
+      }
+    } else if (!isManager(req.user)) {
+      return res.status(403).json({ success: false, message: '无权进行该评价' });
+    }
+
+    // 幂等：同一评价者对同一被评学生同一任务同一类型只保留一条
+    // 学生提交优先用 student 表内部 id（stu-X），与前端学生 id 匹配一致
+    const evaluatorId = req.user.studentRecordId || req.user.account || req.user.id || '';
+    const evId = `ev-task-${req.params.id}-${studentId}-${evalType}-${evaluatorId}`;
+    const t = now();
+    await pool.execute(
+      'REPLACE INTO evaluation (id, course_id, student_id, session_number, type, score, evaluator_id, evaluator_name, comment, created_at) VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?)',
+      [evId, courseId, studentId, evalType, Number(score),
+       evaluatorId, req.user.name || '', comment || (isStudent ? '任务互评' : '任务评分'), t]
+    );
+    res.json({ success: true, message: '评价成功' });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
+/** GET /api/tasks/:id/evals - 该任务全部评价记录（按被评学生分组，含评价者） */
+router.get('/:id/evals', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      'SELECT student_id, type, score, evaluator_id, evaluator_name, comment FROM evaluation WHERE id LIKE ? ORDER BY created_at',
+      [`ev-task-${req.params.id}-%`]
+    );
+    res.json({
+      success: true,
+      evals: rows.map((r) => ({
+        studentId: r.student_id,
+        type: r.type,
+        score: Number(r.score),
+        evaluatorId: r.evaluator_id || '',
+        evaluatorName: r.evaluator_name || '',
+        comment: r.comment || '',
+      })),
+    });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 

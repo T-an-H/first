@@ -35,12 +35,8 @@ const isEnded = (enrollment: Enrollment) => {
 }
 
 const hasPendingEval = (enrollment: Enrollment) => {
-  return store.evalReminders.some(
-    (r) =>
-      r.studentId === enrollment.studentId &&
-      r.courseId === enrollment.courseId &&
-      (r.status === 'pending' || r.status === 'overdue')
-  )
+  // 任务评价模型：已提交任务但未完成自评（旧版"按次数评价"提醒已废弃）
+  return store.hasPendingEvalForCourse(enrollment.courseId)
 }
 
 const getTierBadge = (courseId: string) => {

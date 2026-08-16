@@ -64,9 +64,16 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, message: '账号或密码错误' });
     }
 
+    // 学生登录额外带上 student 表内部 id（如 stu-1），用于任务评价自评等身份校验
+    let studentRecordId;
+    if (user.role === 'student') {
+      const [srows] = await pool.execute('SELECT id FROM student WHERE student_id = ?', [user.account]);
+      if (srows.length > 0) studentRecordId = srows[0].id;
+    }
+
     // 生成 JWT
     const token = jwt.sign(
-      { id: user.id, account: user.account, name: user.name, role: user.role, sub_role: user.sub_role },
+      { id: user.id, account: user.account, name: user.name, role: user.role, sub_role: user.sub_role, studentRecordId },
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES }
     );

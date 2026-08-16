@@ -8,7 +8,6 @@ import { useAppStore } from '@/stores/app'
 import * as d3 from 'd3'
 import { renderIcon } from '@/utils/d3-renderer'
 import { getNow } from '@/lib/date'
-import { javaListStudents, javaListSchedules } from '@/api'
 import { CAREERS } from '@/data/careers'
 
 const store = useAppStore()
@@ -85,14 +84,16 @@ async function loadMySchedules() {
   try {
     const studentName = store.currentDisplayName || store.currentUser
     if (!studentName) return
-    // 1. 查询学生信息获取班级（Java：GET /students?keyword= 返回裸数组）
-    const students = await javaListStudents(studentName)
-    const myInfo = students?.[0]
+    // 1. 查询学生信息获取班级
+    const stuRes = await fetch(`http://localhost:3000/api/students?search=${encodeURIComponent(studentName)}`)
+    const stuData = await stuRes.json()
+    const myInfo = stuData.students?.[0]
     if (!myInfo?.className) return
-    // 2. 按班级加载排课（Java：GET /schedules 返回全部，按 className 前端过滤）
-    const schedules = await javaListSchedules()
-    if (schedules) {
-      dbSchedules.value = schedules.filter((s: any) => s.className === myInfo.className)
+    // 2. 按班级加载排课（与课表页面 Schedule.vue 数据源一致）
+    const schRes = await fetch(`http://localhost:3000/api/schedules?class=${encodeURIComponent(myInfo.className)}`)
+    const schData = await schRes.json()
+    if (schData.success) {
+      dbSchedules.value = schData.schedules
     }
   } catch (e) {
     console.error('加载课表失败:', e)
@@ -162,57 +163,50 @@ const selectedTrendCourseIndex = ref(0)
 const evalTrendData = computed(() => {
   if (!student.value) return []
   const studentId = student.value.id
-  
-  // 获取该学生的所有评价记录
+
+  // 仅统计任务评价（id 前缀 ev-task- 表示任务评价，session=0）
   const studentEvals = store.evaluations
-    .filter(ev => ev.studentId === studentId && ev.score > 0)
-    .sort((a, b) => {
-      // 先按课程分组，再按 sessionNumber 排序
-      if (a.courseId !== b.courseId) return a.courseId.localeCompare(b.courseId)
-      return a.sessionNumber - b.sessionNumber
-    })
-  
+    .filter(ev => ev.studentId === studentId && ev.score > 0 && ev.id.startsWith('ev-task-'))
+    .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+
   if (studentEvals.length === 0) return []
-  
-  // 按课程分组
-  const courseMap = new Map<string, { courseTitle: string; sessions: { session: number; score: number; date: string }[] }>()
-  
+
+  // 按课程 + 任务归组（任务评价 id 格式：ev-task-{taskId}-{studentId}-{type}-{evaluatorId}）
+  const courseMap = new Map<string, { courseTitle: string; tasks: Map<string, number[]> }>()
+
   for (const ev of studentEvals) {
     const course = getCourse(ev.courseId)
     if (!course) continue
-    
+    const rest = ev.id.slice('ev-task-'.length)
+    const taskKey = rest.indexOf('-stu-') >= 0 ? rest.slice(0, rest.indexOf('-stu-')) : rest
+
     if (!courseMap.has(ev.courseId)) {
-      courseMap.set(ev.courseId, {
-        courseTitle: course.title,
-        sessions: []
+      courseMap.set(ev.courseId, { courseTitle: course.title, tasks: new Map() })
+    }
+    const courseData = courseMap.get(ev.courseId)!
+    if (!courseData.tasks.has(taskKey)) courseData.tasks.set(taskKey, [])
+    courseData.tasks.get(taskKey)!.push(Number(ev.score))
+  }
+
+  // 转换为图表数据格式：每门课程内按任务序号生成点（任务1、任务2…）
+  const result: { courseId: string; courseTitle: string; points: { x: number; y: number; label: string }[] }[] = []
+
+  courseMap.forEach((value, key) => {
+    const points: { x: number; y: number; label: string }[] = []
+    let i = 0
+    for (const scores of value.tasks.values()) {
+      i++
+      points.push({
+        x: i,
+        y: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
+        label: `任务${i}`,
       })
     }
-    
-    const courseData = courseMap.get(ev.courseId)!
-    courseData.sessions.push({
-      session: ev.sessionNumber,
-      score: ev.score,
-      date: ev.createdAt
-    })
-  }
-  
-  // 转换为图表数据格式
-  const result: { courseId: string; courseTitle: string; points: { x: number; y: number; label: string }[] }[] = []
-  
-  courseMap.forEach((value, key) => {
-    if (value.sessions.length < 1) return // 至少需要1次评价才能显示趋势
-    const points = value.sessions.map(s => ({
-      x: s.session,
-      y: s.score,
-      label: `第${s.session}次`
-    }))
-    result.push({
-      courseId: key,
-      courseTitle: value.courseTitle,
-      points
-    })
+    if (points.length >= 1) {
+      result.push({ courseId: key, courseTitle: value.courseTitle, points })
+    }
   })
-  
+
   return result
 })
 

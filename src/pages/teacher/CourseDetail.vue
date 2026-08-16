@@ -51,13 +51,36 @@
               <p class="text-sm font-medium text-gray-700 mb-2">评价模板</p>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <button v-for="tpl in EVAL_TEMPLATE_KEYS" :key="tpl"
-                  @click="handleSetConfig({ template: tpl })"
-                  :class="`text-left p-3 rounded-lg border transition-all ${selectedConfig?.template === tpl ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`">
+                  @click="selectDraftTemplate(tpl)"
+                  :class="`text-left p-3 rounded-lg border transition-all ${draftTemplate === tpl ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white hover:border-gray-300'}`">
                   <span class="text-sm font-medium text-gray-900">{{ EvalTemplateLabels[tpl] }}</span>
                   <p class="text-xs text-gray-400 mt-0.5">{{ EvalTemplateDescs[tpl] }}</p>
                   <div class="flex gap-1 mt-1">
                     <span v-for="et in TEMPLATE_EVAL_TYPES[tpl]" :key="et" class="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{{ EvalTypeLabels[et] }}</span>
                   </div>
+                </button>
+              </div>
+            </div>
+
+            <!-- 平时成绩占比（草稿）：与成绩配置「平时成绩构成」共用 gradeConfig，点「保存评价方案」后生效 -->
+            <div class="border-t border-gray-100 pt-4">
+              <p class="text-sm font-medium text-gray-700 mb-1">平时成绩占比（各类评价占平时成绩的百分比，须合计 100%）</p>
+              <p class="text-xs text-gray-400 mb-3">与「成绩配置 → 平时成绩构成」共用同一方案，点下方「保存评价方案」后两端同步生效</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Slider v-for="et in TEMPLATE_EVAL_TYPES[draftTemplate]" :key="et"
+                  :label="EvalTypeLabels[et]"
+                  :val="draftWeights[et] ?? 0"
+                  @change="(v) => draftWeights[et] = v"
+                  :disabled="isWeightLocked" />
+              </div>
+              <p class="text-xs mt-1" :class="draftTotal === 100 ? 'text-emerald-600' : 'text-amber-600'">
+                合计：{{ draftTotal }}%{{ draftTotal !== 100 ? '（须等于 100%）' : '' }}
+              </p>
+              <div class="flex items-center justify-end gap-3 mt-3">
+                <span v-if="draftDirty" class="text-xs text-amber-600">有未保存的修改</span>
+                <button @click="saveEvalPlan()" :disabled="draftTotal !== 100"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-colors bg-emerald-500 hover:bg-emerald-600 text-white disabled:opacity-40 disabled:cursor-not-allowed">
+                  保存评价方案
                 </button>
               </div>
             </div>
@@ -82,6 +105,10 @@
                     class="text-[10px] px-1.5 py-0.5 rounded bg-white text-emerald-700 border border-emerald-200">
                     {{ EvalTypeLabels[et] }}
                   </span>
+                </div>
+                <!-- 当前各类评价的平时成绩占比（与成绩配置联动） -->
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-2 pt-2 border-t border-emerald-200/60 text-xs text-gray-500">
+                  <span v-for="et in regularEvalTypes" :key="et">{{ EvalTypeLabels[et] }} {{ gradeConfig[evalTypeWeightKey[et]] }}%</span>
                 </div>
               </div>
             </div>
@@ -183,7 +210,9 @@
                 <li v-for="(f, i) in taskForm.attachments" :key="i"
                   class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
                   <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                  <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+                  <span v-if="f.dataUrl" @click="openFileDetail(f.dataUrl)" :title="`点击查看 ${f.name}`"
+                    class="flex-1 min-w-0 truncate text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{{ f.name }}</span>
+                  <span v-else class="flex-1 min-w-0 truncate">{{ f.name }}</span>
                   <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
                   <button @click="removeTaskFile(i)" class="text-gray-400 hover:text-red-500 flex-shrink-0" title="移除">
                     <X class="w-3.5 h-3.5" />
@@ -230,41 +259,93 @@
             <li v-for="(f, i) in selectedTask.attachments" :key="i"
               class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
               <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-              <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+              <span v-if="f.dataUrl" @click="openFileDetail(f.dataUrl)" :title="`点击查看 ${f.name}`"
+                class="flex-1 min-w-0 truncate text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{{ f.name }}</span>
+              <span v-else class="flex-1 min-w-0 truncate">{{ f.name }}</span>
               <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
             </li>
           </ul>
 
           <!-- 评价管理：按任务给学生给分 -->
           <div class="border-t border-gray-100 pt-4">
-            <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
               <div class="flex items-center gap-2">
                 <ClipboardCheck class="w-5 h-5 text-gray-400" />
                 <h4 class="font-semibold text-gray-900">评价管理</h4>
                 <span class="text-xs text-gray-400">按任务为每位学生打分</span>
               </div>
-              <button v-if="canGradeTaskUI" @click="setAllTaskScores(90)"
-                class="text-xs px-3 py-1.5 bg-gray-50 text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-100">
-                一键给90分
-              </button>
+              <div v-if="canGradeTaskUI" class="flex items-center gap-2">
+                <input v-model.number="taskBatchScore" type="number" min="0" max="100" placeholder="评分"
+                  class="w-16 px-2 py-1.5 text-xs border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                <button @click="applyBatchTaskScores"
+                  class="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100">
+                  一键批量评价
+                </button>
+              </div>
             </div>
-            <div v-if="taskScoreStudents.length === 0" class="text-center py-8 text-gray-400 text-sm">该课程暂无学员</div>
-            <div v-else class="space-y-2 max-h-72 overflow-y-auto pr-1">
-              <div v-for="stu in taskScoreStudents" :key="stu.id"
-                class="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100">
-                <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-sm font-semibold text-brand-600 flex-shrink-0">
-                  {{ stu.name.charAt(0) }}
+
+            <!-- 搜索 + 先选班级，再看分组内人员 -->
+            <div class="flex items-center gap-2 mb-3 flex-wrap">
+              <div class="relative">
+                <Search class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input v-model="taskSearchKeyword" type="text" placeholder="搜索姓名/学号"
+                  class="pl-8 pr-3 py-1.5 w-40 border border-gray-200 rounded-lg text-xs bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none" />
+              </div>
+              <select v-model="taskClassFilter"
+                class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                <option value="__all__">全部班级</option>
+                <option v-for="cn in taskClassOptions" :key="cn" :value="cn">{{ cn }}</option>
+              </select>
+              <select v-model="taskGroupFilter"
+                class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none">
+                <option value="__all__">全部分组</option>
+                <option v-for="g in taskGroupOptions" :key="g.id" :value="g.id">{{ g.name }}（{{ g.memberIds.length }}人）</option>
+              </select>
+              <span class="text-xs text-gray-400">显示 {{ taskScoreStudents.length }} 人</span>
+            </div>
+
+            <div v-if="taskScoreStudents.length === 0" class="text-center py-8 text-gray-400 text-sm">该筛选条件下暂无学员</div>
+            <div v-else class="space-y-2 max-h-96 overflow-y-auto pr-1">
+              <div v-for="stu in taskScoreStudents" :key="stu.id" class="p-2.5 rounded-lg border border-gray-100">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-sm font-semibold text-brand-600 flex-shrink-0">
+                    {{ stu.name.charAt(0) }}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ stu.name }}</p>
+                    <p class="text-xs text-gray-400">学号 {{ stu.studentId }}<template v-if="stu.className"> · {{ stu.className }}</template></p>
+                  </div>
+                  <!-- 各类评分汇总（自评/组内/组间/教师/导师，互评类去极值平均） -->
+                  <div v-if="getStudentEvalSummary(stu.id).length" class="flex flex-wrap gap-1 justify-end max-w-[260px] flex-shrink-0">
+                    <span v-for="es in getStudentEvalSummary(stu.id)" :key="es.type"
+                      class="text-[10px] px-1.5 py-0.5 rounded-full border" :class="evalBadgeClass(es.type)">
+                      {{ es.label }} {{ es.score }}
+                    </span>
+                  </div>
+                  <span v-if="taskScores[stu.id] !== undefined"
+                    class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex-shrink-0">
+                    已给 {{ taskScores[stu.id] }} 分
+                  </span>
+                  <input v-if="canGradeTaskUI" v-model.number="taskScores[stu.id]" type="number" min="0" max="100" placeholder="评分"
+                    class="w-20 px-2 py-1.5 text-sm border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-brand-400/30 flex-shrink-0" />
                 </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 truncate">{{ stu.name }}</p>
-                  <p class="text-xs text-gray-400">学号 {{ stu.studentId }}</p>
-                </div>
-                <span v-if="taskScores[stu.id] !== undefined"
-                  class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 flex-shrink-0">
-                  已给 {{ taskScores[stu.id] }} 分
-                </span>
-                <input v-if="canGradeTaskUI" v-model.number="taskScores[stu.id]" type="number" min="0" max="100" placeholder="评分"
-                  class="w-20 px-2 py-1.5 text-sm border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-brand-400/30 flex-shrink-0" />
+                <!-- 学生提交内容：文字描述 + 附件 -->
+                <template v-if="getTaskSubmissionDetail(stu.id)">
+                  <p v-if="getTaskSubmissionDetail(stu.id).description"
+                    class="mt-2 ml-11 text-xs text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg px-2.5 py-1.5">
+                    {{ getTaskSubmissionDetail(stu.id).description }}
+                  </p>
+                  <div v-if="getTaskSubmissionDetail(stu.id).attachments?.length" class="mt-1.5 ml-11 flex flex-wrap gap-1.5">
+                    <span v-for="(f, fi) in getTaskSubmissionDetail(stu.id).attachments" :key="fi"
+                      :class="`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded border ${f.dataUrl ? 'bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 cursor-pointer' : 'bg-gray-50 text-gray-500 border-gray-200'}`"
+                      :title="f.dataUrl ? `点击查看 ${f.name}` : ''" @click="f.dataUrl && openFileDetail(f.dataUrl)">
+                      <FileText class="w-3 h-3 flex-shrink-0" />
+                      <span class="max-w-[160px] truncate">{{ f.name }}</span>
+                      <span v-if="f.size" class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+                    </span>
+                  </div>
+                </template>
+                <div v-else class="mt-2 ml-11 text-[11px] text-gray-300">未提交资料</div>
               </div>
             </div>
             <div v-if="canGradeTaskUI" class="flex items-center justify-end gap-2 mt-4">
@@ -310,11 +391,12 @@
           </Section>
 
           <Section title="平时成绩构成" :hint="`合计：${regularTotal}%${regularTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="regularTotal === 100">
-            <Slider label="自评" :val="gradeConfig.selfEvalWeight" @change="(v) => updateGradeConfig('selfEvalWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
-            <Slider label="组内互评" :val="gradeConfig.peerReviewWeight" @change="(v) => updateGradeConfig('peerReviewWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
-            <Slider label="组间互评" :val="gradeConfig.interGroupEvalWeight" @change="(v) => updateGradeConfig('interGroupEvalWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
-            <Slider label="教师评价" :val="gradeConfig.teacherScoreWeight" @change="(v) => updateGradeConfig('teacherScoreWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
-            <Slider label="企业导师评价" :val="gradeConfig.mentorScoreWeight" @change="(v) => updateGradeConfig('mentorScoreWeight', v)" :disabled="isReadOnly || isWeightLocked || isViewOnly" />
+            <p class="text-xs text-gray-400">按当前评价模板（{{ EvalTemplateLabels[activeEvalConfig.template] }}）展示，仅启用类型可设置占比；与「任务管理 → 评价模板」联动</p>
+            <Slider v-for="et in regularEvalTypes" :key="et"
+              :label="EvalTypeLabels[et]"
+              :val="gradeConfig[evalTypeWeightKey[et]]"
+              @change="(v) => updateGradeConfig(evalTypeWeightKey[et], v)"
+              :disabled="isReadOnly || isWeightLocked || isViewOnly" />
           </Section>
 
           <Section title="期中成绩构成" :hint="`合计：${midtermSubTotal}%${midtermSubTotal !== 100 ? '（须等于 100%）' : ''}`" :valid="midtermSubTotal === 100">
@@ -1800,7 +1882,7 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { authHeaders, listTasks, createTask, updateTask, deleteTask, listTaskSubmissions, submitTask, gradeTaskSubmission } from '@/api'
+import { authHeaders, listTasks, createTask, updateTask, deleteTask as apiDeleteTask, listTaskSubmissions, submitTask, gradeTaskSubmission, listTaskEvals } from '@/api'
 import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
@@ -1809,7 +1891,7 @@ import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
   EvalTypeLabels, getDefaultGradeConfig
 } from '@/types'
-import type { EvalTemplate, EvalType, Evaluation, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
+import type { EvalType, EvalTemplate, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
 import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, ClipboardList, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import { javaListEnrollmentStudents, javaBulkEnrollments, javaBulkSchedules, javaBulkScores, javaBulkGroups, javaUpdateStudent } from '@/api'
@@ -1862,7 +1944,7 @@ interface CourseTask {
   submittedCount: number
   totalStudents: number
   avgScore?: number
-  attachments?: { name: string; size: number }[]
+  attachments?: { name: string; size: number; dataUrl?: string }[]
   scores?: Record<string, number>
   createdAt?: string
   createdBy?: string
@@ -1936,6 +2018,7 @@ async function saveTask() {
     }
     closeTaskModal()
     await loadTasks()
+    store.refreshTaskEvalInfo(courseId.value ? [courseId.value] : undefined)
   } catch (e: any) {
     alert(`保存任务失败：${e.message || e}`)
   }
@@ -1943,28 +2026,41 @@ async function saveTask() {
 async function deleteTask(id: string) {
   if (!confirm('确定删除该任务？删除后学生的提交记录也会一并删除。')) return
   try {
-    await deleteTask(id)
+    await apiDeleteTask(id)
     await loadTasks()
+    store.refreshTaskEvalInfo(courseId.value ? [courseId.value] : undefined)
     if (selectedTask.value?.id === id) closeTaskDetail()
   } catch (e: any) {
     alert(`删除任务失败：${e.message || e}`)
   }
 }
 const taskFileInput = ref<HTMLInputElement | null>(null)
-function onTaskFileChange(e: Event) {
+/** 将文件读取为 dataUrl（便于后续点击查看详情） */
+function readFilesAsDataUrl(files: File[]): Promise<{ name: string; size: number; dataUrl: string }[]> {
+  return Promise.all(
+    files.map(
+      (file) =>
+        new Promise<{ name: string; size: number; dataUrl: string }>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve({ name: file.name, size: file.size, dataUrl: reader.result as string })
+          reader.onerror = () => reject(new Error('文件读取失败'))
+          reader.readAsDataURL(file)
+        })
+    )
+  )
+}
+async function onTaskFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (input.files) {
-    for (const file of Array.from(input.files)) {
-      taskForm.value.attachments.push({ name: file.name, size: file.size })
-    }
+    const files = await readFilesAsDataUrl(Array.from(input.files))
+    taskForm.value.attachments.push(...files)
   }
   input.value = ''
 }
-function onTaskFileDrop(e: DragEvent) {
+async function onTaskFileDrop(e: DragEvent) {
   if (e.dataTransfer?.files) {
-    for (const file of Array.from(e.dataTransfer.files)) {
-      taskForm.value.attachments.push({ name: file.name, size: file.size })
-    }
+    const files = await readFilesAsDataUrl(Array.from(e.dataTransfer.files))
+    taskForm.value.attachments.push(...files)
   }
 }
 function removeTaskFile(i: number) {
@@ -1988,25 +2084,126 @@ const selectedTask = ref<CourseTask | null>(null)
 const taskScores = ref<Record<string, number>>({})
 /** 当前任务的学生提交记录（taskId → submissionId），评分时用于定位提交记录 */
 const taskSubmissions = ref<Record<string, { submissionId: string; score: number | null }>>({})
+/** 当前任务的全部提交详情：taskId → submissions（查看学生提交内容用） */
+const taskSubmissionsDetail = ref<Record<string, any[]>>({})
+/** 当前任务的全部评价记录：taskId → evals（查看互评/各类评分用） */
+const taskEvalsDetail = ref<Record<string, any[]>>({})
+/** 任务评分区筛选：先选班级，再看分组内人员 */
+const taskClassFilter = ref('__all__')
+const taskGroupFilter = ref('__all__')
+/** 任务评分区搜索：按姓名/学号/班级过滤 */
+const taskSearchKeyword = ref('')
+/** 一键批量评价的分数 */
+const taskBatchScore = ref(90)
 
-const taskScoreStudents = computed(() =>
-  enrolledStudents.value.map((e) => ({ id: e.student.id, name: e.student.name, studentId: (e.student as any).studentId || '' }))
+const taskClassOptions = computed(() => {
+  const set = new Set<string>()
+  for (const e of enrolledStudents.value) {
+    const c = (e.student as any)?.className
+    if (c) set.add(c)
+  }
+  return [...set]
+})
+const taskGroupOptions = computed(() =>
+  store.studentGroups.filter((g) => g.courseId === courseId.value)
 )
+const taskGroupName = (id: string) => store.studentGroups.find((g) => g.id === id)?.name || id
+
+/** 任务评分学生列表：搜索 + 班级 + 分组过滤 */
+const taskScoreStudents = computed(() => {
+  let list = enrolledStudents.value.map((e) => ({
+    id: e.student.id,
+    name: e.student.name,
+    studentId: (e.student as any).studentId || '',
+    className: (e.student as any)?.className || '未分班',
+  }))
+  const q = taskSearchKeyword.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.studentId.toLowerCase().includes(q) ||
+        s.className.toLowerCase().includes(q)
+    )
+  }
+  if (taskClassFilter.value !== '__all__') {
+    list = list.filter((s) => s.className === taskClassFilter.value)
+  }
+  if (taskGroupFilter.value !== '__all__') {
+    const group = store.studentGroups.find((g) => g.id === taskGroupFilter.value)
+    const members = new Set(group?.memberIds || [])
+    list = list.filter((s) => members.has(s.id))
+  }
+  return list
+})
+
+/** 学生提交内容（文字+附件） */
+function getTaskSubmissionDetail(studentId: string) {
+  if (!selectedTask.value) return null
+  const subs = taskSubmissionsDetail.value[selectedTask.value.id] || []
+  return subs.find((s) => s.studentId === studentId) || null
+}
+
+/** 学生收到的各类评分汇总（仅展示当前评价模板启用的类型，含去极值平均展示） */
+function getStudentEvalSummary(studentId: string) {
+  if (!selectedTask.value) return [] as { type: string; label: string; score: number | null }[]
+  const evals = (taskEvalsDetail.value[selectedTask.value.id] || []).filter((e) => e.studentId === studentId)
+  const out: { type: string; label: string; score: number | null }[] = []
+  // 跟随教师设定的评价模板：只展示模板启用的类型
+  for (const type of regularEvalTypes.value) {
+    const list = evals.filter((e) => e.type === type).map((e) => Number(e.score))
+    if (list.length === 0) continue
+    let avg: number
+    if ((type === 'intra_group' || type === 'inter_group') && list.length >= 3) {
+      const sorted = [...list].sort((a, b) => a - b).slice(1, -1)
+      avg = Math.round(sorted.reduce((a, b) => a + b, 0) / sorted.length)
+    } else {
+      avg = Math.round(list.reduce((a, b) => a + b, 0) / list.length)
+    }
+    out.push({ type, label: EvalTypeLabels[type], score: avg })
+  }
+  return out
+}
+
+/** 各类评分徽章配色 */
+function evalBadgeClass(type: string): string {
+  const map: Record<string, string> = {
+    self: 'bg-purple-50 text-purple-600 border-purple-200',
+    intra_group: 'bg-indigo-50 text-indigo-600 border-indigo-200',
+    inter_group: 'bg-cyan-50 text-cyan-600 border-cyan-200',
+    teacher: 'bg-blue-50 text-blue-600 border-blue-200',
+    mentor: 'bg-amber-50 text-amber-600 border-amber-200',
+  }
+  return map[type] ?? 'bg-gray-50 text-gray-500 border-gray-200'
+}
+
+/** 点击打开附件详情（dataUrl 新窗口查看/下载） */
+function openFileDetail(dataUrl: string) {
+  if (!dataUrl) return
+  window.open(dataUrl, '_blank')
+}
+
 const scoredTaskCount = computed(() => {
   const t = selectedTask.value
   if (!t?.scores) return 0
   return Object.values(t.scores).filter((v) => typeof v === 'number' && v >= 0).length
 })
 
-/** 打开任务详情：加载该任务全部提交，预填已评分 */
+/** 打开任务详情：加载该任务全部提交与评价，预填已评分 */
 async function openTaskDetail(task: CourseTask) {
   selectedTask.value = task
   taskScores.value = { ...(task.scores ?? {}) }
   taskSubmissions.value = {}
+  taskClassFilter.value = '__all__'
+  taskGroupFilter.value = '__all__'
+  taskSearchKeyword.value = ''
+  taskBatchScore.value = 90
   showTaskDetailModal.value = true
   try {
-    const res = await listTaskSubmissions(task.id)
-    const subs = (res.submissions || []) as any[]
+    const [sres, eres] = await Promise.all([listTaskSubmissions(task.id), listTaskEvals(task.id)])
+    const subs = (sres.submissions || []) as any[]
+    taskSubmissionsDetail.value[task.id] = subs
+    taskEvalsDetail.value[task.id] = eres.evals || []
     const byStudent: Record<string, { submissionId: string; score: number | null }> = {}
     for (const s of subs) {
       byStudent[s.studentId] = { submissionId: s.id, score: s.score != null ? Number(s.score) : null }
@@ -2026,8 +2223,21 @@ function closeTaskDetail() {
   selectedTask.value = null
   taskScores.value = {}
   taskSubmissions.value = {}
+  taskSubmissionsDetail.value = {}
+  taskEvalsDetail.value = {}
+  taskClassFilter.value = '__all__'
+  taskGroupFilter.value = '__all__'
+  taskSearchKeyword.value = ''
+  taskBatchScore.value = 90
 }
-function setAllTaskScores(score: number) {
+/** 一键批量评价：将分数应用到当前筛选范围内的全部学生 */
+function applyBatchTaskScores() {
+  const score = Number(taskBatchScore.value)
+  if (Number.isNaN(score) || score < 0 || score > 100) {
+    alert('请输入 0-100 之间的分数')
+    return
+  }
+  if (taskScoreStudents.value.length === 0) return
   const next: Record<string, number> = {}
   for (const stu of taskScoreStudents.value) next[stu.id] = score
   taskScores.value = { ...taskScores.value, ...next }
@@ -2058,6 +2268,7 @@ async function saveTaskScores() {
       try {
         await store.refreshEvaluations(courseId.value)
         store.syncEvalToDetailedGrade(courseId.value)
+        store.refreshTaskEvalInfo([courseId.value])
       } catch (e) {
         console.error('同步任务评分到成绩失败:', e)
       }
@@ -2116,6 +2327,7 @@ onMounted(async () => {
   normalizeProjectShares()
   syncProjectWeightLocksFromStore()
   loadTasks()
+  initEvalDrafts()
 })
 
 /** 默认均分：对未配置占比（全部为 0）的期中/期末项目按项目数平均分配，合计 100% */
@@ -2167,7 +2379,7 @@ const completedCount = computed(() =>
 // ---- Tab 配置 ----
 const tabList = [
   { key: 'students',     label: '学生管理', icon: Users },
-  { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
+  { key: 'comments',     label: '任务管理', icon: ClipboardCheck },
   { key: 'homework',     label: '作业管理', icon: BookOpen },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
   { key: 'grade-config', label: '成绩配置', icon: Settings },
@@ -2177,15 +2389,9 @@ const tabList = [
 /** Tab 红点提醒：检测该 tab 下未处理的事务数量，支持红点一路溯源 */
 function tabBadgeCount(tabKey: string): number {
   if (!courseId.value) return 0
-  const user = store.currentUser || ''
   if (tabKey === 'comments') {
-    // 当前用户在该课程待完成的评价（教师→自己作为授课者收到的提醒，导师→自己作为导师收到的提醒）
-    const myTargetId = store.currentRole === 'student'
-      ? (store.students.find((s) => s.name === user || s.name === store.currentDisplayName)?.id ?? '')
-      : user
-    return store.evalReminders.filter(
-      (r) => r.courseId === courseId.value && r.studentId === myTargetId && r.status !== 'completed'
-    ).length
+    // 任务管理 tab：有待批改的任务提交（任务评价模型）
+    return store.getPendingTaskEvalCount(courseId.value)
   }
   if (tabKey === 'quality-eval') {
     // 仅授课教师/领导专属授课可批改，其余角色（导师/领导只读段/非授课教师）不提醒
@@ -2219,12 +2425,6 @@ function formatDate(dateStr: string): string {
 }
 
 // ---- 常量 ----
-const LEVEL_OPTIONS = [
-  { label: 'A (优秀)', range: [90, 100], color: 'bg-brand-600/15 text-gray-800 border-brand-600' },
-  { label: 'B (良好)', range: [80, 89],  color: 'bg-brand-600/15 text-gray-800 border-brand-600' },
-  { label: 'C (中等)', range: [70, 79],  color: 'bg-brand-600/15 text-gray-800 border-brand-600' },
-  { label: 'D (及格)', range: [60, 69],  color: 'bg-brand-600/15 text-gray-800 border-brand-600' },
-]
 const EVAL_TEMPLATE_KEYS = Object.keys(EvalTemplateLabels) as EvalTemplate[]
 const ExamTypeLabels: Record<string, string> = {
   midterm_exam: '期中考试',
@@ -2590,7 +2790,9 @@ const updateQualityMaxBonus = (val: number) => {
   gradeConfig.value = { ...gradeConfig.value, qualityEvalMaxBonus: Math.max(0, Math.min(20, v)) }
 }
 const mainTotal = computed(() => gradeConfig.value.regularWeight + gradeConfig.value.midtermWeight + gradeConfig.value.finalWeight)
-const regularTotal = computed(() => gradeConfig.value.selfEvalWeight + gradeConfig.value.peerReviewWeight + gradeConfig.value.interGroupEvalWeight + gradeConfig.value.teacherScoreWeight + gradeConfig.value.mentorScoreWeight)
+/** 平时成绩构成合计：只统计当前评价模板启用的类型（未启用类型不参与） */
+const regularTotal = computed(() =>
+  regularEvalTypes.value.reduce((s, et) => s + (gradeConfig.value[evalTypeWeightKey[et]] || 0), 0))
 const midtermSubTotal = computed(() => gradeConfig.value.midtermExamWeight + gradeConfig.value.midtermProjectWeight)
 const finalSubTotal = computed(() => gradeConfig.value.finalExamWeight + gradeConfig.value.finalProjectWeight)
 function handleSaveGradeConfig() {
@@ -2607,16 +2809,6 @@ const selectedExamType = ref<ExamType | ''>('')
 const gradeSearch = ref('')
 const gradeEntrySearch = ref('')
 const examInputs = ref<Record<string, number>>({})
-const selectedStudentIds = ref<string[]>([])
-const evalScoreInputs = ref<Record<string, number>>({})
-const evalStudentSearch = ref('')
-const selectedBatchSession = ref(1)
-
-// 评价管理过滤
-const evalFilterClass = ref('')
-const evalFilterGroup = ref('')
-const showEvalPopup = ref(false)
-const selectedEvalClass = ref('')
 
 // 成绩管理过滤
 const gradeFilterClass = ref('')
@@ -2706,6 +2898,7 @@ function syncProjectWeightLocksFromStore() {
 // 首次挂载的同步由 onMounted 中的 syncProjectWeightLocksFromStore() 完成，故此处不加 immediate（避免 setup 阶段访问后置声明的 computed 触发 TDZ）
 watch(() => courseId.value, () => {
   syncProjectWeightLocksFromStore()
+  initEvalDrafts()
 })
 
 // 成绩查询图表引用
@@ -2721,153 +2914,98 @@ const hasGradeData = computed(() => {
 })
 
 const selectedConfig = computed(() => courseId.value ? store.evalConfigs.find((c) => c.courseId === courseId.value) : null)
-/** 当前生效的评价方案（未配置时回退到系统默认方案：简易评价+每2周一次） */
+/** 当前生效的评价方案（未配置时回退到系统默认方案：全评价，与学生端/服务端默认一致） */
 const activeEvalConfig = computed<EvaluationConfig>(() => {
   if (selectedConfig.value) return selectedConfig.value
   return {
     courseId: courseId.value || '',
-    template: 'simple',
+    template: 'all',
     frequency: 'biweekly',
     hasMentor: false,
     overdueRule: 'average',
   }
 })
-const baseEnabledTypes = computed<EvalType[]>(() => selectedConfig.value ? TEMPLATE_EVAL_TYPES[selectedConfig.value.template] : [])
-const totalSessions = computed(() => courseId.value ? store.getEvalSessions(courseId.value) : 1)
-const courseHasGroups = computed(() => courseId.value ? store.hasGroups(courseId.value) : false)
 
-// ---- 评价管理 ----
-const evalTableSections = computed(() => {
-  if (!courseId.value) return []
-  const session = selectedBatchSession.value
-  const search = evalStudentSearch.value.trim().toLowerCase()
+/** GradeWeightConfig 中数值类型的字段名（排除 courseId 等非数值字段） */
+type WeightNumberKey = { [K in keyof GradeWeightConfig]: GradeWeightConfig[K] extends number ? K : never }[keyof GradeWeightConfig]
 
-  const enrolled = store.enrollments
-    .filter((e) => e.courseId === courseId.value && e.status !== 'dropped')
-    .map((e) => store.students.find((s) => s.id === e.studentId))
-    .filter(Boolean) as NonNullable<ReturnType<typeof store.students.find>>[]
-
-  const filtered = search
-    ? enrolled.filter((s) => s.name.toLowerCase().includes(search))
-    : enrolled
-
-  const groups = store.studentGroups.filter((g) => g.courseId === courseId.value)
-  const memberToGroup = new Map<string, string>()
-  for (const g of groups) {
-    for (const mid of g.memberIds) {
-      memberToGroup.set(mid, g.name)
-    }
-  }
-
-  function buildRow(student: typeof filtered[number]) {
-    const evals = store.evaluations.filter(
-      (e) => e.courseId === courseId.value && e.studentId === student.id && e.sessionNumber === session
-    )
-    const getScore = (type: EvalType) => {
-      const found = evals.filter((e) => e.type === type)
-      if (found.length === 0) return null
-      return Math.round(found.reduce((a, e) => a + e.score, 0) / found.length)
-    }
-    const evalTypeForMentor: EvalType = 'mentor'
-    const submitted = store.isSessionLocked(courseId.value || '', session) ||
-      store.isTeacherEvalSubmitted(courseId.value || '', student.id, session, isMentor.value ? evalTypeForMentor : 'teacher')
-    const draftEvals = evals.filter((e) => e.type === (isMentor.value ? evalTypeForMentor : 'teacher'))
-    return {
-      student,
-      selfScore: getScore('self'),
-      intraScore: getScore('intra_group'),
-      interScore: getScore('inter_group'),
-      teacherScore: getScore('teacher'),
-      mentorScore: getScore('mentor'),
-      submitted,
-      hasDraft: !submitted && draftEvals.length > 0,
-      finalScore: store.getSubmittedTeacherScore(courseId.value || '', student.id, session, isMentor.value ? evalTypeForMentor : 'teacher') ?? '-',
-    }
-  }
-
-  // 先按班级分组，再按分组组织
-  const classMap = new Map<string, typeof filtered>()
-  for (const s of filtered) {
-    const cn = s.className || '未分班'
-    if (!classMap.has(cn)) classMap.set(cn, [])
-    classMap.get(cn)!.push(s)
-  }
-
-  const sections: { className: string; groups: { groupName: string; students: ReturnType<typeof buildRow>[] }[] }[] = []
-  for (const [className, students] of classMap) {
-    const groupedMap = new Map<string, typeof filtered>()
-    const ungrouped: typeof filtered = []
-    for (const s of students) {
-      const groupName = memberToGroup.get(s.id)
-      if (groupName) {
-        if (!groupedMap.has(groupName)) groupedMap.set(groupName, [])
-        groupedMap.get(groupName)!.push(s)
-      } else {
-        ungrouped.push(s)
-      }
-    }
-    const groupsArr: { groupName: string; students: ReturnType<typeof buildRow>[] }[] = []
-    for (const [name, members] of groupedMap) {
-      groupsArr.push({ groupName: name, students: members.map(buildRow) })
-    }
-    if (ungrouped.length > 0) {
-      groupsArr.push({ groupName: '未分组', students: ungrouped.map(buildRow) })
-    }
-    sections.push({ className, groups: groupsArr })
-  }
-  return sections
-})
-
-/** 当前选中的评价班级数据（用于弹窗）— 使用 filteredEvalTableSections 保持过滤一致性 */
-const currentEvalClassSection = computed(() => {
-  if (!selectedEvalClass.value) return null
-  return filteredEvalTableSections.value.find(cb => cb.className === selectedEvalClass.value) || null
-})
-
-/** 评价管理 - 班级选项 */
-const evalClassOptions = computed(() => {
-  const names = new Set(evalTableSections.value.map(s => s.className))
-  return Array.from(names).map(n => ({ label: n, value: n }))
-})
-
-/** 评价管理 - 分组选项（基于当前选中的班级） */
-const evalGroupOptions = computed(() => {
-  if (!evalFilterClass.value) return []
-  const section = evalTableSections.value.find(s => s.className === evalFilterClass.value)
-  if (!section) return []
-  return section.groups.map(g => ({ label: g.groupName, value: g.groupName }))
-})
-
-/** 评价管理 - 过滤后的数据 */
-const filteredEvalTableSections = computed(() => {
-  let sections = evalTableSections.value
-  if (evalFilterClass.value) {
-    sections = sections.filter(s => s.className === evalFilterClass.value)
-  }
-  if (evalFilterGroup.value) {
-    sections = sections.map(s => ({
-      ...s,
-      groups: s.groups.filter(g => g.groupName === evalFilterGroup.value)
-    })).filter(s => s.groups.length > 0)
-  }
-  return sections
-})
-
-const hasEvalInputs = computed(() => Object.keys(evalScoreInputs.value).length > 0)
-
-function isGroupSelected(gi: number): boolean {
-  const group = currentEvalClassSection.value?.groups[gi]
-  if (!group) return false
-  const all = group.students.filter(s => !s.submitted).map(s => s.student.id)
-  return all.length > 0 && all.every(id => selectedStudentIds.value.includes(id))
+/** 评价类型 → 平时成绩权重字段映射（评价模板与成绩配置共用的数据源） */
+const evalTypeWeightKey: Record<EvalType, WeightNumberKey> = {
+  self: 'selfEvalWeight',
+  intra_group: 'peerReviewWeight',
+  inter_group: 'interGroupEvalWeight',
+  teacher: 'teacherScoreWeight',
+  mentor: 'mentorScoreWeight',
 }
 
-const isAllClassSelected = computed(() => {
-  const all = currentEvalClassSection.value
-    ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
-    : []
-  return all.length > 0 && all.every(id => selectedStudentIds.value.includes(id))
+/** 当前评价模板启用的评价类型：平时成绩构成只展示这些类型（未启用的不展示、不可设占比） */
+const regularEvalTypes = computed<EvalType[]>(() => TEMPLATE_EVAL_TYPES[activeEvalConfig.value.template])
+
+/** 各评价模板的默认平时成绩占比（合计 100%），切换模板时草稿占比重置为该模板默认，保证构成可保存 */
+const TEMPLATE_DEFAULT_WEIGHTS: Record<EvalTemplate, Partial<Record<EvalType, number>>> = {
+  all: { self: 10, intra_group: 20, inter_group: 10, teacher: 30, mentor: 30 },
+  standard: { self: 30, teacher: 40, inter_group: 30 },
+  simple: { self: 40, teacher: 60 },
+  project: { self: 10, intra_group: 20, teacher: 40, mentor: 30 },
+}
+
+// ---- 评价方案草稿：任务管理「保存评价方案」= 模板 + 平时成绩占比（未点保存不落库） ----
+const draftTemplate = ref<EvalTemplate>('all')
+const draftWeights = ref<Partial<Record<EvalType, number>>>({})
+
+/** 从当前生效方案初始化草稿（切换课程 / 保存后调用） */
+function initEvalDrafts() {
+  draftTemplate.value = activeEvalConfig.value.template
+  const w: Partial<Record<EvalType, number>> = {}
+  for (const et of TEMPLATE_EVAL_TYPES[draftTemplate.value]) {
+    w[et] = gradeConfig.value[evalTypeWeightKey[et]]
+  }
+  draftWeights.value = w
+}
+
+/** 选择模板：仅更新草稿（含该模板默认占比），点「保存评价方案」才落库 */
+function selectDraftTemplate(tpl: EvalTemplate) {
+  draftTemplate.value = tpl
+  draftWeights.value = { ...TEMPLATE_DEFAULT_WEIGHTS[tpl] }
+}
+
+/** 草稿占比合计（仅统计草稿模板启用的类型） */
+const draftTotal = computed(() =>
+  TEMPLATE_EVAL_TYPES[draftTemplate.value].reduce((s, et) => s + (draftWeights.value[et] ?? 0), 0))
+
+/** 草稿与已保存方案是否有差异（用于"有未保存的修改"提示） */
+const draftDirty = computed(() => {
+  if (draftTemplate.value !== activeEvalConfig.value.template) return true
+  return TEMPLATE_EVAL_TYPES[draftTemplate.value].some(
+    (et) => (draftWeights.value[et] ?? 0) !== gradeConfig.value[evalTypeWeightKey[et]],
+  )
 })
+
+/** 保存评价方案：模板 + 平时成绩占比一次性写入（与成绩配置共用 gradeConfig / evalConfigs，两端一致） */
+function saveEvalPlan() {
+  if (!courseId.value) return
+  if (draftTotal.value !== 100) return
+  store.setEvalConfig({
+    courseId: courseId.value,
+    template: draftTemplate.value,
+    hasMentor: activeEvalConfig.value.hasMentor,
+    overdueRule: activeEvalConfig.value.overdueRule,
+    frequency: 'biweekly',
+  })
+  store.markConfigCompleted(courseId.value, 'evalConfig')
+  const next = { ...gradeConfig.value }
+  const enabled = TEMPLATE_EVAL_TYPES[draftTemplate.value]
+  for (const et of enabled) {
+    next[evalTypeWeightKey[et]] = draftWeights.value[et] ?? 0
+  }
+  // 未启用的评价类型不参与成绩构成：占比清零，保证总成绩计算不被残留权重污染
+  for (const et of Object.keys(evalTypeWeightKey) as EvalType[]) {
+    if (!enabled.includes(et)) next[evalTypeWeightKey[et]] = 0
+  }
+  gradeConfig.value = { ...next }
+  store.saveGradeConfig({ ...next, courseId: courseId.value })
+  initEvalDrafts()
+}
 
 // ---- 成绩管理 computed ----
 const examNames = computed(() => {
@@ -3424,68 +3562,6 @@ function handleSubmitExamScores() {
 
 }
 
-function getStudentTotalScore(studentId: string): string | number {
-  if (!courseId.value) return '-'
-  const scores = store.getExamScoresForCourse(courseId.value)
-    .filter((s) => s.studentId === studentId && s.status === 'submitted')
-  if (scores.length === 0) return '-'
-  const gradeConfig = store.getGradeConfig(courseId.value)
-  let weightedSum = 0
-  let totalWeight = 0
-  const typeGroups = new Map<string, { count: number; sumPercent: number }>()
-  for (const s of scores) {
-    const w = store.getExamWeight(courseId.value, s.examName, s.type)
-    const percent = (s.score / s.fullScore) * 100
-    if (w > 0) {
-      weightedSum += percent * w
-      totalWeight += w
-    } else {
-      if (!typeGroups.has(s.type)) typeGroups.set(s.type, { count: 0, sumPercent: 0 })
-      const g = typeGroups.get(s.type)!
-      g.count++
-      g.sumPercent += percent
-    }
-  }
-  for (const [type, g] of typeGroups) {
-    let typeWeight = 0
-    if (type === 'midterm_exam' || type === 'midterm_project') typeWeight = gradeConfig.midtermWeight
-    else if (type === 'final_exam' || type === 'final_project') typeWeight = gradeConfig.finalWeight
-    else typeWeight = gradeConfig.regularWeight
-    if (typeWeight > 0 && g.count > 0) {
-      const avgPercent = g.sumPercent / g.count
-      weightedSum += avgPercent * typeWeight
-      totalWeight += typeWeight
-    }
-  }
-  if (totalWeight === 0) return '0'
-  return Math.round(weightedSum / totalWeight)
-}
-
-function getStudentExamCount(studentId: string): number {
-  if (!courseId.value) return 0
-  return store.getExamScoresForCourse(courseId.value)
-    .filter((s) => s.studentId === studentId).length
-}
-
-function getStudentAvgScore(studentId: string): string | number {
-  if (!courseId.value) return '-'
-  const allEvals = store.evaluations.filter(
-    (e) => e.courseId === courseId.value && e.studentId === studentId
-  )
-  if (allEvals.length === 0) return '-'
-  const maxSession = Math.max(...allEvals.map((e) => e.sessionNumber))
-  const relevantEvals = allEvals.filter((e) => e.sessionNumber <= maxSession)
-  const sum = relevantEvals.reduce((a, e) => a + e.score, 0)
-  return Math.round(sum / relevantEvals.length)
-}
-
-function getStudentScoreForExam(studentId: string, examName: string): string | number {
-  if (!courseId.value) return '-'
-  const score = store.getExamScoresForCourse(courseId.value, examName)
-    .find((s) => s.studentId === studentId && s.status === 'submitted')
-  return score?.score ?? '-'
-}
-
 async function handleExcelImport(event: Event) {
   if (!courseId.value || !selectedExam.value) return
   const existingScores = store.getExamScoresForCourse(courseId.value, selectedExam.value)
@@ -3595,19 +3671,6 @@ async function handleDownloadTemplate() {
   }
 }
 
-const enabledTypes = computed(() => baseEnabledTypes.value.filter((t) => {
-  if ((t === 'intra_group' || t === 'inter_group') && !courseHasGroups.value) return false
-  if (t === 'mentor' && !selectedConfig.value?.hasMentor) return false
-  return true
-}))
-
-const filteredEvalTypes = computed(() => enabledTypes.value)
-
-const displaySessions = computed(() => {
-  const count = Math.min(totalSessions.value, 3)
-  return Array.from({ length: count }, (_, i) => i + 1)
-})
-
 const enrolledStudents = computed(() => {
   if (!courseId.value) return []
   return store.enrollments
@@ -3617,61 +3680,6 @@ const enrolledStudents = computed(() => {
       student: store.students.find((s) => s.id === e.studentId),
     }))
     .filter((e) => e.student)
-})
-
-const studentSections = computed(() => {
-  if (!courseId.value) return []
-  const search = studentSearch.value.trim().toLowerCase()
-
-  const enrolled = store.enrollments
-    .filter((e) => e.courseId === courseId.value && e.status !== 'dropped')
-    .map((e) => ({
-      enrollmentId: e.id,
-      student: store.students.find((s) => s.id === e.studentId),
-    }))
-    .filter((e) => e.student) as { enrollmentId: string; student: NonNullable<ReturnType<typeof store.students.find>> }[]
-
-  const filtered = search
-    ? enrolled.filter(({ student }) => student.name.toLowerCase().includes(search) || student.id.includes(search))
-    : enrolled
-
-  const groups = store.studentGroups.filter((g) => g.courseId === courseId.value)
-  const memberToGroup = new Map<string, string>()
-  const groupIdMap = new Map<string, string>()
-  for (const g of groups) {
-    for (const mid of g.memberIds) {
-      memberToGroup.set(mid, g.name)
-      groupIdMap.set(mid, g.id)
-    }
-  }
-
-  const groupedMap = new Map<string, { groupId: string; students: typeof filtered }>()
-  const ungrouped: typeof filtered = []
-  for (const item of filtered) {
-    const groupName = memberToGroup.get(item.student.id)
-    const groupId = groupIdMap.get(item.student.id) || ''
-    if (groupName && groupId) {
-      if (!groupedMap.has(groupName)) groupedMap.set(groupName, { groupId, students: [] })
-      groupedMap.get(groupName)!.students.push(item)
-    } else {
-      ungrouped.push(item)
-    }
-  }
-
-  const sections: { groupId: string; groupName: string; students: typeof filtered }[] = []
-  for (const g of groups) {
-    const entry = groupedMap.get(g.name)
-    if (entry) {
-      sections.push({ groupId: g.id, groupName: g.name, students: entry.students })
-      groupedMap.delete(g.name)
-    } else {
-      sections.push({ groupId: g.id, groupName: g.name, students: [] })
-    }
-  }
-  if (ungrouped.length > 0) {
-    sections.push({ groupId: '', groupName: '未分组', students: ungrouped })
-  }
-  return sections
 })
 
 /** 当前课程的班级列表 */
@@ -3871,58 +3879,6 @@ const filteredSelectedGroupStudents = computed(() => {
   )
 })
 
-// ---- 评价数据 ----
-function getStudentEvals(studentId: string, sessionNumber?: number, type?: EvalType): Evaluation[] {
-  return store.evaluations.filter((e) => {
-    if (e.courseId !== courseId.value || e.studentId !== studentId) return false
-    if (sessionNumber && e.sessionNumber !== sessionNumber) return false
-    if (type && e.type !== type) return false
-    return true
-  })
-}
-
-function getStudentEvalCount(studentId: string): number {
-  return store.evaluations.filter((e) => e.courseId === courseId.value && e.studentId === studentId && e.type === 'self').length
-}
-
-function getAvgScore(studentId: string, sessionNumber: number, type: EvalType): number | null {
-  const evals = getStudentEvals(studentId, sessionNumber, type)
-  if (evals.length === 0) return null
-  return Math.round(evals.reduce((a, e) => a + e.score, 0) / evals.length)
-}
-
-function getScoreDisplay(studentId: string, sessionNumber: number, type: EvalType): string {
-  const v = getAvgScore(studentId, sessionNumber, type)
-  return v !== null ? `${v}分` : '-'
-}
-
-function scoreCellClass(studentId: string, sessionNumber: number, type: EvalType): string {
-  const v = getAvgScore(studentId, sessionNumber, type)
-  if (v === null) return 'text-gray-400/60'
-  if (v >= 85) return 'text-emerald-600 font-medium'
-  if (v >= 60) return 'text-blue-600'
-  return 'text-red-500'
-}
-
-function getStudentTotalAvg(studentId: string): string {
-  let total = 0; let count = 0
-  displaySessions.value.forEach((s) => {
-    filteredEvalTypes.value.forEach((t) => {
-      const v = getAvgScore(studentId, s, t)
-      if (v !== null) { total += v; count++ }
-    })
-  })
-  return count > 0 ? `${Math.round(total / count)}分` : '-'
-}
-
-function totalScoreColor(val: string | number): string {
-  if (val === '-') return '#9ca3af'
-  const n = parseInt(String(val))
-  if (n >= 85) return '#22c55e'
-  if (n >= 60) return '#3b82f6'
-  return '#ef4444'
-}
-
 function getEnrollStatus(studentId: string): { label: string; color: string; progress: number } {
   const enr = store.enrollments.find((e) => e.courseId === courseId.value && e.studentId === studentId)
   if (!enr) return { label: '未知', color: 'bg-brand-400/10 text-gray-400', progress: 0 }
@@ -3935,283 +3891,14 @@ function getEnrollStatus(studentId: string): { label: string; color: string; pro
   return { ...map[enr.status] || { label: '未知', color: 'bg-brand-400/10 text-gray-400' }, progress: enr.progress || 0 }
 }
 
-const handleSetConfig = (updates: Partial<import('@/types').EvaluationConfig>) => {
-  if (!courseId.value) return
-  const existing = store.evalConfigs.find((c) => c.courseId === courseId.value)
-  const config = {
-    courseId: courseId.value,
-    template: existing?.template || 'standard',
-    hasMentor: existing?.hasMentor ?? false,
-    overdueRule: existing?.overdueRule || 'average',
-    ...existing,
-    ...updates,
-    frequency: 'biweekly', // 固定：每两学时一次，不可配置
-  }
-  store.setEvalConfig(config)
-  store.markConfigCompleted(courseId.value, 'evalConfig')
-}
-
-const handleBatchEval = (level: string) => {
-  if (!courseId.value) return
-  const range = LEVEL_OPTIONS.find((o) => o.label === level)?.range
-  if (!range) return
-  const score = Math.round((range[0] + range[1]) / 2)
-  const session = selectedBatchSession.value
-  const type: EvalType = isMentor.value ? 'mentor' : 'teacher'
-
-  selectedStudentIds.value.forEach((studentId) => {
-    if (store.isSessionLocked(courseId.value || '', session) ||
-        store.isTeacherEvalSubmitted(courseId.value || '', studentId, session, type)) return
-    const existing = store.evaluations.find(
-      (e) => e.courseId === courseId.value && e.studentId === studentId && e.type === type && e.sessionNumber === session
-    )
-    const ev: Evaluation = {
-      id: existing ? existing.id : `ev-batch-${Date.now()}-${studentId}-${type}`,
-      courseId: courseId.value,
-      studentId,
-      sessionNumber: session,
-      type,
-      score,
-      evaluatorId: store.currentUser || '',
-      evaluatorName: store.currentDisplayName || store.currentUser || (isMentor.value ? '企业导师' : '教师'),
-      comment: level,
-      createdAt: getNow().toISOString().split('T')[0],
-    }
-    if (existing) {
-      store.updateEvaluation(ev.id, { score, comment: level, createdAt: ev.createdAt })
-    } else {
-      store.addEvaluation(ev)
-    }
-  })
-  evalScoreInputs.value = {}
-  store.markSessionEvalRemindersCompleted(courseId.value, session)
-  // 保存后同步评价到详细成绩（实时更新总分）
-  store.syncEvalToDetailedGrade(courseId.value)
-}
-
-function handleSaveEvalScores() {
-  if (!courseId.value) return
-  const session = selectedBatchSession.value
-  const type: EvalType = isMentor.value ? 'mentor' : 'teacher'
-  Object.entries(evalScoreInputs.value).forEach(([studentId, score]) => {
-    if (store.isSessionLocked(courseId.value || '', session) ||
-        store.isTeacherEvalSubmitted(courseId.value || '', studentId, session, type)) return
-    const clampedScore = Math.min(100, Math.max(0, score))
-    const existing = store.evaluations.find(
-      (e) => e.courseId === courseId.value && e.studentId === studentId && e.type === type && e.sessionNumber === session
-    )
-    const ev: Evaluation = {
-      id: existing ? existing.id : `ev-manual-${Date.now()}-${studentId}-${type}`,
-      courseId: courseId.value,
-      studentId,
-      sessionNumber: session,
-      type,
-      score: clampedScore,
-      evaluatorId: store.currentUser || '',
-      evaluatorName: store.currentDisplayName || store.currentUser || (isMentor.value ? '企业导师' : '教师'),
-      createdAt: getNow().toISOString().split('T')[0],
-    }
-    if (existing) {
-      store.updateEvaluation(ev.id, { score: clampedScore, createdAt: ev.createdAt })
-    } else {
-      store.addEvaluation(ev)
-    }
-  })
-  evalScoreInputs.value = {}
-  // 保存后同步评价到详细成绩（实时更新总分）
-  if (courseId.value) {
-    store.syncEvalToDetailedGrade(courseId.value)
-  }
-}
-
-function handleSubmitAll() {
-  if (!courseId.value) return
-  const session = selectedBatchSession.value
-  const type: EvalType = isMentor.value ? 'mentor' : 'teacher'
-
-  // 1. 先保存所有待处理的输入
-  handleSaveEvalScores()
-
-  // 2. 只提交当前弹窗班级中有草稿评价的学生
-  const section = currentEvalClassSection.value
-  if (!section) return
-
-  let count = 0
-  for (const group of section.groups) {
-    for (const s of group.students) {
-      if (s.submitted) continue
-      const hasEval = store.evaluations.some(
-        (e) => e.courseId === courseId.value && e.studentId === s.student.id && e.type === type && e.sessionNumber === session
-      )
-      if (hasEval) {
-        store.submitTeacherEval(courseId.value, s.student.id, session, type)
-        count++
-      }
-    }
-  }
-
-  store.markSessionEvalRemindersCompleted(courseId.value, session)
-  // 提交后同步评价到详细成绩
-  store.syncEvalToDetailedGrade(courseId.value)
-}
-
-function toggleGroup(gi: number) {
-  const group = currentEvalClassSection.value?.groups[gi]
-  if (!group) return
-  const all = group.students.filter(s => !s.submitted).map(s => s.student.id)
-  if (isGroupSelected(gi)) {
-    selectedStudentIds.value = selectedStudentIds.value.filter(id => !all.includes(id))
-  } else {
-    for (const id of all) {
-      if (!selectedStudentIds.value.includes(id)) {
-        selectedStudentIds.value = [...selectedStudentIds.value, id]
-      }
-    }
-  }
-}
-
-function toggleAllClass() {
-  const all = currentEvalClassSection.value
-    ? currentEvalClassSection.value.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
-    : []
-  if (isAllClassSelected.value) {
-    selectedStudentIds.value = selectedStudentIds.value.filter(id => !all.includes(id))
-  } else {
-    for (const id of all) {
-      if (!selectedStudentIds.value.includes(id)) {
-        selectedStudentIds.value = [...selectedStudentIds.value, id]
-      }
-    }
-  }
-}
-
-function closeEvalPopup() {
-  showEvalPopup.value = false
-  selectedEvalClass.value = ''
-  selectedStudentIds.value = []
-  evalScoreInputs.value = {}
-}
-
 function closeGradePopup() {
   showGradePopup.value = false
   selectedGradeClass.value = ''
   gradePopupSearch.value = ''
 }
 
-const selectedUnsubmittedCount = computed(() => {
-  const selected = selectedStudentIds.value
-  if (selectedEvalClass.value) {
-    const section = currentEvalClassSection.value
-    if (!section) return 0
-    const allUnsubmitted = section.groups.flatMap(g => g.students).filter(s => !s.submitted).map(s => s.student.id)
-    return selected.filter(id => allUnsubmitted.includes(id)).length
-  }
-  return selected.filter(id => {
-    const found = evalTableSections.value.some(cb => cb.groups.some(g => g.students.some(s => s.student.id === id && !s.submitted)))
-    return found
-  }).length
-})
-
-function handleSessionSelect(session: number) {
-  if (!courseId.value) return
-  store.autoLockPreviousSession(courseId.value, session)
-  selectedBatchSession.value = session
-
-}
-
-function isSessionDisabled(session: number): boolean {
-  if (!courseId.value) return true
-  if (store.isSessionLocked(courseId.value, session)) return true
-  if (!store.isSessionTime(courseId.value, session)) return true
-  if (session === totalSessions.value && isFinalSessionExpired.value) return true
-  return false
-}
-
-function isSessionTime(session: number): boolean {
-  if (!courseId.value) return true
-  return store.isSessionTime(courseId.value, session)
-}
-
-const isFinalSessionExpired = computed(() => {
-  if (!courseId.value) return false
-  return store.isFinalSessionDeadlinePassed(courseId.value, totalSessions.value)
-})
-
 // 过滤下拉联动：切换班级时重置分组选择
-watch(evalFilterClass, () => { evalFilterGroup.value = '' })
 watch(gradeFilterClass, () => { gradeFilterGroup.value = '' })
-
-// 弹窗打开时，从已保存评价预填评分输入框，方便修改
-watch(showEvalPopup, (show) => {
-  if (show && courseId.value && selectedEvalClass.value) {
-    prefillEvalInputs()
-  }
-  if (!show) {
-    evalScoreInputs.value = {}
-  }
-})
-
-function prefillEvalInputs() {
-  const section = currentEvalClassSection.value
-  if (!section || !courseId.value) return
-  const session = selectedBatchSession.value
-  const type: EvalType = isMentor.value ? 'mentor' : 'teacher'
-  const inputs: Record<string, number> = {}
-  for (const group of section.groups) {
-    for (const s of group.students) {
-      const ev = store.evaluations.find(
-        (e) => e.courseId === courseId.value && e.studentId === s.student.id &&
-              e.type === type && e.sessionNumber === session
-      )
-      if (ev) {
-        inputs[s.student.id] = ev.score
-      }
-    }
-  }
-  evalScoreInputs.value = inputs
-}
-
-function getSessionTitle(session: number): string {
-  if (!courseId.value) return ''
-  if (store.isSessionLocked(courseId.value, session)) return '该轮次已锁定，不可修改'
-  if (!store.isSessionTime(courseId.value, session)) return session === 1 ? '第一节课尚未开始' : '该轮次尚未到开启时间'
-  if (session === totalSessions.value && isFinalSessionExpired.value) return '课程已结束，最终评价已截止'
-  return ''
-}
-
-const hasSubmittable = computed(() => submittableCount.value > 0)
-
-const submittableCount = computed(() => {
-  // 当前弹窗班级中，有草稿（已保存但未提交）或未提交输入的未提交学生数量
-  if (selectedEvalClass.value) {
-    const section = currentEvalClassSection.value
-    if (!section) return 0
-    return section.groups.reduce((a, g) => a + g.students.filter(s => {
-      if (s.submitted) return false
-      if (evalScoreInputs.value[s.student.id] !== undefined) return true
-      return s.hasDraft
-    }).length, 0)
-  }
-  return evalTableSections.value.reduce((a, cb) => a + cb.groups.reduce((b, g) => b + g.students.filter(s => {
-    if (s.submitted) return false
-    if (evalScoreInputs.value[s.student.id] !== undefined) return true
-    return s.hasDraft
-  }).length, 0), 0)
-})
-
-const handleProcessOverdue = () => {
-  if (!courseId.value) return
-  for (let s = 1; s <= totalSessions.value; s++) {
-    store.processSessionOverdue(courseId.value, s)
-  }
-  const students = enrolledStudents.value.map(({ student }) => student).filter(Boolean)
-  for (const s of students) {
-    for (let sn = 1; sn <= totalSessions.value; sn++) {
-      store.markEvalReminderCompleted(courseId.value, s!.id, sn)
-    }
-  }
-
-}
 
 function getStudentName(studentId: string): string {
   const student = store.students.find((s) => s.id === studentId)
@@ -4281,11 +3968,6 @@ function handleSaveEditStudent() {
         )
       }
     })
-    const evalReminders = (store as any).evalReminders?.value || []
-    ;(store as any).evalReminders.value = evalReminders.map((r: any) => {
-      if (r.studentId === oldId) return { ...r, studentId: newId }
-      return r
-    })
     store.studentGroups.forEach((g) => {
       if (g.memberIds.includes(oldId)) {
         store.updateStudentGroup(g.id, {
@@ -4295,7 +3977,6 @@ function handleSaveEditStudent() {
     })
     try {
       localStorage.setItem('examScores', JSON.stringify((store as any).examScores?.value || []))
-      localStorage.setItem('evalReminders', JSON.stringify((store as any).evalReminders?.value || []))
     } catch {}
   }
 

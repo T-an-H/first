@@ -170,135 +170,6 @@
             </template>
           </Modal>
 
-          <!-- ===== 知识图谱 (泡泡图) ===== -->
-          <div v-if="activeTab === 'knowledge_graph'" class="space-y-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-base font-semibold text-gray-800">知识点掌握图谱</h3>
-                <p class="text-xs text-gray-400">基于学习进度与评价数据自动生成 · 泡泡越大表示知识越重要 · 颜色越深表示掌握度越高</p>
-              </div>
-              <span class="text-xs text-gray-400">点击泡泡查看详情</span>
-            </div>
-
-            <!-- 泡泡视图 -->
-            <!-- 分类图例 + 关联图例 -->
-              <div class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-400 items-center">
-                <span v-for="cat in categoryColors" :key="cat.key" class="flex items-center gap-1.5">
-                  <span class="w-3 h-3 rounded-full" :style="{ background: cat.mid }" />
-                  {{ cat.label }}
-                </span>
-                <span class="text-gray-400/60">|</span>
-                <span v-for="rel in relationLegend" :key="rel.key" class="flex items-center gap-1.5">
-                  <svg width="20" height="4" class="overflow-visible"><line x1="0" y1="2" x2="20" y2="2" :stroke="rel.color" stroke-width="2" :stroke-dasharray="rel.dash" /></svg>
-                  {{ rel.label }}
-                </span>
-              </div>
-
-              <!-- SVG 知识图谱 -->
-              <div class="relative bg-white rounded-xl border border-brand-400/20 overflow-hidden">
-                <svg :viewBox="`0 0 ${SVG_W} ${SVG_H}`" class="w-full" style="min-height: 780px">
-                  <!-- 背景网格 -->
-                  <defs>
-                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" stroke-width="0.5" />
-                    </pattern>
-                    <filter id="glow">
-                      <feGaussianBlur stdDeviation="3" result="blur" />
-                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                    </filter>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#grid)" />
-
-                  <!-- 分类环带 -->
-                  <g v-for="(ring, ri) in categoryRings" :key="ri">
-                    <ellipse :cx="SVG_CX" :cy="SVG_CY" :rx="ring.rx" :ry="ring.ry"
-                      fill="none" :stroke="ring.color" stroke-width="1" stroke-dasharray="4,4" stroke-opacity="0.3" />
-                    <text :x="SVG_CX + ring.rx - 4" :y="SVG_CY - ring.ry + 16" font-size="10" :fill="ring.color" fill-opacity="0.5" text-anchor="end">{{ ring.label }}</text>
-                  </g>
-
-                  <!-- 关联连线 -->
-                  <g v-for="(edge, ei) in renderedEdges" :key="'edge-' + ei">
-                    <path :d="edge.path" fill="none"
-                      :stroke="edge.color" :stroke-width="edge.width" :stroke-dasharray="edge.dash"
-                      stroke-linecap="round" opacity="0.5"
-                      class="transition-all duration-300"
-                      :class="{ 'opacity-100': selectedBubble && (edge.source === selectedBubble || edge.target === selectedBubble) }" />
-                    <!-- 箭头标记 -->
-                    <polygon :points="edge.arrow" :fill="edge.color" opacity="0.5"
-                      :class="{ 'opacity-100': selectedBubble && (edge.source === selectedBubble || edge.target === selectedBubble) }" />
-                    <!-- 关系标签（连线中间） -->
-                    <text :x="edge.midX" :y="edge.midY" font-size="8" :fill="edge.color"
-                      text-anchor="middle" dominant-baseline="middle" opacity="0.6"
-                      class="pointer-events-none select-none">
-                      {{ edge.label }}
-                    </text>
-                  </g>
-
-                  <!-- 知识点节点 -->
-                  <g v-for="pn in positionedNodes" :key="pn.node.id"
-                    @click="selectedBubble = selectedBubble === pn.node.id ? null : pn.node.id"
-                    class="cursor-pointer"
-                    :class="{ 'selected-node': selectedBubble === pn.node.id }">
-                    <!-- hover 提示 -->
-                    <title>{{ pn.node.label }} - {{ pn.node.mastery }}% ({{ pn.node.chapter }})</title>
-                    <!-- 阴影光晕（选中/大掌握度） -->
-                    <circle v-if="pn.node.mastery >= 75" :cx="pn.x" :cy="pn.y" :r="pn.r + 6"
-                      :fill="pn.fill" opacity="0.15" filter="url(#glow)" />
-                    <!-- 外圈（选中时高亮） -->
-                    <circle :cx="pn.x" :cy="pn.y" :r="pn.r + 3"
-                      fill="none" :stroke="pn.fill" stroke-width="2"
-                      :class="selectedBubble === pn.node.id ? 'opacity-100' : 'opacity-0'"
-                      class="transition-opacity duration-200" />
-                    <!-- 主体圆 -->
-                    <circle :cx="pn.x" :cy="pn.y" :r="pn.r"
-                      :fill="pn.fill" stroke="white" stroke-width="2"
-                      class="transition-all duration-200 hover:brightness-110"
-                      :style="{ filter: pn.node.mastery >= 80 ? 'drop-shadow(0 2px 6px ' + pn.fill + '66)' : 'none' }" />
-                    <!-- 文字 - 知识点名称（圆内居中，根据泡泡大小自适应字号） -->
-                    <text :x="pn.x" :y="pn.y + 1" :font-size="bubbleFontSize(pn.r)" font-weight="700"
-                      fill="white" text-anchor="middle" dominant-baseline="central"
-                      class="pointer-events-none select-none">
-                      {{ pn.node.label }}
-                    </text>
-                  </g>
-
-                  <!-- 无节点提示 -->
-                  <text v-if="positionedNodes.length === 0" x="50%" y="50%" font-size="14" fill="#9ca3af" text-anchor="middle" dominant-baseline="middle">暂无知识点数据</text>
-                </svg>
-              </div>
-
-              <!-- 选中节点的详情 -->
-              <div v-if="selectedBubble && bubbleNode(selectedBubble)" class="bg-brand-400/5 rounded-xl p-4 border border-brand-400/30 space-y-2">
-                <div class="flex items-center gap-2">
-                  <span class="w-3 h-3 rounded-full" :style="{ background: bubbleColor(bubbleNode(selectedBubble)?.mastery ?? 50, bubbleNode(selectedBubble)?.category ?? 'foundation') }" />
-                  <p class="text-sm font-bold text-gray-800">{{ bubbleNode(selectedBubble)?.label }}</p>
-                  <span class="text-xs px-1.5 py-0.5 rounded bg-brand-400/10 text-brand-600">{{ bubbleNode(selectedBubble)?.chapter }}</span>
-                </div>
-                <p class="text-xs text-gray-400">{{ bubbleNode(selectedBubble)?.description }}</p>
-                <div class="flex items-center gap-3 text-xs">
-                  <span class="text-gray-400">掌握度</span>
-                  <div class="flex-1 h-2 bg-brand-400/10 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full" :style="{ width: (bubbleNode(selectedBubble)?.mastery ?? 0) + '%', background: bubbleColor(bubbleNode(selectedBubble)?.mastery ?? 50, bubbleNode(selectedBubble)?.category ?? 'foundation') }" />
-                  </div>
-                  <span class="font-bold" :style="{ color: bubbleColor(bubbleNode(selectedBubble)?.mastery ?? 50, bubbleNode(selectedBubble)?.category ?? 'foundation') }">{{ bubbleNode(selectedBubble)?.mastery }}%</span>
-                </div>
-                <!-- 选中节点的关联 -->
-                <div v-if="bubbleEdges(selectedBubble).length > 0" class="pt-1 border-t border-brand-400/30">
-                  <p class="text-[11px] text-gray-400 mb-1">关联关系</p>
-                  <div v-for="edge in bubbleEdges(selectedBubble)" :key="edge.source + edge.target"
-                    class="text-xs text-brand-600 flex items-center gap-1.5">
-                    <span :class="edge.source === selectedBubble ? 'font-semibold' : ''">{{ nodeLabel(edge.source) }}</span>
-                    <ArrowRight class="w-3 h-3 text-gray-400" />
-                    <span class="px-1 py-0.5 rounded text-[10px]" :class="relationChipClass(edge.relation)">{{ edge.label }}</span>
-                    <ArrowRight class="w-3 h-3 text-gray-400" />
-                    <span :class="edge.target === selectedBubble ? 'font-semibold' : ''">{{ nodeLabel(edge.target) }}</span>
-                  </div>
-                </div>
-              </div>
-
-
-          </div>
-
           <!-- ===== 任务 ===== -->
           <div v-if="activeTab === 'tasks'" class="space-y-4">
             <div class="flex items-center justify-between">
@@ -330,7 +201,8 @@
             <div v-if="showStudentTaskModal && selectedStudentTask" class="fixed inset-0 z-50 flex items-center justify-center">
               <div class="absolute inset-0 bg-black/40" @click="closeStudentTask" />
               <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[85vh] overflow-y-auto p-6">
-                <div class="flex items-start justify-between gap-4 mb-4">
+                <!-- 头部：任务信息 + 我的得分（合并，简化） -->
+                <div class="flex items-start justify-between gap-4 mb-3">
                   <div class="min-w-0">
                     <h3 class="text-lg font-semibold text-gray-900 leading-tight">{{ selectedStudentTask.title }}</h3>
                     <p class="text-xs text-gray-400 mt-1 whitespace-pre-wrap">{{ selectedStudentTask.description || '暂无介绍' }}</p>
@@ -340,62 +212,166 @@
                   </button>
                 </div>
 
-                <!-- 教师提供的文档资料（只读） -->
-                <div v-if="selectedStudentTask.attachments?.length" class="mb-4">
-                  <p class="text-xs font-medium text-gray-500 mb-1.5">教师提供的文档资料</p>
-                  <ul class="space-y-1.5">
-                    <li v-for="(f, i) in selectedStudentTask.attachments" :key="i"
-                      class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                      <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
-                      <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <!-- 我的得分 -->
-                <div class="border-t border-gray-100 pt-4 mb-4">
-                  <div class="flex items-center justify-between">
-                    <p class="text-xs font-medium text-gray-500">我的得分</p>
+                <!-- 我的得分（一条横幅） -->
+                <div class="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-3 py-2 mb-4">
+                  <p class="text-xs font-medium text-gray-500 flex-shrink-0">我的得分</p>
+                  <div class="flex items-center gap-2 flex-wrap justify-end">
+                    <template v-if="myTaskEvalScores.length">
+                      <span v-for="s in myTaskEvalScores" :key="s.type"
+                        class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-white border border-gray-200 text-gray-600">
+                        {{ s.label }} <b class="text-gray-900">{{ s.score }}分</b>
+                      </span>
+                    </template>
+                    <span v-else class="text-xs text-gray-400">尚未评分</span>
                     <span v-if="myTaskScore(selectedStudentTask.id) !== undefined"
-                      class="px-3 py-1 rounded-full text-sm font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                      class="px-2.5 py-0.5 rounded-full text-sm font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                       {{ myTaskScore(selectedStudentTask.id) }} 分
                     </span>
-                    <span v-else class="text-xs text-gray-400">尚未评分</span>
                   </div>
-                  <p v-if="mySubmissionAttachments.length > 0" class="text-xs text-gray-400 mt-2">
-                    已提交 {{ mySubmissionAttachments.length }} 个文件，可重新上传更新
-                  </p>
                 </div>
 
-                <!-- 提交资料区 -->
-                <div class="border-t border-gray-100 pt-4">
-                  <p class="text-xs font-medium text-gray-500 mb-1.5">提交我的成果</p>
-                  <div
-                    class="border border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-brand-400/60 hover:bg-brand-400/5 transition-colors"
-                    @click="studentTaskFileInput?.click()" @dragover.prevent @drop.prevent="onStudentTaskDrop">
-                    <Upload class="w-5 h-5 mx-auto text-gray-400 mb-1" />
-                    <p class="text-xs text-gray-500">点击或拖拽文件到此处上传</p>
-                    <p class="text-[10px] text-gray-400 mt-0.5">支持 PDF / Word / PPT / Excel / 文本 / 压缩包</p>
+                <!-- 弹窗内部 tab：提交成果 / 互评他人 -->
+                <div class="flex gap-1 bg-gray-100 p-1 rounded-lg mb-4">
+                  <button @click="studentTaskTab = 'submit'"
+                    :class="`flex-1 py-1.5 rounded-md text-xs font-medium transition-all ${studentTaskTab === 'submit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`">
+                    提交成果
+                  </button>
+                  <button v-if="peerEvalEnabled" @click="studentTaskTab = 'peer'"
+                    :class="`flex-1 py-1.5 rounded-md text-xs font-medium transition-all ${studentTaskTab === 'peer' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`">
+                    互评他人
+                    <span v-if="taskEvalPeerTargets.length" class="ml-1 text-[10px] px-1.5 py-0.5 rounded-full"
+                      :class="studentTaskTab === 'peer' ? 'bg-emerald-500 text-white' : 'bg-emerald-100 text-emerald-600'">{{ taskEvalPeerTargets.length }}</span>
+                  </button>
+                </div>
+
+                <!-- Tab：提交成果 -->
+                <div v-if="studentTaskTab === 'submit'">
+                  <!-- 教师提供的文档资料（只读） -->
+                  <div v-if="selectedStudentTask.attachments?.length" class="mb-3">
+                    <p class="text-xs font-medium text-gray-500 mb-1.5">教师提供的文档资料</p>
+                    <ul class="space-y-1.5">
+                      <li v-for="(f, i) in selectedStudentTask.attachments" :key="i"
+                        class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                        <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span v-if="f.dataUrl" @click="openFileDetail(f.dataUrl)" :title="`点击查看 ${f.name}`"
+                          class="flex-1 min-w-0 truncate text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{{ f.name }}</span>
+                        <span v-else class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+                        <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+                      </li>
+                    </ul>
                   </div>
-                  <input ref="studentTaskFileInput" type="file" class="hidden" multiple
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.rar,.7z" @change="onStudentTaskChange" />
-                  <ul v-if="studentTaskAttachments.length" class="mt-2 space-y-1.5">
-                    <li v-for="(f, i) in studentTaskAttachments" :key="i"
-                      class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
-                      <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                      <span class="flex-1 min-w-0 truncate">{{ f.name }}</span>
-                      <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
-                      <button @click="removeStudentTaskFile(i)" class="text-gray-400 hover:text-red-500 flex-shrink-0" title="移除">
-                        <X class="w-3.5 h-3.5" />
+
+                  <!-- 提交资料区：编辑语句 + 上传资料 -->
+                  <div>
+                    <p class="text-xs font-medium text-gray-500 mb-1.5">提交我的成果（可编辑语句说明，也可上传资料）</p>
+                    <textarea v-model="studentTaskDescription" rows="3" maxlength="2000"
+                      placeholder="输入你的成果说明 / 完成情况 / 学习心得..."
+                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-400/30 resize-none mb-3" />
+                    <div
+                      class="border border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-brand-400/60 hover:bg-brand-400/5 transition-colors"
+                      @click="studentTaskFileInput?.click()" @dragover.prevent @drop.prevent="onStudentTaskDrop">
+                      <Upload class="w-5 h-5 mx-auto text-gray-400 mb-1" />
+                      <p class="text-xs text-gray-500">点击或拖拽文件到此处上传</p>
+                      <p class="text-[10px] text-gray-400 mt-0.5">支持 PDF / Word / PPT / Excel / 文本 / 压缩包 · 多次上传提交后为追加</p>
+                    </div>
+                    <input ref="studentTaskFileInput" type="file" class="hidden" multiple
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.rar,.7z" @change="onStudentTaskChange" />
+                    <ul v-if="studentTaskAttachments.length" class="mt-2 space-y-1.5">
+                      <li v-for="(f, i) in studentTaskAttachments" :key="i"
+                        class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-2.5 py-1.5">
+                        <FileText class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                        <span v-if="f.dataUrl" @click="openFileDetail(f.dataUrl)" :title="`点击查看 ${f.name}`"
+                          class="flex-1 min-w-0 truncate text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">{{ f.name }}</span>
+                        <span v-else class="flex-1 min-w-0 truncate">{{ f.name }}</span>
+                        <span class="text-gray-400 flex-shrink-0">{{ formatFileSize(f.size) }}</span>
+                        <button @click="removeStudentTaskFile(i)" class="text-gray-400 hover:text-red-500 flex-shrink-0" title="移除">
+                          <X class="w-3.5 h-3.5" />
+                        </button>
+                      </li>
+                    </ul>
+                    <div class="flex items-center justify-end gap-2 mt-4">
+                      <button @click="closeStudentTask" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">关闭</button>
+                      <button @click="submitStudentTask"
+                        :disabled="studentTaskAttachments.length === 0 && !studentTaskDescription.trim()"
+                        class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg disabled:opacity-50">
+                        提交
                       </button>
-                    </li>
-                  </ul>
-                  <div class="flex items-center justify-end gap-2 mt-4">
-                    <button @click="closeStudentTask" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-100 rounded-lg">关闭</button>
-                    <button @click="submitStudentTask" :disabled="studentTaskAttachments.length === 0"
-                      class="px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg disabled:opacity-50">
-                      提交
+                    </div>
+                  </div>
+
+                  <!-- 自评（简化）：评价方案含自评时展示，直接置于提交成果下方 -->
+                  <div v-if="selfEvalTarget" class="border-t border-gray-100 mt-4 pt-4">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-[10px] px-2 py-0.5 rounded-full border bg-blue-50 text-blue-600 border-blue-200">自评</span>
+                      <p class="text-sm font-medium text-gray-800">我的自评</p>
+                      <span v-if="selfEvalTarget.avgScore !== null" class="ml-auto text-[11px] text-gray-400">当前均分 {{ selfEvalTarget.avgScore }}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-2">对照任务要求，给本次提交的成果评分</p>
+                    <div class="flex items-center gap-2">
+                      <input v-model.number="taskEvalDrafts[`${selectedStudentTask.id}|self|${selfEvalTarget.studentId}`]"
+                        type="number" min="0" max="100" placeholder="0-100 分"
+                        class="w-24 px-2 py-1.5 text-sm border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-brand-400/30" />
+                      <span v-if="selfEvalTarget.myScore !== null" class="text-xs text-emerald-600">我已评 {{ selfEvalTarget.myScore }} 分（可修改）</span>
+                      <span v-else class="text-xs text-gray-400">尚未评分</span>
+                    </div>
+                    <div class="flex justify-end mt-3">
+                      <button @click="submitTaskEvals('self')"
+                        class="px-4 py-2 text-sm bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg">
+                        提交自评
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Tab：互评他人（查看他人提交资料 + 编辑评分，预留互评空间） -->
+                <div v-else>
+                  <div class="flex items-center gap-2 mb-1">
+                    <ClipboardCheck class="w-5 h-5 text-gray-400" />
+                    <h4 class="font-semibold text-gray-900">互评他人</h4>
+                    <span class="text-xs text-gray-400">查看对方提交的资料后进行评分</span>
+                  </div>
+                  <p class="text-xs text-gray-400 mb-3">评分将按教师设定的成绩占比计入对方平时成绩</p>
+                  <div v-if="taskEvalPeerTargets.length" class="space-y-3">
+                    <div v-for="(t, ti) in taskEvalPeerTargets" :key="ti"
+                      class="p-3 rounded-xl border border-gray-100 bg-gray-50/50">
+                      <div class="flex items-center gap-2 mb-1.5">
+                        <span class="text-[10px] px-2 py-0.5 rounded-full border"
+                          :class="t.type === 'self' ? 'bg-blue-50 text-blue-600 border-blue-200' : t.type === 'intra_group' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-purple-50 text-purple-600 border-purple-200'">
+                          {{ EvalTypeLabels[t.type] }}
+                        </span>
+                        <span class="text-sm font-medium text-gray-800">{{ t.name }}</span>
+                        <span v-if="t.studentNo" class="text-xs text-gray-400">{{ t.studentNo }}</span>
+                        <span v-if="t.avgScore !== null" class="ml-auto text-[11px] text-gray-400">当前均分 {{ t.avgScore }}</span>
+                      </div>
+                      <!-- 被评者提交的资料 -->
+                      <p v-if="t.description" class="text-xs text-gray-600 bg-white rounded-lg px-2.5 py-1.5 mb-1.5 whitespace-pre-wrap">{{ t.description }}</p>
+                      <ul v-if="t.attachments.length" class="flex flex-wrap gap-1.5 mb-1.5">
+                        <li v-for="(f, fi) in t.attachments" :key="fi"
+                          :class="`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border ${f.dataUrl ? 'text-blue-600 bg-blue-50 border-blue-100 hover:bg-blue-100 cursor-pointer' : 'text-gray-500 bg-white border-gray-200'}`"
+                          :title="f.dataUrl ? `点击查看 ${f.name}` : ''" @click="f.dataUrl && openFileDetail(f.dataUrl)">
+                          <FileText class="w-3 h-3 text-gray-400" />{{ f.name }}
+                        </li>
+                      </ul>
+                      <!-- 评分 -->
+                      <div class="flex items-center gap-2">
+                        <input v-model.number="taskEvalDrafts[`${selectedStudentTask.id}|${t.type}|${t.studentId}`]"
+                          type="number" min="0" max="100" placeholder="0-100 分"
+                          class="w-24 px-2 py-1.5 text-sm border border-gray-200 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-brand-400/30" />
+                        <span v-if="t.myScore !== null" class="text-xs text-emerald-600">我已评 {{ t.myScore }} 分（可修改）</span>
+                        <span v-else class="text-xs text-gray-400">尚未评分</span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- 空状态：评价方案启用了互评，但暂无可评对象（其他同学未提交该任务） -->
+                  <div v-else class="text-center py-8 bg-gray-50 rounded-xl">
+                    <Users class="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                    <p class="text-sm text-gray-500">暂无待互评的同学</p>
+                    <p class="text-xs text-gray-400 mt-1">同组/其他组同学提交该任务成果后，即可在此查看资料并评分</p>
+                  </div>
+                  <div class="flex justify-end mt-3">
+                    <button @click="submitTaskEvals()" :disabled="taskEvalPeerTargets.length === 0"
+                      class="px-4 py-2 text-sm bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg disabled:opacity-50">
+                      提交评价
                     </button>
                   </div>
                 </div>
@@ -438,25 +414,23 @@
           </div>
           <!-- ===== 评价填写 ===== -->
           <div v-if="activeTab === 'evaluations'" class="space-y-6">
-            <!-- ===== 课程评价板块 ===== -->
+            <!-- ===== 任务评价引导板块（评价统一在"任务"中完成） ===== -->
             <div class="bg-white rounded-2xl border border-blue-100 shadow-sm p-5 space-y-4">
-            <!-- 课程评价标题卡片 -->
-            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
-              <div class="flex items-center gap-2 mb-2">
-                <ClipboardCheck class="w-5 h-5 text-blue-600" />
-                <h3 class="text-base font-semibold text-blue-800">课程评价</h3>
+              <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 border border-blue-100">
+                <div class="flex items-center gap-2 mb-2">
+                  <ClipboardCheck class="w-5 h-5 text-blue-600" />
+                  <h3 class="text-base font-semibold text-blue-800">任务评价</h3>
+                </div>
+                <p class="text-sm text-blue-700 leading-relaxed">
+                  自评、组内互评、组间互评统一在课程"任务"中完成：进入任务后查看他人提交的资料进行评分，教师/导师也会依据你提交的资料评分。所有评价均计入课程平时成绩。
+                </p>
               </div>
-              <p class="text-sm text-blue-700">
-                按照教师配置的评价方案，完成自评、组内互评、组间互评等评价任务，评价结果将计入课程成绩。
-              </p>
-            </div>
-            <div v-if="isReadOnly" class="bg-brand-400/5 border border-brand-400/30 rounded-xl p-6 text-center text-sm text-gray-400">
-              <Eye class="w-8 h-8 mx-auto mb-2 text-gray-400/60" />
-              <p>课程已结束，评价填写功能已关闭</p>
-              <p class="text-xs mt-1">如需查看评价记录，请在"综合评价"中查看</p>
-            </div>
-            <StudentEvaluation v-else :course-id="courseId" :student-id="myStudent?.id || ''"
-              :student-name="myStudent?.name || store.currentDisplayName || store.currentUser || ''" />
+              <div class="flex justify-end">
+                <button @click="activeTab = 'tasks'"
+                  class="inline-flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors">
+                  <ClipboardCheck class="w-4 h-4" /> 去任务评价
+                </button>
+              </div>
             </div>
 
             <!-- ===== 素质评价板块 ===== -->
@@ -575,7 +549,7 @@
                 <div class="flex items-center justify-between mb-5">
                   <div>
                     <p class="text-blue-100/80 text-xs mb-2 tracking-wide">
-                      {{ selectedSession === null ? '最终综合评分' : `第 ${selectedSession} 次综合评分` }}
+                      任务评价综合评分
                     </p>
                     <p class="text-4xl font-bold leading-none drop-shadow-sm">
                       {{ currentComprehensiveScore ?? '-' }}<span class="text-lg text-blue-200/80 ml-1 font-medium">分</span>
@@ -600,42 +574,11 @@
                 </div>
               </div>
 
-            <!-- 次数选择器 -->
-            <div v-if="sessionComprehensiveScores.length > 0" class="bg-white rounded-2xl p-5 border border-brand-400/20 shadow-sm">
-              <h3 class="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-1.5">
-                <Calendar class="w-4 h-4 text-blue-500" /> 查看各次评价
-              </h3>
-              <div class="flex flex-wrap gap-2">
-                <button
-                  @click="selectedSession = null"
-                  class="px-4 py-2 rounded-full text-sm font-medium transition-all border"
-                  :class="selectedSession === null
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
-                    : 'bg-white text-gray-600 border-brand-400/30 hover:border-blue-300 hover:text-blue-600'">
-                  最终
-                  <span v-if="finalComprehensiveScore !== null" class="ml-1 font-bold">({{ finalComprehensiveScore }})</span>
-                </button>
-                <button
-                  v-for="s in sessionComprehensiveScores"
-                  :key="s.session"
-                  @click="selectedSession = s.session"
-                  class="px-4 py-2 rounded-full text-sm font-medium transition-all border"
-                  :class="selectedSession === s.session
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-600/20'
-                    : 'bg-white text-gray-600 border-brand-400/30 hover:border-blue-300 hover:text-blue-600'">
-                  第{{ s.session }}次
-                  <span v-if="s.score !== null" class="ml-1 font-bold">({{ s.score }})</span>
-                  <span v-else class="ml-1 text-gray-300">(-)</span>
-                </button>
-              </div>
-            </div>
-
             <!-- 评价维度细分 -->
             <div class="bg-white rounded-2xl p-5 border border-brand-400/20 shadow-sm">
               <h3 class="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-1.5">
                 <BarChart3 class="w-4 h-4 text-blue-500" /> 评价维度细分
-                <span v-if="selectedSession !== null" class="text-xs font-normal text-gray-400 ml-1">· 第 {{ selectedSession }} 次</span>
-                <span v-else class="text-xs font-normal text-gray-400 ml-1">· 全部平均</span>
+                <span class="text-xs font-normal text-gray-400 ml-1">· 基于任务评价</span>
               </h3>
               <div class="space-y-3.5">
                 <div v-for="dim in evalDimensions" :key="dim.label"
@@ -668,7 +611,7 @@
               </p>
               <p>总成绩 = 平时成绩({{ currentCfg.regularWeight }}%) + 期中成绩({{ currentCfg.midtermWeight }}%) + 期末成绩({{ currentCfg.finalWeight }}%)</p>
               <p class="text-xs text-brand-700 mt-1.5 leading-relaxed">
-                平时成绩构成：自评({{ currentCfg.selfEvalWeight }}%) + 互评({{ currentCfg.peerReviewWeight }}%) + 组间评({{ currentCfg.interGroupEvalWeight }}%) + 教师({{ currentCfg.teacherScoreWeight }}%) + 导师({{ currentCfg.mentorScoreWeight }}%)
+                平时成绩构成：<template v-for="(et, i) in studentEvalTypes" :key="et">{{ i > 0 ? ' + ' : '' }}{{ EvalTypeLabels[et] }}({{ currentCfg[gradeWeightKeyMap[et]] }}%)</template>
               </p>
             </div>
             </div>
@@ -687,7 +630,7 @@
               </div>
             </div>
             <p class="text-blue-100/80 text-sm mt-3 leading-relaxed">
-              基于本课程历次评价数据，分析你的学习进步趋势，直观展示学业成长轨迹。
+              基于本课程各任务评价数据，分析你的任务得分成长趋势，直观展示学业成长轨迹。
             </p>
           </div>
 
@@ -698,7 +641,7 @@
               <div class="bg-white rounded-2xl p-4 border border-brand-400/20 shadow-sm">
                 <p class="text-xs text-gray-400 mb-1.5">当前得分</p>
                 <p class="text-2xl font-bold text-gray-900">{{ valueAddedData[valueAddedData.length - 1].score }}</p>
-                <p class="text-xs text-gray-400 mt-1">第{{ valueAddedData.length }}次评价</p>
+                <p class="text-xs text-gray-400 mt-1">第{{ valueAddedData.length }}项任务</p>
               </div>
               <div v-if="valueAddedStats" class="bg-white rounded-2xl p-4 border border-brand-400/20 shadow-sm">
                 <p class="text-xs text-gray-400 mb-1.5">相比上次</p>
@@ -712,7 +655,7 @@
                 <p class="text-2xl font-bold" :class="valueAddedImprovement.totalChange > 0 ? 'text-emerald-600' : valueAddedImprovement.totalChange < 0 ? 'text-red-500' : 'text-gray-500'">
                   {{ valueAddedImprovement.totalChange > 0 ? '+' : '' }}{{ valueAddedImprovement.totalChange.toFixed(1) }}
                 </p>
-                <p class="text-xs text-gray-400 mt-1">共{{ valueAddedData.length }}次评价</p>
+                <p class="text-xs text-gray-400 mt-1">共{{ valueAddedData.length }}项任务</p>
               </div>
             </div>
 
@@ -844,12 +787,12 @@
               <TrendingUp class="w-8 h-8 text-blue-500" />
             </div>
             <h3 class="text-lg font-semibold text-gray-900 mb-2">暂无增值评价数据</h3>
-            <p class="text-sm text-gray-500">完成至少一次课程评价后，系统将自动生成你的增值评价趋势图</p>
+            <p class="text-sm text-gray-500">完成至少一次任务评价后，系统将自动生成你的增值评价趋势图</p>
             <button 
-              v-if="(activeTab as string) !== 'evaluations'"
-              @click="activeTab = 'evaluations'"
+              v-if="(activeTab as string) !== 'tasks'"
+              @click="activeTab = 'tasks'"
               class="mt-6 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-sm font-medium rounded-full shadow-md shadow-blue-600/20 transition-colors">
-              去评价填写
+              去任务评价
             </button>
           </div>
           </div>
@@ -868,13 +811,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
-  CheckCircle, Circle, Layers, GitBranch, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
-  Download, Upload, TrendingUp, X, Calendar, BarChart3, PieChart
+  CheckCircle, Circle, Layers, Award, Sparkles, UserCheck, Users, MessageSquare, Eye, HelpCircle, Lock, XCircle,
+  Download, Upload, TrendingUp, X, BarChart3, PieChart
 } from 'lucide-vue-next'
-import StudentEvaluation from '@/components/StudentEvaluation.vue'
 import StudentHomework from '@/components/Homework/StudentHomework.vue'
-import { listTasks, listTaskSubmissions, submitTask } from '@/api'
+import { listTasks, listTaskSubmissions, submitTask, listTaskEvals, submitTaskEval } from '@/api'
 import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile } from '@/types'
+import { TEMPLATE_EVAL_TYPES, EvalTypeLabels } from '@/types'
 import Modal from '@/components/Modal.vue'
 import { getNow } from '@/lib/date'
 
@@ -885,14 +828,15 @@ const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
-const VALID_TABS = ['ai_tier', 'knowledge_graph', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const VALID_TABS = ['ai_tier', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
 const activeTab = ref<string>(
   VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
 )
 const selectedFiles = ref<Record<string, File>>({})
 
 onMounted(() => {
-  store.pushNearDeadlineEvalReminders()
+  // 任务评价模型：刷新本课程任务评价快照（旧版"按次数评价"提醒已废弃）
+  store.refreshTaskEvalInfo([courseId])
   if (myStudent.value) {
     store.autoAssignOverdueBasicTier(courseId, myStudent.value.id)
   }
@@ -908,7 +852,6 @@ watch(() => route.query.tab, (val) => {
 
 const tabs = [
   { id: 'ai_tier', label: 'AI分层', icon: Layers },
-  { id: 'knowledge_graph', label: '知识图谱', icon: GitBranch },
   { id: 'tasks', label: '任务', icon: Edit3 },
   { id: 'resources', label: '资源', icon: FileText },
   { id: 'homework', label: '作业', icon: BookOpen },
@@ -925,12 +868,32 @@ const myGrade = computed(() =>
   store.grades.find((g) => g.courseId === courseId && g.studentId === myStudent.value?.id)
 )
 
-// ===== 任务（教师布置，学生上传资料，教师/导师评分） =====
+// ===== 任务（教师布置，学生上传资料/编辑语句，教师/导师/学生按模板评价） =====
 const courseTasks = ref<any[]>([])
-/** 我的得分缓存：taskId → score（从提交记录中读取） */
+/** 我的得分缓存：taskId → score（教师/导师评分，即 submission.score） */
 const taskScoresByTask = ref<Record<string, number>>({})
 /** 我的已提交附件：taskId → 附件列表 */
-const myTaskSubmittedFiles = ref<Record<string, { name: string; size: number }[]>>({})
+const myTaskSubmittedFiles = ref<Record<string, { name: string; size: number; dataUrl?: string }[]>>({})
+/** 我的已提交文字描述：taskId → description */
+const myTaskDescription = ref<Record<string, string>>({})
+/** 某任务全部提交：taskId → 提交列表（评价他人时查看资料用） */
+const taskSubmissionsByTask = ref<Record<string, any[]>>({})
+/** 某任务全部评价记录：taskId → 评价列表 */
+const taskEvalsByTask = ref<Record<string, any[]>>({})
+/** 任务评价草稿：`${taskId}|${type}|${studentId}` → 分数 */
+const taskEvalDrafts = ref<Record<string, number>>({})
+
+/** 课程当前评价模板（未配置默认 all 全评价） */
+const courseEvalTemplate = computed(() =>
+  (store.evalConfigs || []).find((c) => c.courseId === courseId)?.template || 'all'
+)
+/** 模板允许的学生评价类型 */
+const studentEvalTypes = computed(() => TEMPLATE_EVAL_TYPES[courseEvalTemplate.value] || TEMPLATE_EVAL_TYPES.all)
+/** 我的分组（用于组内互评） */
+const myStudentGroup = computed(() =>
+  (store.studentGroups || []).find((g) => g.courseId === courseId && myStudent.value && g.memberIds.includes(myStudent.value.id))
+)
+const myGroupMemberIds = computed(() => myStudentGroup.value?.memberIds || [])
 
 async function loadCourseTasks() {
   if (!myStudent.value) return
@@ -942,16 +905,20 @@ async function loadCourseTasks() {
       description: t.description || '',
       attachments: t.attachments || [],
     }))
-    // 逐个任务读取我的提交与评分
+    // 逐个任务读取提交、评分与评价记录
     for (const t of courseTasks.value) {
       try {
-        const sres = await listTaskSubmissions(t.id)
-        const my = (sres.submissions || []).find((s: any) => s.studentId === myStudent.value!.id)
+        const [sres, eres] = await Promise.all([listTaskSubmissions(t.id), listTaskEvals(t.id)])
+        const subs: any[] = sres.submissions || []
+        taskSubmissionsByTask.value[t.id] = subs
+        taskEvalsByTask.value[t.id] = eres.evals || []
+        const my = subs.find((s) => s.studentId === myStudent.value!.id)
         if (my) {
           if (my.score != null) taskScoresByTask.value[t.id] = Number(my.score)
           if (Array.isArray(my.attachments) && my.attachments.length > 0) {
             myTaskSubmittedFiles.value[t.id] = my.attachments
           }
+          if (my.description) myTaskDescription.value[t.id] = my.description
         }
       } catch {}
     }
@@ -967,22 +934,144 @@ function myTaskScore(taskId: string): number | undefined {
 /** 是否已提交（未评分）：用于任务行展示"已提交·待评分"状态 */
 function hasSubmittedTask(taskId: string): boolean {
   const files = myTaskSubmittedFiles.value[taskId]
-  return Array.isArray(files) && files.length > 0
+  const desc = myTaskDescription.value[taskId]
+  return (Array.isArray(files) && files.length > 0) || !!desc
+}
+
+/** 任务评价目标列表：自评（自己）/ 组内互评（同组已提交成员）/ 组间互评（其他组已提交成员），并附带对方提交资料 */
+const taskEvalTargets = computed(() => {
+  const task = selectedStudentTask.value
+  if (!task || !myStudent.value) return []
+  const subs = taskSubmissionsByTask.value[task.id] || []
+  const hasSub = (sid: string) => subs.some((s) => s.studentId === sid)
+  const targets: { type: string; studentId: string; name: string; studentNo: string; description: string; attachments: any[]; myScore: number | null; avgScore: number | null }[] = []
+  const push = (type: string, sid: string) => {
+    if (!hasSub(sid)) return
+    const stu = store.students.find((s) => s.id === sid)
+    const sub = subs.find((s) => s.studentId === sid)
+    const evals = (taskEvalsByTask.value[task.id] || []).filter((e) => e.studentId === sid && e.type === type)
+    const myEval = evals.find((e) => e.evaluatorId === myStudent.value!.id)
+    const myScore = myEval ? Number(myEval.score) : null
+    const avg = evals.length ? Math.round(evals.reduce((a, b) => a + Number(b.score), 0) / evals.length) : null
+    targets.push({
+      type, studentId: sid,
+      name: stu?.name || sid,
+      studentNo: (stu as any)?.studentId || '',
+      description: sub?.description || '',
+      attachments: sub?.attachments || [],
+      myScore, avgScore: avg,
+    })
+  }
+  if (studentEvalTypes.value.includes('self')) push('self', myStudent.value.id)
+  if (studentEvalTypes.value.includes('intra_group')) {
+    for (const sid of myGroupMemberIds.value) if (sid !== myStudent.value.id) push('intra_group', sid)
+  }
+  if (studentEvalTypes.value.includes('inter_group')) {
+    const enrolled = store.enrollments
+      .filter((e) => e.courseId === courseId && e.status !== 'dropped')
+      .map((e) => e.studentId)
+    for (const sid of enrolled) {
+      if (sid === myStudent.value.id || myGroupMemberIds.value.includes(sid)) continue
+      push('inter_group', sid)
+    }
+  }
+  return targets
+})
+
+/** 我的任务各类得分（仅展示当前评价模板启用的类型，含去极值平均展示） */
+const myTaskEvalScores = computed(() => {
+  const task = selectedStudentTask.value
+  if (!task || !myStudent.value) return [] as { type: string; label: string; score: number | null }[]
+  const evals = (taskEvalsByTask.value[task.id] || []).filter((e) => e.studentId === myStudent.value!.id)
+  const out: { type: string; label: string; score: number | null }[] = []
+  // 跟随教师设定的评价模板：只展示模板启用的类型
+  for (const type of studentEvalTypes.value) {
+    const list = evals.filter((e) => e.type === type).map((e) => Number(e.score))
+    if (list.length === 0) continue
+    let avg: number
+    if ((type === 'intra_group' || type === 'inter_group') && list.length >= 3) {
+      const sorted = [...list].sort((a, b) => a - b).slice(1, -1)
+      avg = Math.round(sorted.reduce((a, b) => a + b, 0) / sorted.length)
+    } else {
+      avg = Math.round(list.reduce((a, b) => a + b, 0) / list.length)
+    }
+    out.push({ type, label: EvalTypeLabels[type], score: avg })
+  }
+  const teacherScore = myTaskScore(task.id)
+  if (teacherScore !== undefined) {
+    if (studentEvalTypes.value.includes('teacher') && !out.some((o) => o.type === 'teacher')) {
+      out.push({ type: 'teacher', label: EvalTypeLabels.teacher, score: teacherScore })
+    }
+    if (studentEvalTypes.value.includes('mentor') && !out.some((o) => o.type === 'mentor')) {
+      out.push({ type: 'mentor', label: EvalTypeLabels.mentor, score: teacherScore })
+    }
+  }
+  return out
+})
+
+/** 自评目标（简化，直接展示在"提交成果"下方，不需查看他人资料） */
+const selfEvalTarget = computed(() => taskEvalTargets.value.find((t) => t.type === 'self') ?? null)
+
+/** 互评他人目标：仅组内/组间互评（评价他人/其他组），不含自评 */
+const taskEvalPeerTargets = computed(() => taskEvalTargets.value.filter((t) => t.type !== 'self'))
+
+/** 评价方案是否启用互评（组内/组间）→ 决定"互评他人"入口是否展示（跟随教师设定的评价模板） */
+const peerEvalEnabled = computed(() =>
+  studentEvalTypes.value.includes('intra_group') || studentEvalTypes.value.includes('inter_group')
+)
+
+/** 提交任务评价（自评/互评）：typeFilter 传 'self' 只提交自评，不传则提交互评他人 */
+async function submitTaskEvals(typeFilter?: string) {
+  const task = selectedStudentTask.value
+  if (!task) return
+  const entries = Object.entries(taskEvalDrafts.value)
+    .filter(([k, v]) => {
+      const [, type] = k.split('|')
+      if (!k.startsWith(`${task.id}|`) || typeof v !== 'number' || v < 0) return false
+      return typeFilter ? type === typeFilter : type !== 'self'
+    })
+  if (entries.length === 0) return
+  try {
+    for (const [k, score] of entries) {
+      const [, type, studentId] = k.split('|')
+      await submitTaskEval(task.id, { studentId, type, score })
+    }
+    const eres = await listTaskEvals(task.id)
+    taskEvalsByTask.value[task.id] = eres.evals || []
+    // 刷新评价数据并重新聚合平时成绩（互评结果按成绩配置占比计入总成绩）
+    await store.refreshEvaluations(courseId)
+    store.syncEvalToDetailedGrade(courseId)
+    // 任务评价模型：刷新快照驱动"待评价"红点/待办
+    store.refreshTaskEvalInfo([courseId])
+    alert('评价已提交！')
+  } catch (e: any) {
+    alert(`评价提交失败：${e.message || e}`)
+  }
 }
 
 // ---- 学生任务详情弹窗 ----
 const showStudentTaskModal = ref(false)
 const selectedStudentTask = ref<any>(null)
+/** 任务弹窗内部 tab：提交成果 / 互评他人 */
+const studentTaskTab = ref<'submit' | 'peer'>('submit')
 const studentTaskFileInput = ref<HTMLInputElement | null>(null)
-const studentTaskAttachments = ref<{ name: string; size: number }[]>([])
-/** 当前任务的我的已提交附件（仅展示用） */
-const mySubmissionAttachments = computed(() =>
-  selectedStudentTask.value ? (myTaskSubmittedFiles.value[selectedStudentTask.value.id] || []) : []
-)
+const studentTaskAttachments = ref<{ name: string; size: number; dataUrl?: string }[]>([])
+/** 提交的文字描述（编辑语句） */
+const studentTaskDescription = ref('')
 
 async function openStudentTask(task: any) {
   selectedStudentTask.value = task
-  studentTaskAttachments.value = []
+  // 文件集合 = 已提交文件 + 本次追加（删除/上传均作用于该集合，提交时整体写入）
+  studentTaskAttachments.value = [...(myTaskSubmittedFiles.value[task.id] || [])]
+  studentTaskDescription.value = myTaskDescription.value[task.id] || ''
+  studentTaskTab.value = 'submit'
+  // 预填我的评价草稿
+  const evals = taskEvalsByTask.value[task.id] || []
+  for (const e of evals) {
+    if (e.evaluatorId === myStudent.value?.id) {
+      taskEvalDrafts.value[`${task.id}|${e.type}|${e.studentId}`] = Number(e.score)
+    }
+  }
   showStudentTaskModal.value = true
 }
 
@@ -990,22 +1079,44 @@ function closeStudentTask() {
   showStudentTaskModal.value = false
   selectedStudentTask.value = null
   studentTaskAttachments.value = []
+  studentTaskDescription.value = ''
 }
 
-function onStudentTaskChange(e: Event) {
+/** 将文件读取为 dataUrl（便于教师/同学点击查看详情） */
+function readFilesAsDataUrl(files: File[]): Promise<{ name: string; size: number; dataUrl: string }[]> {
+  return Promise.all(
+    files.map(
+      (file) =>
+        new Promise<{ name: string; size: number; dataUrl: string }>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve({ name: file.name, size: file.size, dataUrl: reader.result as string })
+          reader.onerror = () => reject(new Error('文件读取失败'))
+          reader.readAsDataURL(file)
+        })
+    )
+  )
+}
+
+async function onStudentTaskChange(e: Event) {
   const input = e.target as HTMLInputElement
   if (input.files) {
-    for (const file of Array.from(input.files)) {
-      studentTaskAttachments.value.push({ name: file.name, size: file.size })
+    try {
+      const files = await readFilesAsDataUrl(Array.from(input.files))
+      studentTaskAttachments.value.push(...files)
+    } catch (err: any) {
+      alert(`文件读取失败：${err.message || err}`)
     }
   }
   input.value = ''
 }
 
-function onStudentTaskDrop(e: DragEvent) {
+async function onStudentTaskDrop(e: DragEvent) {
   if (e.dataTransfer?.files) {
-    for (const file of Array.from(e.dataTransfer.files)) {
-      studentTaskAttachments.value.push({ name: file.name, size: file.size })
+    try {
+      const files = await readFilesAsDataUrl(Array.from(e.dataTransfer.files))
+      studentTaskAttachments.value.push(...files)
+    } catch (err: any) {
+      alert(`文件读取失败：${err.message || err}`)
     }
   }
 }
@@ -1014,19 +1125,32 @@ function removeStudentTaskFile(i: number) {
   studentTaskAttachments.value.splice(i, 1)
 }
 
+/** 点击打开附件详情（dataUrl 新窗口查看/下载） */
+function openFileDetail(dataUrl: string) {
+  if (!dataUrl) return
+  window.open(dataUrl, '_blank')
+}
+
 async function submitStudentTask() {
   if (!selectedStudentTask.value || !myStudent.value) return
-  if (studentTaskAttachments.value.length === 0) {
-    alert('请先选择要提交的文件')
+  if (studentTaskAttachments.value.length === 0 && !studentTaskDescription.value.trim()) {
+    alert('请输入文字说明或选择要提交的文件')
     return
   }
   try {
+    // 追加语义：提交当前完整文件集合（已提交文件 + 本次新上传 - 已删除），服务端覆盖更新
     await submitTask(selectedStudentTask.value.id, {
       studentId: myStudent.value.id,
       attachments: studentTaskAttachments.value,
+      description: studentTaskDescription.value.trim(),
     })
     myTaskSubmittedFiles.value[selectedStudentTask.value.id] = [...studentTaskAttachments.value]
-    alert('提交成功！等待教师/导师评分')
+    if (studentTaskDescription.value.trim()) {
+      myTaskDescription.value[selectedStudentTask.value.id] = studentTaskDescription.value.trim()
+    }
+    // 任务评价模型：刷新快照驱动"待评价"红点/待办
+    store.refreshTaskEvalInfo([courseId])
+    alert('提交成功！等待教师/导师/同学评分')
     closeStudentTask()
   } catch (e: any) {
     alert(`提交失败：${e.message || e}`)
@@ -1082,22 +1206,28 @@ const tierBadgeClass = computed(() => {
   return map[myTier.value]
 })
 
-// ===== 增值评价 =====
+// ===== 增值评价（按任务归组：任务1 → 任务N，展示任务得分成长趋势） =====
 const valueAddedData = computed(() => {
   if (!myStudent.value) return []
-  const studentId = myStudent.value.id
-  
-  const evals = store.evaluations
-    .filter(ev => ev.courseId === courseId && ev.studentId === studentId && ev.score > 0)
-    .sort((a, b) => a.sessionNumber - b.sessionNumber)
-  
-  if (evals.length === 0) return []
-  
-  return evals.map(ev => ({
-    session: ev.sessionNumber,
-    score: ev.score,
-    label: `第${ev.sessionNumber}次`
-  }))
+  const sid = myStudent.value.id
+
+  const out: { task: number; score: number; label: string }[] = []
+  let idx = 0
+  for (const t of courseTasks.value) {
+    // 该任务中"我"收到的全部评价（含自评/互评/教师/导师），取平均作为任务得分
+    const evals = (taskEvalsByTask.value[t.id] || []).filter((e) => e.studentId === sid && e.score > 0)
+    let score: number | null = null
+    if (evals.length > 0) {
+      score = Math.round(evals.reduce((a, e) => a + Number(e.score), 0) / evals.length)
+    } else if (taskScoresByTask.value[t.id] != null) {
+      score = taskScoresByTask.value[t.id]
+    }
+    if (score !== null) {
+      idx++
+      out.push({ task: idx, score, label: `任务${idx}` })
+    }
+  }
+  return out
 })
 
 const valueAddedStats = computed(() => {
@@ -1262,409 +1392,6 @@ const aiTips = computed(() => {
   ]
 })
 
-// ===== 知识图谱 (节点 + 边) =====
-interface KnowledgeNode {
-  id: string
-  label: string
-  mastery: number
-  importance: number
-  category: 'foundation' | 'core' | 'advanced' | 'comprehensive'
-  chapter: string
-  description: string
-}
-
-interface KnowledgeEdge {
-  source: string
-  target: string
-  relation: 'prerequisite' | 'related_to' | 'extends' | 'part_of'
-  label: string
-}
-
-interface KnowledgeGraph {
-  nodes: KnowledgeNode[]
-  edges: KnowledgeEdge[]
-}
-
-function generateKnowledgeGraph(courseId: string, studentId: string): KnowledgeGraph {
-  const evals = store.evaluations.filter((e) => e.courseId === courseId && e.studentId === studentId)
-  const avgEvalScore = evals.length > 0
-    ? Math.round(evals.reduce((s, e) => s + e.score, 0) / evals.length)
-    : 60
-  const progress = myEnrollment.value?.progress ?? 50
-
-  const masteryFor = (base: number): number => Math.min(95, Math.max(20, (base + avgEvalScore + progress) / 2))
-
-  const graphs: Record<string, { nodes: Omit<KnowledgeNode, 'mastery' | 'importance'>[]; edges: KnowledgeEdge[] }> = {
-    'course-1': {
-      nodes: [
-        { id: 'kp-1', label: 'JS语法基础', category: 'foundation', chapter: '第1章', description: '变量、作用域、闭包、原型链等 JS 核心语法' },
-        { id: 'kp-2', label: 'React核心概念', category: 'foundation', chapter: '第1章', description: 'JSX、组件化、Props、State 等 React 基础' },
-        { id: 'kp-3', label: 'Hooks体系', category: 'core', chapter: '第2章', description: 'useState、useEffect、useContext 等内置 Hooks' },
-        { id: 'kp-4', label: '状态管理', category: 'core', chapter: '第2章', description: 'Context API、Reducer、状态提升与共享策略' },
-        { id: 'kp-5', label: '组件通信', category: 'core', chapter: '第3章', description: '父子传值、跨层通信、Event Bus 模式' },
-        { id: 'kp-6', label: '路由与导航', category: 'core', chapter: '第3章', description: 'React Router 路由配置、嵌套路由、路由守卫' },
-        { id: 'kp-7', label: '性能优化', category: 'advanced', chapter: '第4章', description: 'Memo、useCallback、Lazy Loading、虚拟列表' },
-        { id: 'kp-8', label: '测试与调试', category: 'advanced', chapter: '第4章', description: 'Jest、React Testing Library、Debug 技巧' },
-        { id: 'kp-9', label: '企业级架构', category: 'advanced', chapter: '第5章', description: 'Monorepo、微前端、CI/CD、工程化实践' },
-        { id: 'kp-10', label: '综合项目实战', category: 'comprehensive', chapter: '项目', description: '从零搭建完整企业级应用的端到端能力' },
-      ],
-      edges: [
-        { source: 'kp-1', target: 'kp-2', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-2', target: 'kp-3', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-2', target: 'kp-4', relation: 'related_to', label: '相关联' },
-        { source: 'kp-3', target: 'kp-5', relation: 'extends', label: '拓展延伸' },
-        { source: 'kp-4', target: 'kp-6', relation: 'related_to', label: '相关联' },
-        { source: 'kp-3', target: 'kp-7', relation: 'extends', label: '深入扩展' },
-        { source: 'kp-5', target: 'kp-8', relation: 'related_to', label: '实践关联' },
-        { source: 'kp-7', target: 'kp-9', relation: 'extends', label: '进阶方向' },
-        { source: 'kp-6', target: 'kp-9', relation: 'related_to', label: '组合构建' },
-        { source: 'kp-9', target: 'kp-10', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-8', target: 'kp-10', relation: 'related_to', label: '实践关联' },
-      ],
-    },
-    'course-2': {
-      nodes: [
-        { id: 'kp-1', label: 'Python基础', category: 'foundation', chapter: '第1章', description: '数据类型、控制流、函数、面向对象基础' },
-        { id: 'kp-2', label: 'NumPy数组计算', category: 'foundation', chapter: '第1章', description: '多维数组、广播机制、向量化运算' },
-        { id: 'kp-3', label: 'Pandas数据处理', category: 'core', chapter: '第2章', description: 'DataFrame操作、数据清洗、分组聚合' },
-        { id: 'kp-4', label: '数据可视化', category: 'core', chapter: '第2章', description: 'Matplotlib、Seaborn 图表绘制' },
-        { id: 'kp-5', label: '统计分析基础', category: 'core', chapter: '第3章', description: '描述统计、假设检验、相关分析' },
-        { id: 'kp-6', label: '机器学习入门', category: 'advanced', chapter: '第4章', description: '监督学习、无监督学习基础算法' },
-        { id: 'kp-7', label: '特征工程', category: 'advanced', chapter: '第4章', description: '特征选择、降维、数据变换' },
-        { id: 'kp-8', label: '综合数据项目', category: 'comprehensive', chapter: '项目', description: '端到端数据分析项目实战能力' },
-      ],
-      edges: [
-        { source: 'kp-1', target: 'kp-2', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-2', target: 'kp-3', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-3', target: 'kp-4', relation: 'related_to', label: '相关联' },
-        { source: 'kp-3', target: 'kp-5', relation: 'extends', label: '深入方向' },
-        { source: 'kp-5', target: 'kp-6', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-4', target: 'kp-7', relation: 'related_to', label: '实践关联' },
-        { source: 'kp-6', target: 'kp-8', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-7', target: 'kp-8', relation: 'related_to', label: '实践关联' },
-      ],
-    },
-    'course-14': {
-      nodes: [
-        { id: 'kp-1', label: '大模型基础', category: 'foundation', chapter: '第1章', description: 'Transformer 架构、预训练与微调概念' },
-        { id: 'kp-2', label: 'Prompt工程', category: 'foundation', chapter: '第1章', description: '提示词设计、Few-shot、思维链技巧' },
-        { id: 'kp-3', label: 'API调用集成', category: 'core', chapter: '第2章', description: 'OpenAI API、流式响应、Token管理' },
-        { id: 'kp-4', label: 'RAG检索增强', category: 'core', chapter: '第2章', description: '文档索引、向量数据库、语义检索' },
-        { id: 'kp-5', label: 'Agent智能体', category: 'core', chapter: '第3章', description: '函数调用、工具链、多智能体协作' },
-        { id: 'kp-6', label: '微调与部署', category: 'advanced', chapter: '第3章', description: 'LoRA微调、模型量化、推理优化' },
-        { id: 'kp-7', label: '应用安全与评估', category: 'advanced', chapter: '第4章', description: '内容过滤、越狱防护、效果评估' },
-        { id: 'kp-8', label: 'AI应用综合开发', category: 'comprehensive', chapter: '项目', description: '打通前/后端+AI能力的完整应用构建' },
-      ],
-      edges: [
-        { source: 'kp-1', target: 'kp-2', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-2', target: 'kp-3', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-1', target: 'kp-4', relation: 'related_to', label: '相关联' },
-        { source: 'kp-3', target: 'kp-5', relation: 'extends', label: '进阶方向' },
-        { source: 'kp-4', target: 'kp-5', relation: 'related_to', label: '组合构建' },
-        { source: 'kp-1', target: 'kp-6', relation: 'extends', label: '深入方向' },
-        { source: 'kp-5', target: 'kp-7', relation: 'related_to', label: '实践关联' },
-        { source: 'kp-3', target: 'kp-8', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-5', target: 'kp-8', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-6', target: 'kp-8', relation: 'related_to', label: '实践关联' },
-      ],
-    },
-    'course-3': {
-      nodes: [
-        { id: 'kp-1', label: '设计基础理论', category: 'foundation', chapter: '第1章', description: '色彩理论、排版原则、视觉层级' },
-        { id: 'kp-2', label: '用户研究方法', category: 'foundation', chapter: '第1章', description: '用户访谈、问卷、可用性测试方法' },
-        { id: 'kp-3', label: '信息架构', category: 'core', chapter: '第2章', description: '内容组织、导航设计、心智模型' },
-        { id: 'kp-4', label: '交互设计', category: 'core', chapter: '第2章', description: '用户流程、交互模式、反馈机制' },
-        { id: 'kp-5', label: '原型设计', category: 'core', chapter: '第3章', description: '线框图、高保真原型、设计系统' },
-        { id: 'kp-6', label: '视觉设计进阶', category: 'advanced', chapter: '第3章', description: '动效设计、微交互、品牌视觉统一' },
-        { id: 'kp-7', label: '设计交付与开发', category: 'advanced', chapter: '第4章', description: '标注切图、设计Token、开发协作' },
-        { id: 'kp-8', label: '全链路设计项目', category: 'comprehensive', chapter: '项目', description: '从用户研究到上线跟踪的完整设计流程' },
-      ],
-      edges: [
-        { source: 'kp-1', target: 'kp-3', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-2', target: 'kp-3', relation: 'related_to', label: '互补关联' },
-        { source: 'kp-3', target: 'kp-4', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-4', target: 'kp-5', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-1', target: 'kp-6', relation: 'extends', label: '进阶方向' },
-        { source: 'kp-5', target: 'kp-7', relation: 'related_to', label: '实践关联' },
-        { source: 'kp-4', target: 'kp-8', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-5', target: 'kp-8', relation: 'prerequisite', label: '前置依赖' },
-        { source: 'kp-6', target: 'kp-8', relation: 'related_to', label: '实践关联' },
-      ],
-    },
-  }
-
-  const defaultGraph = graphs['course-1']
-  const courseGraph = graphs[courseId] || defaultGraph
-
-  const catGroups: Record<string, typeof courseGraph.nodes> = {}
-  for (const n of courseGraph.nodes) {
-    if (!catGroups[n.category]) catGroups[n.category] = []
-    catGroups[n.category].push(n)
-  }
-  const catIdx: Record<string, number> = {}
-
-  const nodes: KnowledgeNode[] = courseGraph.nodes.map((n) => {
-    const ci = catIdx[n.category] ?? 0
-    catIdx[n.category] = ci + 1
-
-    let importance = 2
-    if (n.category === 'foundation' || n.category === 'comprehensive') importance = 3
-    else if (n.category === 'core') importance = ci < 2 ? 3 : 2
-    else if (n.category === 'advanced') importance = ci < 1 ? 2 : 1
-
-    return {
-      ...n,
-      mastery: masteryFor(
-        n.category === 'foundation' ? 70 + Math.floor(Math.random() * 20) :
-        n.category === 'core' ? 50 + Math.floor(Math.random() * 30) :
-        n.category === 'advanced' ? 30 + Math.floor(Math.random() * 35) :
-        20 + Math.floor(Math.random() * 50)
-      ),
-      importance,
-    }
-  })
-
-  return { nodes, edges: courseGraph.edges }
-}
-
-const knowledgeGraphData = computed<KnowledgeGraph>(() =>
-  generateKnowledgeGraph(courseId, myStudent.value?.id || '')
-)
-
-// ===== 知识图谱 SVG 可视化 =====
-
-function nodeLabel(id: string): string {
-  const n = knowledgeGraphData.value.nodes.find((n) => n.id === id)
-  return n ? n.label : id
-}
-
-const SVG_W = 900
-const SVG_H = 800
-const SVG_CX = SVG_W / 2
-const SVG_CY = 460
-
-const categoryRings = computed(() => {
-  const rings: { rx: number; ry: number; color: string; label: string }[] = []
-  const radii = [145, 240, 330, 415]
-  const ringColors = ['#5eb6b9', '#5eb6b9', '#5eb6b9', '#5eb6b9']
-  const ringLabels = ['基础知识', '核心知识', '进阶能力', '综合能力']
-  for (let i = 0; i < radii.length; i++) {
-    rings.push({ rx: radii[i], ry: radii[i] * 0.78, color: ringColors[i], label: ringLabels[i] })
-  }
-  return rings
-})
-
-const relationLegend = [
-  { key: 'prerequisite', label: '前置依赖', color: '#429fc4', dash: '' },
-  { key: 'related_to', label: '相关联', color: '#5eb6b9', dash: '5,4' },
-  { key: 'extends', label: '拓展延伸', color: '#429fc4', dash: '3,5' },
-  { key: 'part_of', label: '组成关系', color: '#429fc4', dash: '7,4' },
-]
-
-const categoryColors = [
-  { key: 'foundation', label: '基础知识', light: '#93c5fd', mid: '#3b82f6', deep: '#1d4ed8' },
-  { key: 'core', label: '核心知识', light: '#86efac', mid: '#22c55e', deep: '#15803d' },
-  { key: 'advanced', label: '进阶能力', light: '#fde68a', mid: '#f59e0b', deep: '#b45309' },
-  { key: 'comprehensive', label: '综合能力', light: '#c4b5fd', mid: '#8b5cf6', deep: '#6d28d9' },
-]
-
-function categoryColorMap(cat: string): { light: string; mid: string; deep: string } {
-  return categoryColors.find((c) => c.key === cat) || categoryColors[0]
-}
-
-function bubbleColor(mastery: number, category: string): string {
-  const cc = categoryColorMap(category)
-  if (mastery >= 80) return cc.deep
-  if (mastery >= 50) return cc.mid
-  return cc.light
-}
-
-function bubbleSize(importance: number): number {
-  return importance === 3 ? 55 : importance === 2 ? 42 : 30
-}
-
-function bubbleFontSize(r: number): number {
-  return r >= 50 ? 14 : r >= 38 ? 12 : 10
-}
-
-interface PositionedNode {
-  x: number
-  y: number
-  r: number
-  fill: string
-  node: KnowledgeNode
-}
-
-const positionedNodes = computed<PositionedNode[]>(() => {
-  const nodes = knowledgeGraphData.value.nodes
-  const categoryRadius: Record<string, number> = {
-    foundation: 145,
-    core: 240,
-    advanced: 330,
-    comprehensive: 415,
-  }
-  const ringAngleOffsets: Record<string, number> = {
-    foundation: 0,
-    core: 30,
-    advanced: -25,
-    comprehensive: 20,
-  }
-
-  const grouped: Record<string, KnowledgeNode[]> = {}
-  for (const n of nodes) {
-    if (!grouped[n.category]) grouped[n.category] = []
-    grouped[n.category].push(n)
-  }
-
-  const result: PositionedNode[] = []
-  for (const [cat, catNodes] of Object.entries(grouped)) {
-    const r = categoryRadius[cat] || 160
-    const count = catNodes.length
-    const arcDeg = Math.min(200, 60 + count * 30)
-    const arcRad = (arcDeg * Math.PI) / 180
-    const offsetRad = ((ringAngleOffsets[cat] || 0) * Math.PI) / 180
-    const startAngle = -Math.PI / 2 - arcRad / 2 + offsetRad
-    const step = count > 1 ? arcRad / (count - 1) : 0
-
-    catNodes.forEach((node, i) => {
-      const angle = startAngle + step * i
-      const radius = bubbleSize(node.importance)
-      const fill = bubbleColor(node.mastery, cat)
-      result.push({
-        x: SVG_CX + r * Math.cos(angle),
-        y: SVG_CY + r * Math.sin(angle),
-        r: radius,
-        fill,
-        node,
-      })
-    })
-  }
-
-  const MIN_GAP = 14
-  for (let iter = 0; iter < 3; iter++) {
-    let moved = false
-    for (let i = 0; i < result.length; i++) {
-      for (let j = i + 1; j < result.length; j++) {
-        const a = result[i]
-        const b = result[j]
-        const dx = b.x - a.x
-        const dy = b.y - a.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        const minDist = a.r + b.r + MIN_GAP
-        if (dist < minDist && dist > 0.01) {
-          const push = (minDist - dist) / 2
-          const nx = dx / dist
-          const ny = dy / dist
-          a.x -= nx * push
-          a.y -= ny * push
-          b.x += nx * push
-          b.y += ny * push
-          moved = true
-        }
-      }
-    }
-    if (!moved) break
-  }
-
-  return result
-})
-
-interface RenderedEdge {
-  source: string
-  target: string
-  path: string
-  arrow: string
-  midX: number
-  midY: number
-  label: string
-  color: string
-  dash: string
-  width: number
-}
-
-const renderedEdges = computed<RenderedEdge[]>(() => {
-  const posMap = new Map<string, { x: number; y: number; r: number }>()
-  for (const pn of positionedNodes.value) {
-    posMap.set(pn.node.id, { x: pn.x, y: pn.y, r: pn.r })
-  }
-
-  const edgeStyles: Record<string, { color: string; dash: string; width: number }> = {
-    prerequisite: { color: '#429fc4', dash: '', width: 2 },
-    related_to: { color: '#5eb6b9', dash: '5,3', width: 1.5 },
-    extends: { color: '#429fc4', dash: '3,4', width: 1.5 },
-    part_of: { color: '#429fc4', dash: '7,3', width: 1.5 },
-  }
-
-  const result: RenderedEdge[] = []
-  for (const edge of knowledgeGraphData.value.edges) {
-    const src = posMap.get(edge.source)
-    const tgt = posMap.get(edge.target)
-    if (!src || !tgt) continue
-
-    const style = edgeStyles[edge.relation] || edgeStyles.related_to
-
-    const dx = tgt.x - src.x
-    const dy = tgt.y - src.y
-    const dist = Math.sqrt(dx * dx + dy * dy)
-    if (dist < 1) continue
-    const nx = dx / dist
-    const ny = dy / dist
-
-    const x1 = src.x + nx * src.r
-    const y1 = src.y + ny * src.r
-    const x2 = tgt.x - nx * tgt.r
-    const y2 = tgt.y - ny * tgt.r
-
-    const midX = (x1 + x2) / 2
-    const midY = (y1 + y2) / 2
-    const cpx = midX - ny * 20
-    const cpy = midY + nx * 20
-    const path = `M ${x1} ${y1} Q ${cpx} ${cpy} ${x2} ${y2}`
-
-    const arrowSize = 8
-    const ax = x2 - nx * arrowSize
-    const ay = y2 - ny * arrowSize
-    const apx = -ny * arrowSize * 0.4
-    const apy = nx * arrowSize * 0.4
-    const arrow = `${ax - apx},${ay - apy} ${x2},${y2} ${ax + apx},${ay + apy}`
-
-    result.push({
-      source: edge.source,
-      target: edge.target,
-      path,
-      arrow,
-      midX: (x1 + x2) / 2,
-      midY: (y1 + y2) / 2 - 6,
-      label: edge.label,
-      color: style.color,
-      dash: style.dash,
-      width: style.width,
-    })
-  }
-  return result
-})
-
-const selectedBubble = ref<string | null>(null)
-
-function bubbleNode(id: string | null): KnowledgeNode | undefined {
-  if (!id) return undefined
-  return knowledgeGraphData.value.nodes.find((n) => n.id === id)
-}
-
-function bubbleEdges(id: string): KnowledgeEdge[] {
-  return knowledgeGraphData.value.edges.filter((e) => e.source === id || e.target === id)
-}
-
-function relationChipClass(relation: string): string {
-  const map: Record<string, string> = {
-    prerequisite: 'bg-brand-600/10 text-brand-600',
-    related_to: 'bg-brand-400/10 text-brand-600',
-    extends: 'bg-brand-600/10 text-brand-600',
-    part_of: 'bg-brand-400/10 text-brand-600',
-  }
-  return map[relation] || 'bg-brand-400/10 text-gray-400'
-}
-
 // ===== 综合评价 =====
 const totalScore = computed(() => {
   const base = myGrade.value?.score ?? null
@@ -1704,76 +1431,47 @@ const gradeWeightKeyMap: Record<string, keyof import('@/types').GradeWeightConfi
   mentor: 'mentorScoreWeight',
 }
 
-const allEvalTypes = ['self', 'intra_group', 'inter_group', 'teacher', 'mentor'] as const
-type EvalTypeKey = typeof allEvalTypes[number]
+// ===== 综合评价（基于任务评价，session_number=0） =====
 
-const selectedSession = ref<number | null>(null)
-
-const evalSessions = computed(() => {
-  const evals = store.evaluations.filter(
-    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
+/** 该学生本课程的全部任务评价 */
+const myTaskEvals = computed(() =>
+  store.evaluations.filter(
+    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id && e.sessionNumber === 0
   )
-  const sessions = new Set<number>()
-  evals.forEach(e => sessions.add(e.sessionNumber))
-  return Array.from(sessions).sort((a, b) => a - b)
-})
+)
 
-function calcSessionComprehensiveScore(sessionNumber: number) {
-  const cfg = currentCfg.value
-  const evals = store.evaluations.filter(
-    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id && e.sessionNumber === sessionNumber
-  )
-  let totalWeight = 0
-  let weightedSum = 0
-  for (const type of allEvalTypes) {
-    const filtered = evals.filter(e => e.type === type)
-    if (filtered.length === 0) continue
-    const avg = Math.round(filtered.reduce((s, e) => s + e.score, 0) / filtered.length)
-    const weight = (cfg[gradeWeightKeyMap[type]] as number) || 0
-    weightedSum += avg * weight
-    totalWeight += weight
+/** 按类型聚合平均：与成绩计算保持一致（组内/组间互评去极值，其余普通平均） */
+function avgForType(type: string): number | null {
+  const list = myTaskEvals.value.filter((e) => e.type === type).map((e) => e.score)
+  if (list.length === 0) return null
+  if ((type === 'intra_group' || type === 'inter_group') && list.length >= 3) {
+    const sorted = [...list].sort((a, b) => a - b).slice(1, -1)
+    return Math.round(sorted.reduce((a, b) => a + b, 0) / sorted.length)
   }
-  if (totalWeight === 0) return null
-  return Math.round(weightedSum / totalWeight)
+  return Math.round(list.reduce((a, b) => a + b, 0) / list.length)
 }
 
-const sessionComprehensiveScores = computed(() => {
-  return evalSessions.value.map(sn => ({
-    session: sn,
-    score: calcSessionComprehensiveScore(sn),
-  }))
-})
-
-const finalComprehensiveScore = computed(() => {
-  const validScores = sessionComprehensiveScores.value.filter(s => s.score !== null)
-  if (validScores.length === 0) return null
-  return Math.round(validScores.reduce((s, v) => s + (v.score as number), 0) / validScores.length)
-})
-
+/** 任务评价综合分 = 各类型平均 × 成绩配置占比（即平时成绩，仅统计当前评价模板启用的类型） */
 const currentComprehensiveScore = computed(() => {
-  if (selectedSession.value === null) return finalComprehensiveScore.value
-  const found = sessionComprehensiveScores.value.find(s => s.session === selectedSession.value)
-  return found ? found.score : null
+  const cfg = currentCfg.value
+  if (!cfg) return null
+  let weightedSum = 0
+  let totalWeight = 0
+  for (const type of studentEvalTypes.value) {
+    const avg = avgForType(type)
+    const weight = (cfg[gradeWeightKeyMap[type]] as number) || 0
+    if (avg !== null && weight > 0) {
+      weightedSum += avg * weight
+      totalWeight += weight
+    }
+  }
+  return totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null
 })
 
 const evalDimensions = computed(() => {
-  const evals = store.evaluations.filter(
-    (e) => e.courseId === courseId && e.studentId === myStudent.value?.id
-  )
-
-  const evalsForCalc = selectedSession.value !== null
-    ? evals.filter(e => e.sessionNumber === selectedSession.value)
-    : evals
-
-  const calcAvg = (type: string) => {
-    const filtered = evalsForCalc.filter((e) => e.type === type)
-    if (filtered.length === 0) return null
-    return Math.round(filtered.reduce((s, e) => s + e.score, 0) / filtered.length)
-  }
-
   const dims: { label: string; icon: string; iconBg: string; iconColor: string; barColor: string; score: number; maxScore: number }[] = []
-  for (const type of allEvalTypes) {
-    const score = calcAvg(type)
+  for (const type of studentEvalTypes.value) {
+    const score = avgForType(type)
     if (score !== null) {
       const weight = (currentCfg.value[gradeWeightKeyMap[type]] as number) || 0
       dims.push({
@@ -1787,7 +1485,6 @@ const evalDimensions = computed(() => {
       })
     }
   }
-
   return dims
 })
 

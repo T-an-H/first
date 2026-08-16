@@ -198,56 +198,6 @@ export async function bulkImportGroups(groups: any) {
   })
 }
 
-export async function fetchEvalConfig(courseId: string) {
-  return request(`/eval/config/${courseId}`)
-}
-
-export async function saveEvalConfig(config: any) {
-  return request('/eval/config', {
-    method: 'POST',
-    body: JSON.stringify(config),
-  })
-}
-
-export async function saveEvaluation(ev: any) {
-  return request('/eval/save', {
-    method: 'POST',
-    body: JSON.stringify(ev),
-  })
-}
-
-export async function batchSaveEvaluations(evaluations: any) {
-  return request('/eval/batch', {
-    method: 'POST',
-    body: JSON.stringify({ evaluations }),
-  })
-}
-
-export async function deleteEvaluation(id: string) {
-  return request(`/eval/${id}`, { method: 'DELETE' })
-}
-
-export async function submitTeacherEval(data: any) {
-  return request('/eval/submit', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  })
-}
-
-export async function saveEvalReminders(reminders: any) {
-  return request('/eval/reminders', {
-    method: 'POST',
-    body: JSON.stringify({ reminders }),
-  })
-}
-
-export async function updateEvalReminder(id: string, status: string) {
-  return request(`/eval/reminders/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify({ status }),
-  })
-}
-
 // ============================================================
 // 课程任务（教师布置 / 学生提交 / 教师导师评分）
 // ============================================================
@@ -297,6 +247,19 @@ export async function gradeTaskSubmission(submissionId: string, score: number) {
     method: 'PUT',
     body: JSON.stringify({ score }),
   })
+}
+
+/** POST /api/tasks/:id/evals - 任务评价（教师 teacher / 导师 mentor / 学生 self·intra_group·inter_group，按模板校验） */
+export async function submitTaskEval(taskId: string, data: { studentId: string; type: string; score: number; comment?: string }) {
+  return request(`/tasks/${encodeURIComponent(taskId)}/evals`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** GET /api/tasks/:id/evals - 某任务全部评价记录（含评价者） */
+export async function listTaskEvals(taskId: string) {
+  return request(`/tasks/${encodeURIComponent(taskId)}/evals`)
 }
 
 export async function fetchCourseScores(courseId: string) {
@@ -473,10 +436,6 @@ export async function javaListExamScores() {
 
 export async function javaListEvalConfigs() {
   return javaRequest('/teaching/eval-configs')
-}
-
-export async function javaListEvalReminders() {
-  return javaRequest('/teaching/eval-reminders')
 }
 
 export async function javaListDetailedGrades() {
@@ -666,17 +625,6 @@ export async function javaUpdateStudent(id: string, data: any) {
 }
 export async function javaDeleteStudent(id: string) {
   return javaRequest(`/students/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
-
-// 评价提醒
-export async function javaAddEvalReminder(reminder: any) {
-  return javaRequest('/teaching/eval-reminders', { method: 'POST', body: JSON.stringify(reminder) })
-}
-export async function javaUpdateEvalReminder(id: string, data: any) {
-  return javaRequest(`/teaching/eval-reminders/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
-}
-export async function javaDeleteEvalReminder(id: string) {
-  return javaRequest(`/teaching/eval-reminders/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 // 学生分层

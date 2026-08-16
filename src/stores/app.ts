@@ -1,24 +1,24 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { getNow } from '@/lib/date'
-import { javaUpdateEvalReminder as apiUpdateReminder } from '@/api'
 import { javaAddEnrollment, javaUpdateEnrollment, javaDeleteEnrollment, javaAddGroup, javaUpdateGroup, javaDeleteGroup, javaAddFile, javaDeleteFile, javaSaveGradeConfig, javaUpdateFile, javaDeleteCourse, javaAddCourse, javaUpdateCourse, javaAddSchedule, javaUpdateSchedule, javaDeleteSchedule, javaAddStudent, javaUpdateStudent, javaDeleteStudent, javaAddGrade, javaUpdateGrade, javaDeleteGrade, javaAddExamScore, javaUpdateExamScore, javaDeleteExamScore, javaAddTodo, javaUpdateTodo, javaDeleteTodo, javaAddNote, javaUpdateNote, javaDeleteNote, javaAddEvaluation, javaUpdateEvaluation, javaDeleteEvaluation, javaSaveEvalConfig, javaScoreQualityEvaluation, javaAddDetailedGrade, javaUpdateDetailedGrade, javaDeleteDetailedGrade } from '@/api'
 import {
   javaListEnrollments, javaListGroups, javaListFiles, javaListEvaluations, javaGetGradeConfig,
   javaListCourses, javaListStudents, javaListSchedules, javaListGrades, javaListExamScores,
-  javaListEvalConfigs, javaListEvalReminders, javaListDetailedGrades, javaListQualityEvaluations,
+  javaListEvalConfigs, javaListDetailedGrades, javaListQualityEvaluations,
   javaListHomework, javaListHomeworkSubmissions, javaListTodos, javaListNotes,
   javaListStudentTiers, javaListCategories, javaListDepartments, javaListDepartmentClasses,
   javaListTeachers, javaListMentors, javaListLeaders,
+  listTasks, listTaskSubmissions, listTaskEvals,
 } from '@/api'
 import type {
   Course, Category, Student, Schedule, Enrollment, Teacher, Grade,
   CloudFile, TodoItem, Note, Evaluation, EvaluationConfig,
-  StudentGroup, EvalAnomaly, EvalReminder, GradeWeightConfig, DetailedGrade,
+  StudentGroup, GradeWeightConfig, DetailedGrade,
   Mentor, Leader, AITierQuestion, StudentTierRecord, EvalType,
   Homework, HomeworkSubmission, Department, QualityEvaluation, QualityEvalFile, QualityEvalSubmission
 } from '@/types'
-import { getDefaultGradeConfig, TEMPLATE_EVAL_TYPES } from '@/types'
+import { getDefaultGradeConfig } from '@/types'
 import {
   MOCK_VERSION,
 } from '@/data/mockData'
@@ -64,9 +64,9 @@ try {
       'departments', 'departmentClasses', 'categories', 'courses',
       'schedules', 'students', 'enrollments', 'teachers', 'grades',
       'cloudFiles', 'todos', 'notes',
-      'evaluations', 'evalConfigs', 'studentGroups', 'evalReminders',
+      'evaluations', 'evalConfigs', 'studentGroups',
       'gradeConfigs', 'detailedGrades', 'homework', 'homeworkSubmissions',
-      'examScores', 'examWeights', 'teacherSubmittedEvals', 'lockedSessions',
+      'examScores', 'examWeights',
       'studentTiers', 'qualityEvaluations', 'projectWeightLocks',
       'mentors',
       'isLoggedIn', 'currentUser', 'currentDisplayName', 'currentRole', 'secondaryRoles',
@@ -94,7 +94,6 @@ export const useAppStore = defineStore('app', () => {
   const evaluations = ref<Evaluation[]>(loadFromStorage<Evaluation[]>('evaluations', []))
   const evalConfigs = ref<EvaluationConfig[]>(loadFromStorage<EvaluationConfig[]>('evalConfigs', []))
   const studentGroups = ref<StudentGroup[]>(loadFromStorage<StudentGroup[]>('studentGroups', []))
-  const evalReminders = ref<EvalReminder[]>(loadFromStorage<EvalReminder[]>('evalReminders', []))
 
   // 素质评价提交（学生上传文件，教师打分）
   const qualityEvaluations = ref<import('@/types').QualityEvaluation[]>(
@@ -136,7 +135,6 @@ export const useAppStore = defineStore('app', () => {
   // 显示名（如 王老师 / 张明），用于界面展示与基础数据匹配
   const currentDisplayName = ref<string | null>(loadFromStorage<string | null>('currentDisplayName', null))
   const currentRole = ref<UserRole>(loadFromStorage<UserRole>('currentRole', null))
-  const hasEvalReminders = ref<boolean>(false)
 
   // 企业导师数据
   const mentors = ref<Mentor[]>(loadFromStorage<Mentor[]>('mentors', []))
@@ -152,11 +150,6 @@ export const useAppStore = defineStore('app', () => {
   )
   const selectedDepartmentId = ref<string | null>(
     loadFromStorage<string | null>('selectedDepartmentId', null)
-  )
-
-  // 教师已提交的评价记录（string[]，key: `${courseId}||${studentId}||${session}||${type}`）
-  const teacherSubmittedEvals = ref<string[]>(
-    loadFromStorage<string[]>('teacherSubmittedEvals', [])
   )
 
   // 考试/项目成绩
@@ -179,11 +172,9 @@ export const useAppStore = defineStore('app', () => {
     loadFromStorage<Record<string, { weights: boolean; evalConfig: boolean }>>('configCompleted', {})
   )
 
-  // 已锁定的评价轮次（key: `${courseId}||${sessionNumber}`）
-  // 锁定后该轮次无法再修改评价
-  const lockedSessions = ref<string[]>(
-    loadFromStorage<string[]>('lockedSessions', [])
-  )
+  // 任务评价快照（仅任务评价模型）：courseId → taskId → 提交/评价状态
+  // 由 refreshTaskEvalInfo() 从 Express(3000) 的任务接口拉取，驱动"待评价"红点与待办
+  const taskEvalSnapshot = ref<Record<string, Record<string, { submitted: string[]; ungraded: string[]; selfDone: Record<string, boolean> }>>>({})
 
   if (hasLegacyCloudFiles) {
     saveToStorage('cloudFiles', cloudFiles.value)
@@ -201,14 +192,14 @@ export const useAppStore = defineStore('app', () => {
     try {
       const [
         dbCourses, dbStudents, dbSchedules, dbEnrollments, dbGrades, dbExamScores,
-        dbEvaluations, dbEvalConfigs, dbEvalReminders, dbGroups, dbFiles, dbDetailedGrades,
+        dbEvaluations, dbEvalConfigs, dbGroups, dbFiles, dbDetailedGrades,
         dbQualityEvals, dbHomework, dbHomeworkSubmissions, dbTodos, dbNotes,
         dbStudentTiers, dbCategories, dbDepartments, dbDepartmentClasses, dbTeachers,
         dbMentors, dbLeaders,
       ] = await Promise.all([
         javaListCourses(), javaListStudents(), javaListSchedules(), javaListEnrollments(),
         javaListGrades(), javaListExamScores(), javaListEvaluations(), javaListEvalConfigs(),
-        javaListEvalReminders(), javaListGroups(), javaListFiles(), javaListDetailedGrades(),
+        javaListGroups(), javaListFiles(), javaListDetailedGrades(),
         javaListQualityEvaluations(), javaListHomework(), javaListHomeworkSubmissions(),
         javaListTodos(), javaListNotes(), javaListStudentTiers(),
         javaListCategories(), javaListDepartments(), javaListDepartmentClasses(),
@@ -223,7 +214,6 @@ export const useAppStore = defineStore('app', () => {
       if (Array.isArray(dbExamScores)) { examScores.value = dbExamScores; saveToStorage('examScores', dbExamScores) }
       if (Array.isArray(dbEvaluations)) { evaluations.value = dbEvaluations; saveToStorage('evaluations', dbEvaluations) }
       if (Array.isArray(dbEvalConfigs)) { evalConfigs.value = dbEvalConfigs; saveToStorage('evalConfigs', dbEvalConfigs) }
-      if (Array.isArray(dbEvalReminders)) { evalReminders.value = dbEvalReminders; saveToStorage('evalReminders', dbEvalReminders) }
       if (Array.isArray(dbGroups)) { studentGroups.value = dbGroups; saveToStorage('studentGroups', dbGroups) }
       if (Array.isArray(dbFiles)) { cloudFiles.value = dbFiles.map(normalizeCloudFile); saveToStorage('cloudFiles', cloudFiles.value) }
       if (Array.isArray(dbDetailedGrades)) { detailedGrades.value = dbDetailedGrades; saveToStorage('detailedGrades', dbDetailedGrades) }
@@ -278,11 +268,46 @@ export const useAppStore = defineStore('app', () => {
       }
 
       // 数据库数据就绪后刷新自动待办
+      await refreshTaskEvalInfo()
       generateAutoTodos()
     } catch (e) {
       // Java 后端未启动时静默失败，保留 localStorage 已有缓存
       console.warn('[store] 数据库数据拉取失败（Java 后端未启动？）:', e)
     }
+  }
+
+  /**
+   * 刷新任务评价快照：从 Express(3000) 拉取各课程任务、提交与任务评价，
+   * 用于任务评价模型下的"待评价"红点/待办判定（旧版"按次数评价"提醒已废弃）。
+   * 可在评分/提交/互评后按需调用（courseIds 为空则刷新全部课程）。
+   */
+  async function refreshTaskEvalInfo(courseIds?: string[]) {
+    const targets = courseIds ?? courses.value.map((c) => c.id)
+    if (targets.length === 0) return
+    await Promise.all(targets.map(async (courseId) => {
+      try {
+        const res = await listTasks(courseId)
+        const snapshot: Record<string, { submitted: string[]; ungraded: string[]; selfDone: Record<string, boolean> }> = {}
+        await Promise.all((res.tasks || []).map(async (t: any) => {
+          const [sres, eres] = await Promise.all([listTaskSubmissions(t.id), listTaskEvals(t.id)])
+          const subs = (sres.submissions || []) as any[]
+          const evals = (eres.evals || []) as any[]
+          const selfDone: Record<string, boolean> = {}
+          for (const e of evals) {
+            if (e.type === 'self') selfDone[e.studentId] = true
+          }
+          snapshot[t.id] = {
+            submitted: subs.map((s) => s.studentId),
+            ungraded: subs.filter((s) => s.score == null).map((s) => s.studentId),
+            selfDone,
+          }
+        }))
+        taskEvalSnapshot.value = { ...taskEvalSnapshot.value, [courseId]: snapshot }
+      } catch (e) {
+        console.warn(`[store] 刷新课程 ${courseId} 任务评价快照失败:`, e)
+      }
+    }))
+    generateAutoTodos()
   }
 
   function login(username: string, role: UserRole, isTeacherFromDb?: boolean, isMentorFromDb?: boolean, displayName?: string | null) {
@@ -813,68 +838,6 @@ export const useAppStore = defineStore('app', () => {
     return groups
   }
 
-  function detectAnomalies(courseId: string, sessionNumber: number): EvalAnomaly[] {
-    const course = courses.value.find((c) => c.id === courseId)
-    if (!course) return []
-    const anomalies: EvalAnomaly[] = []
-    // 找出该课程此轮的所有自评
-    const selfEvals = evaluations.value.filter(
-      (e) => e.courseId === courseId && e.sessionNumber === sessionNumber && e.type === 'self'
-    )
-    // 找出所有非自评的评价
-    const otherEvals = evaluations.value.filter(
-      (e) => e.courseId === courseId && e.sessionNumber === sessionNumber && e.type !== 'self'
-    )
-    for (const self of selfEvals) {
-      // 计算其他评价的平均分
-      const related = otherEvals.filter((e) => e.studentId === self.studentId)
-      if (related.length === 0) continue
-      const avgScore = Math.round(related.reduce((s, e) => s + e.score, 0) / related.length)
-      const diff = Math.abs(self.score - avgScore)
-      if (diff > 20) {
-        const student = students.value.find((s) => s.id === self.studentId)
-        anomalies.push({
-          id: `anomaly-${courseId}-${self.studentId}-${sessionNumber}`,
-          courseId,
-          studentId: self.studentId,
-          studentName: student?.name || '未知',
-          sessionNumber,
-          type: 'self',
-          selfScore: self.score,
-          avgScore,
-          diff,
-          warning: `自评(${self.score}分)与其他评价平均分(${avgScore}分)相差${diff}分，差异过大！`,
-        })
-      }
-    }
-    return anomalies
-  }
-
-  /** 教师提交评价（提交后锁定，学生端可见） */
-  function submitTeacherEval(courseId: string, studentId: string, session: number, type: string) {
-    const key = `${courseId}||${studentId}||${session}||${type}`
-    if (!teacherSubmittedEvals.value.includes(key)) {
-      teacherSubmittedEvals.value = [...teacherSubmittedEvals.value, key]
-      saveToStorage('teacherSubmittedEvals', teacherSubmittedEvals.value)
-    }
-    // 评价内容本身已通过 addEvaluation/updateEvaluation 落库，这里仅记录本地提交状态
-  }
-
-  /** 检查某条教师评价是否已提交 */
-  function isTeacherEvalSubmitted(courseId: string, studentId: string, session: number, type: string): boolean {
-    const key = `${courseId}||${studentId}||${session}||${type}`
-    return teacherSubmittedEvals.value.includes(key)
-  }
-
-  /** 获取某学生当前可查看的教师最终评分 */
-  function getSubmittedTeacherScore(courseId: string, studentId: string, session: number, type: string): number | null {
-    if (!isTeacherEvalSubmitted(courseId, studentId, session, type)) return null
-    const ev = evaluations.value.find(
-      (e) => e.courseId === courseId && e.studentId === studentId && e.sessionNumber === session && e.type === type
-    )
-    return ev?.score ?? null
-  }
-
   /** 考试/项目成绩操作 */
   function addExamScore(score: import('@/types').ExamScore) {
     examScores.value.push(score)
@@ -1020,505 +983,6 @@ export const useAppStore = defineStore('app', () => {
     return !hasFinalExamSubmitted(courseId)
   }
 
-  // ====== 评价轮次锁定与时机 ======
-
-  /** 锁定某评价轮次（锁定后不可再修改评价） */
-  function lockSession(courseId: string, sessionNumber: number) {
-    const key = `${courseId}||${sessionNumber}`
-    if (!lockedSessions.value.includes(key)) {
-      lockedSessions.value = [...lockedSessions.value, key]
-      saveToStorage('lockedSessions', lockedSessions.value)
-    }
-  }
-
-  /** 检查某评价轮次是否已锁定 */
-  function isSessionLocked(courseId: string, sessionNumber: number): boolean {
-    return lockedSessions.value.includes(`${courseId}||${sessionNumber}`)
-  }
-
-  /**
-   * 获取某评价轮次对应的课次索引范围
-   * 将课程所有课次按总评价次数均分
-   */
-  function getSessionScheduleRangeIndex(courseId: string, sessionNumber: number, totalSessions: number): { startIdx: number; endIdx: number } | null {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    if (courseSchedules.length === 0) return null
-
-    const perSession = Math.ceil(courseSchedules.length / totalSessions)
-    const startIdx = (sessionNumber - 1) * perSession
-    const endIdx = Math.min(sessionNumber * perSession - 1, courseSchedules.length - 1)
-
-    if (startIdx >= courseSchedules.length) return null
-
-    return { startIdx, endIdx }
-  }
-
-  /**
-   * 获取某评价轮次对应的课次结束日期
-   * 将课程的所有课次按总评价次数均分后，取对应轮次的最后一节课结束时间
-   */
-  function getSessionEndDate(courseId: string, sessionNumber: number): Date | null {
-    const totalSessions = getEvalSessions(courseId)
-    const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions)
-    if (!range) return null
-
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    return new Date(courseSchedules[range.endIdx].endDate)
-  }
-
-  /**
-   * 判断某评价轮次是否已到开启时间
-   * 第1次评价从第一节课上课就开启
-   * 第k次评价从该轮次对应第一节课上课时开启
-   */
-  function isSessionTime(courseId: string, sessionNumber: number): boolean {
-    const totalSessions = getEvalSessions(courseId)
-
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    if (courseSchedules.length === 0) return true
-
-    // 第1次评价从第一节课上课就开启
-    if (sessionNumber === 1) {
-      return getNow() >= new Date(courseSchedules[0].startDate)
-    }
-
-    // 其他轮次：从对应轮次第一节课上课开始
-    const range = getSessionScheduleRangeIndex(courseId, sessionNumber, totalSessions)
-    // 无对应排课（幻影场次）→ 永不开启，避免提前锁定真实场次
-    if (!range) return false
-    return getNow() >= new Date(courseSchedules[range.startIdx].startDate)
-  }
-
-  /**
-   * 判断最终评价轮次是否已过截止期
-   * 最终评价截止时间为该轮次开启后第三天
-   */
-  function isFinalSessionDeadlinePassed(courseId: string, totalSessions: number): boolean {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    if (courseSchedules.length === 0) return false
-
-    // 最终评价轮次的第一节课开始时间
-    const range = getSessionScheduleRangeIndex(courseId, totalSessions, totalSessions)
-    if (!range) return false
-
-    // 最终评价截止时间：评价开启时间 + 3天
-    const deadline = new Date(courseSchedules[range.startIdx].startDate)
-    deadline.setDate(deadline.getDate() + 3)
-    return getNow() > deadline
-  }
-
-  /**
-   * 自动锁定所有历史轮次并处理逾期
-   * 当第 N 次评价开启时，第 1 ~ N-1 次及之前的评价自动锁定
-   */
-  function autoLockPreviousSession(courseId: string, currentSession: number) {
-    for (let s = 1; s < currentSession; s++) {
-      if (!isSessionLocked(courseId, s)) {
-        processSessionOverdue(courseId, s)
-        markSessionEvalRemindersCompleted(courseId, s)
-        lockSession(courseId, s)
-      }
-    }
-  }
-
-  /**
-   * 自动锁定所有已到期的评价轮次
-   * 当第 N+1 轮次已到开启时间时，锁定第 N 轮次
-   * 当课程结束时，锁定最终轮次
-   * 按课程逐一检查
-   */
-  function autoLockExpiredSessions() {
-    const activeCourses = courses.value.filter((c) => c.status === 'active')
-    for (const course of activeCourses) {
-      const total = getEvalSessions(course.id)
-      // 检查各轮次：如果下一轮已到开启时间，锁定当前轮
-      for (let s = 1; s < total; s++) {
-        if (isSessionTime(course.id, s + 1) && !isSessionLocked(course.id, s)) {
-          processSessionOverdue(course.id, s)
-          markSessionEvalRemindersCompleted(course.id, s)
-          lockSession(course.id, s)
-        }
-      }
-      // 课程已结束，锁定最终轮次
-      if (isFinalSessionDeadlinePassed(course.id, total) && !isSessionLocked(course.id, total)) {
-        processSessionOverdue(course.id, total)
-        markSessionEvalRemindersCompleted(course.id, total)
-        lockSession(course.id, total)
-      }
-    }
-  }
-
-  // ====== 评价待办提醒生成 ======
-
-  /**
-   * 计算某评价轮次的截止日期
-   * - 最终轮次：最后一节课结束时间
-   * - 非最终轮次：该轮次对应最后一节课结束时间
-   */
-  function getSessionDeadline(courseId: string, sessionNumber: number, totalSessions: number): string {
-    const courseSchedules = schedules.value
-      .filter((s) => s.courseId === courseId)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-
-    if (courseSchedules.length === 0) return ''
-
-    if (sessionNumber >= totalSessions) {
-      // 最终轮次：最后一节课结束时间后第三天
-      const lastEnd = new Date(courseSchedules[courseSchedules.length - 1].endDate)
-      lastEnd.setDate(lastEnd.getDate() + 3)
-      return lastEnd.toISOString().split('T')[0]
-    }
-    // 非最终轮次：该轮次最后一节课结束时间
-    const end = getSessionEndDate(courseId, sessionNumber)
-    if (end) return end.toISOString().split('T')[0]
-    return ''
-  }
-
-  /** 
-   * 当某评价轮次可开始评价时，生成待办提醒（教师端和学生端）
-   * 含截止日期计算
-   */
-  function generateSessionReminders(courseId: string, sessionNumber: number) {
-    const course = courses.value.find((c) => c.id === courseId)
-    const config = evalConfigs.value.find((c) => c.courseId === courseId)
-    if (!course || !config) return
-
-    const totalSessions = getEvalSessions(courseId)
-    const deadline = getSessionDeadline(courseId, sessionNumber, totalSessions)
-    const enabledTypes = TEMPLATE_EVAL_TYPES[config.template] || ['self', 'teacher']
-    const courseEnrollments = enrollments.value.filter(
-      (e) => e.courseId === courseId && e.status !== 'dropped'
-    )
-    let newEvalReminders: EvalReminder[] = []
-
-    for (const enr of courseEnrollments) {
-      for (const type of enabledTypes) {
-        // 教师评价 → 课程教师 + 作为教师的领导；导师评价 → 课程导师 + 作为导师的领导；自评/互评 → 学生
-        const targetIds = type === 'teacher'
-          ? getCourseTeacherTargets(courseId)
-          : type === 'mentor'
-            ? getCourseMentorTargets(courseId)
-            : [enr.studentId]
-
-        for (const targetId of targetIds) {
-          const reminderId = `session-reminder-${courseId}-${targetId}-${type}-${sessionNumber}`
-
-          // 已存在提醒则跳过
-          if (evalReminders.value.some((r) => r.id === reminderId)) continue
-
-          newEvalReminders.push({
-            id: reminderId,
-            courseId,
-            courseTitle: course.title,
-            studentId: targetId,
-            sessionNumber,
-            deadline,
-            status: 'pending',
-          })
-        }
-      }
-    }
-
-    if (newEvalReminders.length > 0) {
-      evalReminders.value = [...evalReminders.value, ...newEvalReminders]
-      saveToStorage('evalReminders', evalReminders.value)
-    }
-  }
-
-  /**
-   * 检查并自动标记逾期的评价提醒
-   * 当截止日期已过且仍为 pending 状态时，标记为 overdue
-   */
-  function checkAndMarkOverdueReminders() {
-    const now = getNow()
-    let changed = false
-    evalReminders.value = evalReminders.value.map((r) => {
-      if (r.status !== 'pending') return r
-      if (!r.deadline) return r
-      const deadline = new Date(r.deadline)
-      if (now > deadline) {
-        changed = true
-        return { ...r, status: 'overdue' as const }
-      }
-      return r
-    })
-    if (changed) {
-      saveToStorage('evalReminders', evalReminders.value)
-    }
-    generateAutoTodos()
-  }
-
-  /**
-   * 扫描所有活跃课程，为已到上课时间的轮次生成待办提醒
-   * 同时自动锁定已到期的轮次，并检查逾期
-   */
-  function checkAndGenerateSessionReminders() {
-    // 先处理自动锁定
-    autoLockExpiredSessions()
-
-    const activeCourses = courses.value.filter((c) => c.status === 'active')
-    for (const course of activeCourses) {
-      const totalSessions = getEvalSessions(course.id)
-      for (let s = 1; s <= totalSessions; s++) {
-        if (isSessionTime(course.id, s) && !isSessionLocked(course.id, s)) {
-          generateSessionReminders(course.id, s)
-        }
-      }
-    }
-    // 同步检查逾期提醒
-    checkAndMarkOverdueReminders()
-    // 触发自动待办生成
-    generateAutoTodos()
-  }
-
-  /**
-   * 获取某课程的评价次数 — 由课程总学时决定
-   * 默认每 2 学时进行 1 次评价（与固定频率"每两学时一次"保持一致）
-   */
-  function getEvalSessions(courseId: string): number {
-    const course = courses.value.find((c) => c.id === courseId)
-    if (!course) return 1
-
-    const duration = Number(course.duration)
-    if (!duration || duration <= 0) return 1
-
-    return Math.max(1, Math.ceil(duration / 2))
-  }
-
-  function hasGroups(courseId: string): boolean {
-    return studentGroups.value.some((g) => g.courseId === courseId)
-  }
-
-  function generateEvalReminders(courseId: string) {
-    const course = courses.value.find((c) => c.id === courseId)
-    const config = evalConfigs.value.find((c) => c.courseId === courseId)
-    if (!course || !config) return
-    const totalSessions = getEvalSessions(courseId)
-    const courseEnrollments = enrollments.value.filter(
-      (e) => e.courseId === courseId && e.status !== 'dropped'
-    )
-    const startDate = new Date(course.createdAt || getNow())
-    const reminders: EvalReminder[] = []
-
-    const enabledTypes = TEMPLATE_EVAL_TYPES[config.template] || ['self', 'teacher']
-
-    for (const enr of courseEnrollments) {
-      for (let s = 1; s <= totalSessions; s++) {
-        for (const type of enabledTypes) {
-          // 教师评价 → 课程教师 + 作为教师的领导；导师评价 → 课程导师 + 作为导师的领导；自评/互评 → 学生
-          const targetIds = type === 'teacher'
-            ? getCourseTeacherTargets(courseId)
-            : type === 'mentor'
-              ? getCourseMentorTargets(courseId)
-              : [enr.studentId]
-
-          const hasEval = evaluations.value.some(
-            (e) => e.courseId === courseId && e.studentId === enr.studentId && e.sessionNumber === s && e.type === type
-          )
-          if (hasEval) continue
-
-          const weekOffset = s * 2
-          const deadline = new Date(startDate)
-          deadline.setDate(deadline.getDate() + weekOffset * 7)
-          const deadlineStr = deadline.toISOString().split('T')[0]
-
-          for (const targetId of targetIds) {
-            const reminderId = `reminder-${courseId}-${targetId}-${type}-${s}`
-            const exists = evalReminders.value.some((r) => r.id === reminderId)
-            if (exists) continue
-
-            reminders.push({
-              id: reminderId,
-              courseId,
-              courseTitle: course.title,
-              studentId: targetId,
-              sessionNumber: s,
-              deadline: deadlineStr,
-              status: new Date(deadlineStr) < getNow() ? 'overdue' : 'pending',
-            })
-          }
-        }
-      }
-    }
-    if (reminders.length > 0) {
-      evalReminders.value = [...evalReminders.value, ...reminders]
-      saveToStorage('evalReminders', evalReminders.value)
-    }
-  }
-
-  function pushNearDeadlineEvalReminders() {
-    const now = getNow()
-    const oneWeekLater = new Date(now)
-    oneWeekLater.setDate(oneWeekLater.getDate() + 7)
-
-    const isTeacher = currentRole.value === 'teacher'
-    const isStudent = currentRole.value === 'student'
-
-    const pendingReminders = evalReminders.value.filter((r) => {
-      if (r.status === 'completed') return false
-      if (isTeacher && r.studentId === currentUser.value) {
-        const deadline = new Date(r.deadline)
-        return deadline >= now && deadline <= oneWeekLater
-      }
-      if (isStudent) {
-        const student = students.value.find((s) => s.name === currentDisplayName.value)
-        if (student && r.studentId === student.id) {
-          const deadline = new Date(r.deadline)
-          return deadline >= now && deadline <= oneWeekLater
-        }
-      }
-      return false
-    })
-
-    const existingTodoKeys = new Set(todos.value.map((t) => t.title))
-    let newCount = 0
-
-    for (const r of pendingReminders) {
-      const todoTitle = `📋 评价提醒：${r.courseTitle} 第${r.sessionNumber}次评价即将截止（${r.deadline}）`
-      if (existingTodoKeys.has(todoTitle)) continue
-      todos.value.push({
-        id: `todo-eval-${Date.now()}-${r.id}`,
-        title: todoTitle,
-        completed: false,
-        createdAt: now.toISOString().split('T')[0],
-        dueDate: r.deadline,
-        createdBy: currentUser.value || 'system',
-      })
-      existingTodoKeys.add(todoTitle)
-      newCount++
-    }
-
-    if (newCount > 0) {
-      saveToStorage('todos', todos.value)
-      todos.value = [...todos.value]
-    }
-  }
-
-  /**
-   * 逾期处理：对某课程某轮次中未提交的评价，按配置规则自动处理
-   * 适用于所有评价类型（自评/教师评/导师评/组内互评/组间互评）
-   * 规则：
-   *   average - 默认记 60 分
-   *   zero    - 记 0 分
-   *   full    - 记 100 分
-   *   none    - 不处理，跳过
-   */
-  function processSessionOverdue(courseId: string, sessionNumber: number) {
-    const config = evalConfigs.value.find((c) => c.courseId === courseId)
-    if (!config || config.overdueRule === 'none') return
-
-    const course = courses.value.find((c) => c.id === courseId)
-    if (!course) return
-
-    const enabledTypes = TEMPLATE_EVAL_TYPES[config.template] || ['self', 'teacher']
-    const courseEnrollments = enrollments.value.filter(
-      (e) => e.courseId === courseId && e.status !== 'dropped'
-    )
-    const newEvals: Evaluation[] = []
-
-    for (const enr of courseEnrollments) {
-      for (const type of enabledTypes) {
-        // 已有该类型评价则跳过
-        if (evaluations.value.some(
-          (e) => e.courseId === courseId && e.studentId === enr.studentId && e.sessionNumber === sessionNumber && e.type === type
-        )) continue
-
-        let score: number | null = null
-        let comment = ''
-
-        switch (config.overdueRule) {
-          case 'average': {
-            score = 60
-            comment = '逾期未评，默认60分'
-            break
-          }
-          case 'zero':
-            score = 0
-            comment = '逾期未评，记0分'
-            break
-          case 'full':
-            score = 100
-            comment = '逾期未评，记满分'
-            break
-        }
-
-        if (score === null) continue
-
-        // 确定评价人和评价名
-        const targetIsTeacher = type === 'teacher' || type === 'mentor'
-        const evaluatorId = targetIsTeacher ? course.teacher : enr.studentId
-        const evaluatorName = targetIsTeacher
-          ? course.teacher
-          : (students.value.find((s) => s.id === enr.studentId)?.name || '未知')
-
-        newEvals.push({
-          id: `auto-${courseId}-${enr.studentId}-${sessionNumber}-${type}-${Date.now()}`,
-          courseId,
-          studentId: enr.studentId,
-          sessionNumber,
-          type: type as EvalType,
-          score,
-          evaluatorId,
-          evaluatorName,
-          comment,
-          createdAt: getNow().toISOString().split('T')[0],
-        })
-      }
-    }
-
-    if (newEvals.length > 0) {
-      evaluations.value = [...evaluations.value, ...newEvals]
-      saveToStorage('evaluations', evaluations.value)
-    }
-  }
-
-  function markEvalReminderCompleted(courseId: string, studentId: string, sessionNumber: number) {
-    evalReminders.value = evalReminders.value.map((r) => {
-      if (r.courseId === courseId && r.studentId === studentId && r.sessionNumber === sessionNumber) {
-        return { ...r, status: 'completed' as const }
-      }
-      return r
-    })
-    saveToStorage('evalReminders', evalReminders.value)
-    // 触发自动待办清理
-    generateAutoTodos()
-    apiUpdateReminder(`${courseId}||${studentId}||${sessionNumber}`, 'completed').catch(() => {})
-  }
-
-  /** 标记某课程某轮次所有评价提醒为已完成 */
-  function markSessionEvalRemindersCompleted(courseId: string, sessionNumber: number) {
-    evalReminders.value = evalReminders.value.map((r) => {
-      if (r.courseId === courseId && r.sessionNumber === sessionNumber && r.status !== 'completed') {
-        return { ...r, status: 'completed' as const }
-      }
-      return r
-    })
-    saveToStorage('evalReminders', evalReminders.value)
-    generateAutoTodos()
-  }
-
-  function checkEvalReminders() {
-    const now = getNow()
-    const hasUpcoming = evalReminders.value.some((r) => {
-      if (r.status === 'completed') return false
-      const deadline = new Date(r.deadline)
-      return deadline >= now
-    })
-    hasEvalReminders.value = hasUpcoming
-  }
-
   function recalculateProgress(courseId: string) {
     const courseSchedules = schedules.value
       .filter((s) => s.courseId === courseId)
@@ -1566,13 +1030,31 @@ export const useAppStore = defineStore('app', () => {
     javaUpdateDetailedGrade(id, data).catch(() => {})
   }
 
-  /** 将教师评价同步到详细成绩表，实现实时成绩更新 */
+  /** 互评类（组内/组间）评分：去掉最高分与最低分后取平均；不足 3 个评分则直接取平均 */
+  function avgEvalScores(scores: number[]): number {
+    if (scores.length === 0) return 0
+    if (scores.length < 3) {
+      return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+    }
+    const sorted = [...scores].sort((a, b) => a - b).slice(1, -1)
+    return Math.round(sorted.reduce((a, b) => a + b, 0) / sorted.length)
+  }
+
+  /** 将各类评价同步到详细成绩表，实现实时成绩更新。
+   *  teacher/mentor/self 取普通平均；intra_group/inter_group 取去极值平均（不足3个直接平均） */
   function syncEvalToDetailedGrade(courseId: string) {
-    const typeMap: Record<string, keyof DetailedGrade> = { teacher: 'teacherScore', mentor: 'mentorScore' }
-    for (const [evalType, gradeField] of Object.entries(typeMap)) {
+    const typeMap: Record<string, { field: keyof DetailedGrade; trimExtremes: boolean }> = {
+      self: { field: 'selfEvalScore', trimExtremes: false },
+      intra_group: { field: 'peerReviewScore', trimExtremes: true },
+      inter_group: { field: 'interGroupScore', trimExtremes: true },
+      teacher: { field: 'teacherScore', trimExtremes: false },
+      mentor: { field: 'mentorScore', trimExtremes: false },
+    }
+    for (const [evalType, { field, trimExtremes }] of Object.entries(typeMap)) {
       const studentScores = new Map<string, number[]>()
+      // 仅聚合任务评价（session_number=0）：旧版"按次数"评价已废弃，不参与成绩计算
       for (const ev of evaluations.value) {
-        if (ev.courseId !== courseId || ev.type !== evalType) continue
+        if (ev.courseId !== courseId || ev.type !== evalType || ev.sessionNumber !== 0) continue
         if (!studentScores.has(ev.studentId)) studentScores.set(ev.studentId, [])
         studentScores.get(ev.studentId)!.push(ev.score)
       }
@@ -1580,8 +1062,8 @@ export const useAppStore = defineStore('app', () => {
         if (dg.courseId !== courseId) return dg
         const scores = studentScores.get(dg.studentId)
         if (!scores || scores.length === 0) return dg
-        const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-        return { ...dg, [gradeField]: avg }
+        const avg = trimExtremes ? avgEvalScores(scores) : Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+        return { ...dg, [field]: avg }
       })
     }
     saveToStorage('detailedGrades', detailedGrades.value)
@@ -1799,42 +1281,6 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 企业导师相关 ======
 
-  /**
-   * 某课程教师评价的提醒对象：课程教师 + 教师记录 courseIds 归属的教师 + 将该课程作为专属授课课程的学院领导（asTeacher）
-   * 使"领导-教师部分"与普通教师一样能收到评价待办
-   */
-  function getCourseTeacherTargets(courseId: string): string[] {
-    const course = courses.value.find((c) => c.id === courseId)
-    if (!course) return []
-    const targets = new Set<string>()
-    if (course.teacher) targets.add(course.teacher)
-    teachers.value.forEach((t) => {
-      if (t.courseIds.includes(courseId)) targets.add(t.name)
-    })
-    leaders.value.forEach((l) => {
-      if (l.asTeacher && l.teacherCourseIds?.includes(courseId)) targets.add(l.name)
-    })
-    return [...targets]
-  }
-
-  /**
-   * 某课程导师评价的提醒对象：课程导师 + 导师记录 courseIds 归属的导师 + 将该课程作为专属导师课程的学院领导（asMentor）
-   * 使"领导-导师部分"与普通导师一样能收到评价待办
-   */
-  function getCourseMentorTargets(courseId: string): string[] {
-    const course = courses.value.find((c) => c.id === courseId)
-    if (!course) return []
-    const targets = new Set<string>()
-    if (course.mentor) targets.add(course.mentor)
-    mentors.value.forEach((m) => {
-      if (m.courseIds.includes(courseId)) targets.add(m.name)
-    })
-    leaders.value.forEach((l) => {
-      if (l.asMentor && l.mentorCourseIds?.includes(courseId)) targets.add(l.name)
-    })
-    return [...targets]
-  }
-
   /** 获取某导师负责的所有课程ID */
   function getMentorCourseIds(mentorName: string): string[] {
     const mentor = mentors.value.find((m) => m.name === mentorName || m.name === currentDisplayName.value)
@@ -1876,16 +1322,26 @@ export const useAppStore = defineStore('app', () => {
 
   // ====== 待处理事务统计（用于侧边栏红点提醒与一路溯源） ======
 
-  /** 当前用户在该课程是否有待完成的评价（按当前用户自身的提醒判断） */
+  /** 当前用户在该课程是否有待完成的评价（任务评价模型）
+   *  学生：已提交任务的尚未完成自评；教师/导师/领导：存在尚未批改的任务提交 */
   function hasPendingEvalForCourse(courseId: string): boolean {
     const user = currentUser.value
     if (!user) return false
-    const myTargetId = currentRole.value === 'student'
-      ? (students.value.find((s) => s.name === user || s.name === currentDisplayName.value)?.id ?? '')
-      : user
-    return evalReminders.value.some(
-      (r) => r.courseId === courseId && r.studentId === myTargetId && r.status !== 'completed'
-    )
+    const tasks = taskEvalSnapshot.value[courseId]
+    if (!tasks) return false
+    if (currentRole.value === 'student') {
+      const myId = students.value.find((s) => s.name === user || s.name === currentDisplayName.value)?.id ?? ''
+      if (!myId) return false
+      return Object.values(tasks).some((t) => t.submitted.includes(myId) && !t.selfDone[myId])
+    }
+    return Object.values(tasks).some((t) => t.ungraded.length > 0)
+  }
+
+  /** 某课程待批改任务数（教师/导师端"任务管理"红点） */
+  function getPendingTaskEvalCount(courseId: string): number {
+    const tasks = taskEvalSnapshot.value[courseId]
+    if (!tasks) return 0
+    return Object.values(tasks).filter((t) => t.ungraded.length > 0).length
   }
 
   /** 该课程是否仍有未完成的配置（成绩权重/评价方案） */
@@ -1912,10 +1368,7 @@ export const useAppStore = defineStore('app', () => {
       }
     } else if (scope === 'mentor') {
       for (const courseId of getMentorCourseIds(user)) {
-        const hasPending = evalReminders.value.some(
-          (r) => r.courseId === courseId && r.studentId === user && r.status !== 'completed'
-        )
-        if (hasPending) result.add(courseId)
+        if (hasPendingEvalForCourse(courseId)) result.add(courseId)
       }
     } else if (scope === 'student') {
       const student = students.value.find((s) => s.name === user || s.name === currentDisplayName.value)
@@ -1924,9 +1377,7 @@ export const useAppStore = defineStore('app', () => {
         const aiTierPending = new Set(getPendingAITierTests(student.id).map((t) => t.courseId))
         for (const enr of enrolled) {
           const courseId = enr.courseId
-          const hasEval = evalReminders.value.some(
-            (r) => r.courseId === courseId && r.studentId === student.id && r.status !== 'completed'
-          )
+          const hasEval = hasPendingEvalForCourse(courseId)
           const hasHomework = homework.value.some(
             (h) => h.courseId === courseId && !homeworkSubmissions.value.some((s) => s.homeworkId === h.id && s.studentId === student.id)
           )
@@ -1934,12 +1385,9 @@ export const useAppStore = defineStore('app', () => {
         }
       }
     } else if (scope === 'leader') {
-      // 领导段：仅统计教师/导师类待评（非学生自评），避免因学生自评未交导致的常亮红点
-      const studentIds = new Set(students.value.map((s) => s.id))
+      // 领导段：仅统计教师/导师类待评（hasPendingEvalForCourse 对非学生角色按"未批改提交"判定）
       for (const c of getLeaderCourses(user)) {
-        const hasPendingEval = evalReminders.value.some(
-          (r) => r.courseId === c.id && r.status !== 'completed' && !studentIds.has(r.studentId)
-        )
+        const hasPendingEval = hasPendingEvalForCourse(c.id)
         if (hasPendingEval || countPendingQualitySubmissions(c.id) > 0) result.add(c.id)
       }
     }
@@ -2006,8 +1454,6 @@ export const useAppStore = defineStore('app', () => {
       if (currentRole.value !== 'student' || !currentUser.value) return null
       return students.value.find((s) => s.name === currentDisplayName.value)?.id ?? null
     })()
-    // 当前用户在评价提醒中的目标 id：学生用学生 id，其余角色用姓名（领导教师/导师的提醒直接指向其姓名）
-    const myTargetId = currentStudentId || currentUser.value || ''
     // 是否教师身份（普通教师 或 领导 asTeacher 在教师部分有专属授课课程）
     const isTeacherLike = !!currentUser.value && (
       currentRole.value === 'teacher' ||
@@ -2021,25 +1467,36 @@ export const useAppStore = defineStore('app', () => {
     // ── 辅助函数：检查 auto 待办是否已存在 ──
     const hasAutoTodo = (id: string) => autoTodoIds.has(id) || newTodos.some((t) => t.id === id)
 
-    // ── 1. 评价待办（教师/领导教师、导师/领导导师、学生） ──
-    const myPendingEvalReminders = evalReminders.value.filter((r) => {
-      if (r.status === 'completed' || r.status === 'overdue') return false
-      return r.studentId === myTargetId
-    })
-    for (const r of myPendingEvalReminders) {
-      const todoId = `auto-eval-${r.courseId}-${r.sessionNumber}`
+    // ── 1. 评价待办（任务评价模型：评价均来自任务提交） ──
+    // 学生：已提交任务但未完成自评；教师/导师/领导：存在尚未批改的任务提交
+    const evalTodoCourses = currentRole.value === 'student'
+      ? enrollments.value
+          .filter((e) => e.studentId === currentStudentId && e.status !== 'dropped')
+          .map((e) => e.courseId)
+      : Array.from(new Set([
+          ...(currentUser.value ? getTeacherCoursesForUser(currentUser.value).map((c) => c.id) : []),
+          ...(currentUser.value ? getMentorCourseIds(currentUser.value) : []),
+        ]))
+    for (const courseId of evalTodoCourses) {
+      const course = courses.value.find((c) => c.id === courseId)
+      const tasks = taskEvalSnapshot.value[courseId]
+      if (!course || !tasks) continue
+      let pendingTitle = ''
+      if (currentRole.value === 'student') {
+        if (currentStudentId && Object.values(tasks).some((t) => t.submitted.includes(currentStudentId) && !t.selfDone[currentStudentId])) {
+          pendingTitle = `[评价] ${course.title} 有待完成的评价`
+        }
+      } else if (Object.values(tasks).some((t) => t.ungraded.length > 0)) {
+        pendingTitle = `[评价] ${course.title} 有待批改的任务提交`
+      }
+      if (!pendingTitle) continue
+      const todoId = `auto-eval-${courseId}`
       if (hasAutoTodo(todoId)) continue
-      // 从提醒 id 判断类型：session-reminder-{courseId}-{targetId}-{type}-{session}
-      const roleType = r.id.includes('-teacher-') ? '教师评' : r.id.includes('-mentor-') ? '导师评' : ''
-      const title = currentRole.value === 'student'
-        ? `[评价] ${r.courseTitle} 第${r.sessionNumber}次评价`
-        : `[评价] ${r.courseTitle} 第${r.sessionNumber}次评价 (${roleType})`
       newTodos.push({
         id: todoId,
-        title,
+        title: pendingTitle,
         completed: false,
         createdAt: now.toISOString().split('T')[0],
-        dueDate: r.deadline || undefined,
         createdBy: currentUser.value || 'system',
       })
       changed = true
@@ -2125,20 +1582,19 @@ export const useAppStore = defineStore('app', () => {
     todos.value = todos.value.map((t) => {
       if (t.completed) return t
 
-      // 评价待办清理（课程 ID 可能含连字符，用 lastIndexOf 解析；按当前用户自身提醒判断）
+      // 评价待办清理（任务评价模型：不再有待批改/待完成评价时自动消失）
       if (t.id.startsWith('auto-eval-')) {
-        const rest = t.id.replace('auto-eval-', '')
-        const sepIdx = rest.lastIndexOf('-')
-        if (sepIdx > 0) {
-          const courseId = rest.substring(0, sepIdx)
-          const sessionNum = parseInt(rest.substring(sepIdx + 1))
-          const related = evalReminders.value.filter(
-            (r) => r.courseId === courseId && r.sessionNumber === sessionNum && r.studentId === myTargetId
-          )
-          if (related.length > 0 && related.every((r) => r.status === 'completed')) {
-            changed = true
-            return { ...t, completed: true }
-          }
+        const courseId = t.id.replace('auto-eval-', '')
+        const course = courses.value.find((c) => c.id === courseId)
+        const tasks = taskEvalSnapshot.value[courseId]
+        const stillPending = !!course && !!tasks && (
+          currentRole.value === 'student'
+            ? (currentStudentId ? Object.values(tasks).some((tt) => tt.submitted.includes(currentStudentId) && !tt.selfDone[currentStudentId]) : false)
+            : Object.values(tasks).some((tt) => tt.ungraded.length > 0)
+        )
+        if (!stillPending) {
+          changed = true
+          return { ...t, completed: true }
         }
       }
 
@@ -2208,16 +1664,14 @@ export const useAppStore = defineStore('app', () => {
     // state
     courses, categories, students, schedules, enrollments, teachers, grades,
     cloudFiles, todos, notes,
-    evaluations, evalConfigs, studentGroups, evalReminders,
+    evaluations, evalConfigs, studentGroups,
     gradeConfigs, detailedGrades,
     homework, homeworkSubmissions,
     isLoggedIn, currentUser, currentDisplayName, currentRole,
-    hasEvalReminders,
     mentors, leaders, secondaryRoles,
     departments, departmentClasses, selectedDepartmentId,
     examScores,
     examWeights,
-    lockedSessions,
     studentTiers,
     initFromDatabase,
     // actions
@@ -2236,18 +1690,12 @@ export const useAppStore = defineStore('app', () => {
     addEvaluation, updateEvaluation, deleteEvaluation,
     setEvalConfig, addStudentGroup, addStudent, updateStudent, deleteStudent, updateStudentGroup, deleteStudentGroup,
     getCourseGroups, clearCourseGroups, setCourseGroups, randomGroup,
-    detectAnomalies, getEvalSessions, hasGroups,
-    submitTeacherEval, isTeacherEvalSubmitted, getSubmittedTeacherScore,
     addExamScore, updateExamScore, submitExamScores, getExamScoresForCourse, getExamNames, deduplicateExamScores, normalizeWrittenExamNames,
     setExamWeight, getExamWeight, getExamWeightsForCourse,
     getProjectWeightLock, setProjectWeightLock,
     hasFinalExamSubmitted, isEvalConfigEditable, isWeightConfigEditable,
-    lockSession, isSessionLocked, getSessionScheduleRangeIndex, getSessionEndDate, isSessionTime, isFinalSessionDeadlinePassed, autoLockPreviousSession, autoLockExpiredSessions,
-    generateSessionReminders, checkAndGenerateSessionReminders, getSessionDeadline, checkAndMarkOverdueReminders,
-    generateAutoTodos, generateEvalReminders, pushNearDeadlineEvalReminders, processSessionOverdue,
-    markEvalReminderCompleted, markSessionEvalRemindersCompleted,
+    generateAutoTodos,
     isFirstClassStarted, markConfigCompleted, getPendingConfigCourses,
-    checkEvalReminders,
     recalculateProgress,
     saveGradeConfig, getGradeConfig,
     addDetailedGrade, updateDetailedGrade, getDetailedGrades, syncEvalToDetailedGrade, refreshEvaluations,
@@ -2257,7 +1705,9 @@ export const useAppStore = defineStore('app', () => {
     getQualityEvaluationsForCourse, getStudentQualityEvaluation, getStudentQualityScore, countPendingQualitySubmissions,
     getMentorCourseIds, getLeaderCourses, getLeaderStudents,
     getLeaderTeacherCourses, isLeaderTeacherCourse,
-    getTeacherCoursesForUser, getCourseTeacherTargets, getCourseMentorTargets,
+    getTeacherCoursesForUser,
+    // 任务评价快照（任务评价模型的红点/待办判定）
+    refreshTaskEvalInfo, getPendingTaskEvalCount,
     // 待处理事务统计（红点提醒）
     hasPendingEvalForCourse, isCourseConfigPending, getMyPendingCourseIds,
     getStudentTier, determineTier, submitAITierTest,

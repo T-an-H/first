@@ -13,7 +13,6 @@ import scheduleRoutes from './routes/schedules.js';
 import categoryRoutes from './routes/categories.js';
 import courseRoutes from './routes/courses.js';
 import teachingRoutes from './routes/teaching.js';
-import evalRoutes from './routes/eval.js';
 import extraRoutes from './routes/extra.js';
 import taskRoutes from './routes/tasks.js';
 
@@ -65,9 +64,6 @@ app.use('/api/teaching', (req, res, next) => {
   if (req.method === 'GET' || req.method === 'OPTIONS') return next();
   return requireTeacher(req, res, next);
 }, teachingRoutes);
-
-// 评价管理路由
-app.use('/api/eval', evalRoutes);
 
 // 课程任务路由（教师布置/学生提交/教师导师评分）
 app.use('/api/tasks', taskRoutes);

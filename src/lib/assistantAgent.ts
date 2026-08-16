@@ -176,13 +176,6 @@ function buildStudentActions(studentCourses: Course[]): AssistantPageAction[] {
         [...courseKeywords, 'AI分层', '分层测试', '分层测评', '分层'],
       ),
       createAction(
-        `student.course.${course.id}.knowledge_graph`,
-        `打开《${course.title}》知识图谱`,
-        `进入《${course.title}》的知识图谱页`,
-        { path: coursePath, query: { tab: 'knowledge_graph' } },
-        [...courseKeywords, '知识图谱', '知识点图', '知识图'],
-      ),
-      createAction(
         `student.course.${course.id}.resources`,
         `打开《${course.title}》课程资源`,
         `进入《${course.title}》的资源页`,
@@ -234,10 +227,10 @@ function buildTeacherActions(teacherCourses: Course[]): AssistantPageAction[] {
     ),
     createAction(
       'teacher.evaluation',
-      '打开评价管理',
-      '进入教师端评价管理页',
-      { path: '/teacher/evaluation' },
-      ['评价管理', '评价', '评教', '评语', '评论'],
+      '打开任务管理',
+      '进入教师端我的课程，在课程详情页的任务管理中查看/评价',
+      { path: '/teacher/courses' },
+      ['评价管理', '评价', '评教', '评语', '评论', '任务管理'],
     ),
     createAction(
       'teacher.extra',
