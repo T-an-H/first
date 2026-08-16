@@ -170,7 +170,6 @@ type StudentCourseAction =
   | 'grade'
   | 'homework'
   | 'ai_tier'
-  | 'knowledge_graph'
   | 'resources'
   | 'evaluations'
 type TeacherCourseAction = 'course' | 'comments' | 'grade-config' | 'grade-entry' | 'homework' | 'students'
@@ -720,7 +719,6 @@ function buildStudentCourseSelectionIntent(
     grade: '你想看哪门课的成绩？',
     homework: '你想打开哪门课的作业区？',
     ai_tier: '你想做哪门课的 AI 分层测试？',
-    knowledge_graph: '你想看哪门课的知识图谱？',
     resources: '你想看哪门课的课程资源？',
     evaluations: '你想打开哪门课的评价区？',
   }
@@ -829,7 +827,6 @@ function buildStudentCourseActionIntent(action: StudentCourseAction, course: Cou
   const tabMap: Partial<Record<StudentCourseAction, string>> = {
     homework: 'homework',
     ai_tier: 'ai_tier',
-    knowledge_graph: 'knowledge_graph',
     resources: 'resources',
     evaluations: 'evaluations',
   }
@@ -839,7 +836,6 @@ function buildStudentCourseActionIntent(action: StudentCourseAction, course: Cou
     grade: `我带你去看《${course.title}》的成绩详情。`,
     homework: `我带你去《${course.title}》的作业区。`,
     ai_tier: `我带你去《${course.title}》的 AI 分层测试。`,
-    knowledge_graph: `我带你去《${course.title}》的知识图谱。`,
     resources: `我带你去《${course.title}》的课程资源。`,
     evaluations: `我带你去《${course.title}》的评价区。`,
   }
@@ -1037,7 +1033,6 @@ function resolveStudentIntent(rawText: string): AssistantIntent | null {
   const isExtraIntent = /(额外功能|待办|云盘|文件|文档|笔记)/.test(rawText)
   const isHomeworkIntent = /(作业|提交作业)/.test(rawText)
   const isAITierIntent = /(ai分层|分层测试|分层测评|分层)/i.test(rawText)
-  const isKnowledgeIntent = /(知识图谱|知识点图|知识图)/.test(rawText)
   const isResourcesIntent = /(资源|资料|课件)/.test(rawText)
   const isEvaluationIntent = /(评价|互评|自评|老师评价|导师评价)/.test(rawText)
   const isCourseListIntent = /(我的课程|课程列表|选课|有哪些课|课程中心)/.test(rawText)
@@ -1056,14 +1051,6 @@ function resolveStudentIntent(rawText: string): AssistantIntent | null {
     if (courseResolution.ambiguous) return buildStudentCourseSelectionIntent('ai_tier', courseResolution.candidates)
     if (specificCourse) return buildStudentCourseActionIntent('ai_tier', specificCourse)
     return buildStudentCourseSelectionIntent('ai_tier')
-  }
-
-  if (isKnowledgeIntent) {
-    if (courseResolution.ambiguous) {
-      return buildStudentCourseSelectionIntent('knowledge_graph', courseResolution.candidates)
-    }
-    if (specificCourse) return buildStudentCourseActionIntent('knowledge_graph', specificCourse)
-    return buildStudentCourseSelectionIntent('knowledge_graph')
   }
 
   if (isResourcesIntent) {
@@ -1198,8 +1185,8 @@ function resolveTeacherIntent(rawText: string): AssistantIntent | null {
     }
     return {
       type: 'navigate',
-      message: '我带你去评价管理页。',
-      to: '/teacher/evaluation',
+      message: '评价管理已并入课程详情页的“任务管理”，我带你去我的课程选择对应课程。',
+      to: '/teacher/courses',
     }
   }
 

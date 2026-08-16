@@ -324,7 +324,7 @@ export const EvalTemplateDescs: Record<EvalTemplate, string> = {
   all: '5种评价全部启用：自评+组内互评+组间互评+教师评价+企业导师评价',
   standard: '自评+教师评价+组间互评',
   simple: '仅教师评价+自评',
-  project: '增加企业导师+组间互评',
+  project: '自评+组内互评+教师评价+企业导师评价（不含组间互评）',
 };
 
 /** 模板→评价类型映射 */
@@ -332,7 +332,7 @@ export const TEMPLATE_EVAL_TYPES: Record<EvalTemplate, EvalType[]> = {
   all: ['self', 'intra_group', 'inter_group', 'teacher', 'mentor'],
   standard: ['self', 'teacher', 'inter_group'],
   simple: ['self', 'teacher'],
-  project: ['self', 'intra_group', 'teacher', 'mentor', 'inter_group'],
+  project: ['self', 'intra_group', 'teacher', 'mentor'],
 };
 
 /** 评价频率 */
@@ -389,16 +389,7 @@ export interface Evaluation {
   createdAt: string;
 }
 
-/** 评价待办提醒 */
-export interface EvalReminder {
-  id: string;
-  courseId: string;
-  courseTitle: string;
-  studentId: string;
-  sessionNumber: number;
-  deadline: string;
-  status: 'pending' | 'completed' | 'overdue';
-}
+/** 评价待办提醒（任务评价模型：无独立提醒记录，由任务提交/评价状态驱动） */
 
 /** 学生分组 */
 export interface StudentGroup {
@@ -406,20 +397,6 @@ export interface StudentGroup {
   courseId: string;
   name: string;
   memberIds: string[];
-}
-
-/** 异常预警记录 */
-export interface EvalAnomaly {
-  id: string;
-  courseId: string;
-  studentId: string;
-  studentName: string;
-  sessionNumber: number;
-  type: EvalType;
-  selfScore: number;
-  avgScore: number;
-  diff: number;
-  warning: string;
 }
 
 /** 素质评价提交（学生上传图片/文档，教师打分直接加进总成绩） */

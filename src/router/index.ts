@@ -65,11 +65,6 @@ const router = createRouter({
           name: 'TeacherExtra',
           component: () => import('@/pages/teacher/Extra.vue'),
         },
-        {
-          path: 'evaluation',
-          name: 'TeacherEvaluation',
-          component: () => import('@/pages/teacher/Evaluation.vue'),
-        },
       ],
     },
     {

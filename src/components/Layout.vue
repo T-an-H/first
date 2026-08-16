@@ -34,7 +34,8 @@ function checkDepartment() {
 }
 
 onMounted(() => {
-  store.checkAndGenerateSessionReminders()
+  // 任务评价模型：拉取任务评价快照并刷新自动待办（旧版"按次数评价"提醒已废弃）
+  store.refreshTaskEvalInfo()
   store.generateAutoTodos()
 })
 
