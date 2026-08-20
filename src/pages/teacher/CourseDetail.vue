@@ -1739,6 +1739,11 @@
       </Teleport>
     </div>
 
+    <!-- ===== 课程管理 Tab（知识图谱） ===== -->
+    <div v-if="activeTab === 'course-mgmt'" class="space-y-6">
+      <KnowledgeGraph :course-id="courseId" :students="kgStudents" :can-manage="canManageProjects" />
+    </div>
+
     <!-- ===== 素质评价 Tab ===== -->
     <!-- Tab: 作业管理 -->
     <div v-if="activeTab === 'homework'" class="space-y-6">
@@ -1903,7 +1908,8 @@ import {
   EvalTypeLabels, getDefaultGradeConfig
 } from '@/types'
 import type { EvalType, EvalTemplate, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
-import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, ClipboardList, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, ClipboardList, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut, Network } from 'lucide-vue-next'
+import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
 import { getNow } from '@/lib/date'
 import { javaListEnrollmentStudents, javaBulkEnrollments, javaBulkSchedules, javaBulkScores, javaBulkGroups, javaUpdateStudent, javaListDepartmentClasses, javaAddDepartmentClass, javaDeleteDepartmentClass } from '@/api'
 import * as echarts from 'echarts'
@@ -2419,6 +2425,7 @@ const completedCount = computed(() =>
 // ---- Tab 配置 ----
 const tabList = [
   { key: 'students',     label: '学生管理', icon: Users },
+  { key: 'course-mgmt',  label: '课程管理', icon: Network },
   { key: 'comments',     label: '任务管理', icon: ClipboardCheck },
   { key: 'homework',     label: '作业管理', icon: BookOpen },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
@@ -3757,6 +3764,19 @@ const enrolledStudents = computed(() => {
     }))
     .filter((e) => e.student)
 })
+
+/** 知识图谱所需的学生信息（id/name/studentId/className） */
+const kgStudents = computed(() =>
+  enrolledStudents.value
+    .map((e) => e.student)
+    .filter(Boolean)
+    .map((s) => ({
+      id: s!.id,
+      name: s!.name,
+      studentId: s!.studentId,
+      className: s!.className,
+    }))
+)
 
 /** 当前课程的班级列表 */
 const courseGroups = computed(() => {

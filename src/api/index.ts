@@ -663,3 +663,103 @@ export async function javaDeleteStudentTier(id: string) {
 export async function javaUpdateFile(id: string, data: any) {
   return javaRequest(`/teaching/files/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
 }
+
+// ============================================================
+// 课程管理（知识图谱）项目：course_project / 文件 / 进度 / 评教问卷
+// 由授课计划表生成，每 2 学时一个项目；项目含 5 个学习内容
+// ============================================================
+
+/** GET /projects?courseId= 项目列表 */
+export async function javaListProjects(courseId: string) {
+  return javaRequest(`/projects?courseId=${encodeURIComponent(courseId)}`)
+}
+
+/** GET /projects/{id} 项目详情 */
+export async function javaGetProject(id: string) {
+  return javaRequest(`/projects/${encodeURIComponent(id)}`)
+}
+
+/** POST /projects 新增项目 */
+export async function javaAddProject(project: any) {
+  return javaRequest('/projects', { method: 'POST', body: JSON.stringify(project) })
+}
+
+/** POST /projects/bulk 批量新增项目（Excel 解析结果，body 为裸数组） */
+export async function javaAddProjectsBulk(projects: any[]) {
+  return javaRequest('/projects/bulk', { method: 'POST', body: JSON.stringify(projects) })
+}
+
+/** PUT /projects/{id} 更新项目 */
+export async function javaUpdateProject(id: string, data: any) {
+  return javaRequest(`/projects/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+/** DELETE /projects/{id} 删除项目（级联删除文件与进度） */
+export async function javaDeleteProject(id: string) {
+  return javaRequest(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** GET /projects/{projectId}/files?fileType= 项目文件列表 */
+export async function javaListProjectFiles(projectId: string, fileType?: string) {
+  const q = fileType ? `?fileType=${encodeURIComponent(fileType)}` : ''
+  return javaRequest(`/projects/${encodeURIComponent(projectId)}/files${q}`)
+}
+
+/** POST /projects/files 新增项目文件 */
+export async function javaAddProjectFile(file: any) {
+  return javaRequest('/projects/files', { method: 'POST', body: JSON.stringify(file) })
+}
+
+/** DELETE /projects/files/{id} 删除项目文件 */
+export async function javaDeleteProjectFile(id: string) {
+  return javaRequest(`/projects/files/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** GET /projects/{projectId}/progress 项目全部学生进度 */
+export async function javaListProjectProgress(projectId: string) {
+  return javaRequest(`/projects/${encodeURIComponent(projectId)}/progress`)
+}
+
+/** POST /projects/{projectId}/progress 学生提交/更新进度（幂等） */
+export async function javaUpsertProjectProgress(projectId: string, data: any) {
+  return javaRequest(`/projects/${encodeURIComponent(projectId)}/progress`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+/** PUT /projects/progress/{id} 教师批改（工单/测试评分） */
+export async function javaGradeProjectProgress(id: string, data: { score: number; comment?: string }) {
+  return javaRequest(`/projects/progress/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+/** GET /questionnaire?courseId= 课程评教问卷（无则 null） */
+export async function javaGetQuestionnaire(courseId: string) {
+  return javaRequest(`/questionnaire?courseId=${encodeURIComponent(courseId)}`)
+}
+
+/** POST /questionnaire 创建/更新评教问卷 */
+export async function javaSaveQuestionnaire(data: any) {
+  return javaRequest('/questionnaire', { method: 'POST', body: JSON.stringify(data) })
+}
+
+/** DELETE /questionnaire/{id} 删除评教问卷 */
+export async function javaDeleteQuestionnaire(id: string) {
+  return javaRequest(`/questionnaire/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** GET /questionnaire/{id}/responses 问卷全部填写记录 */
+export async function javaListEvalResponses(questionnaireId: string) {
+  return javaRequest(`/questionnaire/${encodeURIComponent(questionnaireId)}/responses`)
+}
+
+/** POST /questionnaire/{id}/responses 学生提交/更新评教 */
+export async function javaSubmitEvalResponse(questionnaireId: string, data: any) {
+  return javaRequest(`/questionnaire/${encodeURIComponent(questionnaireId)}/responses`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
