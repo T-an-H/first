@@ -412,6 +412,10 @@
               :tier="tierFinalized ? myTier : undefined"
             />
           </div>
+          <!-- ===== 项目图谱（知识图谱：预习/工单/资料/测试/评教） ===== -->
+          <div v-if="activeTab === 'course-mgmt'" class="space-y-4">
+            <KnowledgeGraph :course-id="courseId" :students="[]" :can-manage="false" :student-mode="true" :my-student-id="myStudent?.id || ''" />
+          </div>
           <!-- ===== 评价填写 ===== -->
           <div v-if="activeTab === 'evaluations'" class="space-y-6">
             <!-- ===== 任务评价引导板块（评价统一在"任务"中完成） ===== -->
@@ -812,9 +816,10 @@ import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
   CheckCircle, Circle, Layers, Award, Sparkles, UserCheck, Users, MessageSquare, Eye, HelpCircle, Lock, XCircle,
-  Download, Upload, TrendingUp, X, BarChart3, PieChart
+  Download, Upload, TrendingUp, X, BarChart3, PieChart, Network
 } from 'lucide-vue-next'
 import StudentHomework from '@/components/Homework/StudentHomework.vue'
+import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
 import { listTasks, listTaskSubmissions, submitTask, listTaskEvals, submitTaskEval } from '@/api'
 import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile } from '@/types'
 import { TEMPLATE_EVAL_TYPES, EvalTypeLabels } from '@/types'
@@ -828,7 +833,7 @@ const courseId = route.params.id as string
 const myStudent = computed(() => store.students.find((s) => s.name === store.currentUser || s.name === store.currentDisplayName))
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
-const VALID_TABS = ['ai_tier', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const VALID_TABS = ['ai_tier', 'tasks', 'resources', 'homework', 'course-mgmt', 'evaluations', 'eval_overview']
 const activeTab = ref<string>(
   VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
 )
@@ -855,6 +860,7 @@ const tabs = [
   { id: 'tasks', label: '任务', icon: Edit3 },
   { id: 'resources', label: '资源', icon: FileText },
   { id: 'homework', label: '作业', icon: BookOpen },
+  { id: 'course-mgmt', label: '项目图谱', icon: Network },
   { id: 'evaluations', label: '评价填写', icon: ClipboardCheck },
   { id: 'eval_overview', label: '综合评价', icon: Award },
 ]
