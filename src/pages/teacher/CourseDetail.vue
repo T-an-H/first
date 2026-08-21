@@ -383,6 +383,11 @@
       </Teleport>
     </div>
 
+    <!-- Tab: 课程管理（知识图谱） -->
+    <div v-if="activeTab === 'course-mgmt'" class="space-y-6">
+      <KnowledgeGraph :course-id="courseId" :students="kgStudents" :can-manage="canManageProjects" />
+    </div>
+
     <!-- Tab: 成绩配置（完整权重配置） -->
     <div v-if="activeTab === 'grade-config'" class="space-y-6">
       <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -1889,13 +1894,14 @@ import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
 import TeacherHomework from '@/components/Homework/TeacherHomework.vue'
+import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
   EvalTypeLabels, EvalTypeColors, EvalFrequencyLabels,
   EvalFrequencyDescs, getDefaultGradeConfig
 } from '@/types'
 import type { EvalTemplate, EvalType, Evaluation, EvalFrequency, Schedule, GradeWeightConfig, EvaluationConfig } from '@/types'
-import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut } from 'lucide-vue-next'
+import { AlertTriangle, ChevronRight, Plus, Search, X, Pencil, Trash2, Calendar, Clock, ClipboardCheck, TrendingUp, Users, Upload, RefreshCw, Settings, ArrowLeft, Eye, Lock, EyeOff, CheckCircle, Save, FileSpreadsheet, BookOpen, BarChart3, UserCheck, FileText, UserPlus, UserMinus, LogOut, Network } from 'lucide-vue-next'
 import { getNow } from '@/lib/date'
 import {
   bulkImportEnrollments,
@@ -1946,6 +1952,7 @@ const isViewOnly = computed(() => {
 const canManageEval = computed(() => !isViewOnly.value || isMentor.value)
 /** 能否添加/管理课程项目：企业导师可以添加项目；领导/其他教师仅查看 */
 const canManageProjects = computed(() => !isViewOnly.value || isMentor.value)
+const kgStudents = computed(() => enrolledStudents.value.map((item: any) => item.student).filter(Boolean))
 
 // 从数据库加载课程学员
 onMounted(async () => {
@@ -2052,6 +2059,7 @@ const completedCount = computed(() =>
 // ---- Tab 配置 ----
 const tabList = [
   { key: 'students',     label: '学生管理', icon: Users },
+  { key: 'course-mgmt',  label: '课程管理', icon: Network },
   { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
   { key: 'homework',     label: '作业管理', icon: BookOpen },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
