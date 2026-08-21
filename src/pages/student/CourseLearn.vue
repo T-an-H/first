@@ -181,6 +181,11 @@
             </template>
           </Modal>
 
+          <!-- ===== 课程图谱（项目/预习/工单/资料/测试/评教） ===== -->
+          <div v-if="activeTab === 'course-mgmt'" class="space-y-4">
+            <KnowledgeGraph :course-id="courseId" :students="[]" :can-manage="false" :student-mode="true" :my-student-id="myStudent?.id || ''" />
+          </div>
+
           <!-- ===== 知识图谱 (泡泡图) ===== -->
           <div v-if="activeTab === 'knowledge_graph'" class="space-y-5">
             <div class="flex items-center justify-between">
@@ -803,10 +808,11 @@ import { useAppStore } from '@/stores/app'
 import {
   ArrowLeft, BookOpen, FileText, ClipboardCheck, Edit3,
   CheckCircle, Circle, Layers, Award, Sparkles, UserCheck, Users, MessageSquare, ArrowRight, Eye, HelpCircle, Lock, XCircle,
-  Download, Upload, TrendingUp, X, Calendar, BarChart3, PieChart
+  Download, Upload, TrendingUp, X, Calendar, BarChart3, PieChart, Network
 } from 'lucide-vue-next'
 import StudentEvaluation from '@/components/StudentEvaluation.vue'
 import StudentHomework from '@/components/Homework/StudentHomework.vue'
+import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
 import type { AITierQuestion, LearningTier, CloudFile, QualityEvalFile, Schedule } from '@/types'
 import Modal from '@/components/Modal.vue'
 import { fetchSchedules } from '@/api'
@@ -842,7 +848,7 @@ const currentClassName = computed(() =>
 )
 
 // 支持 ?tab=xxx 直达对应模块（用于红点溯源跳转）
-const VALID_TABS = ['ai_tier', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
+const VALID_TABS = ['ai_tier', 'course-mgmt', 'tasks', 'resources', 'homework', 'evaluations', 'eval_overview']
 const activeTab = ref<string>(
   VALID_TABS.includes(route.query.tab as string) ? (route.query.tab as string) : 'tasks'
 )
@@ -908,6 +914,7 @@ watch(() => route.query.tab, (val) => {
 
 const tabs = [
   { id: 'ai_tier', label: 'AI分层', icon: Layers },
+  { id: 'course-mgmt', label: '课程图谱', icon: Network },
   { id: 'tasks', label: '任务', icon: Edit3 },
   { id: 'resources', label: '资源', icon: FileText },
   { id: 'homework', label: '作业', icon: BookOpen },
