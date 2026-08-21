@@ -229,7 +229,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { X, FileText, Upload, CheckCircle, BookOpen, Wrench, ClipboardCheck, FileQuestion, Star, GitBranch } from 'lucide-vue-next'
-import { javaListProjectFiles, javaUpsertProjectProgress, javaListProjectProgress, javaGetQuestionnaire, javaListEvalResponses, javaSubmitEvalResponse } from '@/api'
+import { javaListProjectFiles, javaUpsertProjectProgress, javaListProjectProgress, javaGetQuestionnaire, javaListEvalResponses, javaSubmitEvalResponse } from '@/api/knowledgeGraph'
 
 const props = defineProps<{
   project: any

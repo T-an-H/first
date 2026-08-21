@@ -196,7 +196,7 @@ import * as XLSX from 'xlsx'
 import { Network, Upload, Plus, X, Pencil, Trash2, Info, ListChecks, FileSpreadsheet } from 'lucide-vue-next'
 import ProjectDetailModal from './ProjectDetailModal.vue'
 import StudentProjectModal from './StudentProjectModal.vue'
-import { javaListProjects, javaAddProjectsBulk, javaAddProject, javaUpdateProject, javaDeleteProject, javaListProjectFiles, javaListProjectProgress } from '@/api'
+import { javaListProjects, javaAddProjectsBulk, javaAddProject, javaUpdateProject, javaDeleteProject, javaListProjectFiles, javaListProjectProgress } from '@/api/knowledgeGraph'
 
 const props = defineProps<{
   courseId: string
