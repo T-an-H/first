@@ -371,8 +371,18 @@
             <div>
               <label class="mb-1 block text-sm font-medium text-gray-700">颜色</label>
               <div class="flex items-center gap-3">
-                <input v-model="deptForm.color" type="color" class="h-10 w-10 cursor-pointer rounded border" />
-                <span class="text-sm text-gray-500">{{ deptForm.color }}</span>
+                <span
+                  class="h-10 w-10 flex-shrink-0 rounded border border-gray-200"
+                  :style="{ backgroundColor: deptForm.color }"
+                />
+                <select
+                  v-model="deptForm.color"
+                  class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                >
+                  <option v-for="color in DEPARTMENT_COLOR_OPTIONS" :key="color.value" :value="color.value">
+                    {{ color.name }}
+                  </option>
+                </select>
               </div>
             </div>
             <div class="flex gap-3 pt-2">
@@ -389,7 +399,7 @@
         <div class="absolute inset-0 bg-black/50" @click="showDeptImportModal = false" />
         <div class="relative mx-4 w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
           <h3 class="mb-2 text-lg font-semibold text-gray-900">从 Excel 导入学院</h3>
-          <p class="mb-4 text-sm text-gray-500">Excel 文件需要包含“学院名称”列，可选“颜色”列。</p>
+          <p class="mb-4 text-sm text-gray-500">Excel 文件需要包含“学院名称”列，可选“颜色”列；颜色请填写中文名称。</p>
 
           <div class="mb-4 rounded-lg border border-blue-100 bg-blue-50 p-3">
             <p class="mb-2 text-xs text-blue-600">没有模板？先下载一个标准模板：</p>
@@ -491,6 +501,7 @@ import {
 } from '@/api'
 import { useAppStore } from '@/stores/app'
 import type { Category, Course, Department, Schedule, Teacher } from '@/types'
+import { DEPARTMENT_COLOR_OPTIONS, resolveDepartmentColor } from '@/lib/departmentColors'
 
 type CourseFormState = {
   title: string
@@ -557,7 +568,7 @@ const fileInput = ref<HTMLInputElement>()
 const importMsg = ref<{ success: boolean; text: string } | null>(null)
 const hasLoadedMasterData = ref(false)
 
-const presetColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#ef4444', '#14b8a6', '#6366f1', '#84cc16']
+const presetColors = DEPARTMENT_COLOR_OPTIONS.map((color) => color.value)
 const routeDepartmentId = computed(() => (typeof route.query.departmentId === 'string' ? route.query.departmentId : ''))
 const routeCategoryId = computed(() => (typeof route.query.categoryId === 'string' ? route.query.categoryId : ''))
 const routeCourseId = computed(() => (typeof route.query.courseId === 'string' ? route.query.courseId : ''))
@@ -1394,9 +1405,10 @@ async function confirmDeptImport() {
       }
 
       try {
+        const fallbackColor = presetColors[(departments.value.length + added) % presetColors.length]
         await createDepartment({
           name,
-          color: color ? (color.startsWith('#') ? color : `#${color}`) : presetColors[(departments.value.length + added) % presetColors.length],
+          color: resolveDepartmentColor(color, fallbackColor),
         })
         added += 1
       } catch {
@@ -1419,9 +1431,9 @@ async function confirmDeptImport() {
 
 function downloadDeptTemplate() {
   const data = [
-    { 学院名称: '计算机学院', 颜色: '#3b82f6' },
-    { 学院名称: '信息工程学院', 颜色: '#10b981' },
-    { 学院名称: '外国语学院', 颜色: '#f59e0b' },
+    { 学院名称: '计算机学院', 颜色: '蓝色' },
+    { 学院名称: '信息工程学院', 颜色: '绿色' },
+    { 学院名称: '外国语学院', 颜色: '橙色' },
   ]
   const worksheet = XLSX.utils.json_to_sheet(data)
   worksheet['!cols'] = [{ wch: 20 }, { wch: 15 }]

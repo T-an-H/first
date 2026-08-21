@@ -67,8 +67,21 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">颜色</label>
               <div class="flex items-center gap-3">
-                <input v-model="form.color" type="color" class="w-10 h-10 rounded cursor-pointer border" />
-                <span class="text-sm text-gray-500">{{ form.color }}</span>
+                <span
+                  class="h-10 w-10 flex-shrink-0 rounded border border-gray-200"
+                  :style="{ backgroundColor: form.color }"
+                />
+                <select
+                  v-model="form.color"
+                  class="min-w-0 flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                >
+                  <option v-if="!isDepartmentColorOption(form.color)" :value="form.color">
+                    {{ getDepartmentColorName(form.color) }}
+                  </option>
+                  <option v-for="color in DEPARTMENT_COLOR_OPTIONS" :key="color.value" :value="color.value">
+                    {{ color.name }}
+                  </option>
+                </select>
               </div>
             </div>
             <div v-if="editingDept" class="border-t pt-4">
@@ -116,6 +129,11 @@ import { createDepartment, deleteDepartment as apiDeleteDepartment, fetchDepartm
 import { useAppStore } from '@/stores/app'
 import { GraduationCap, Plus, ArrowRight, LogOut, Trash2 } from 'lucide-vue-next'
 import type { Department } from '@/types'
+import {
+  DEPARTMENT_COLOR_OPTIONS,
+  getDepartmentColorName,
+  isDepartmentColorOption,
+} from '@/lib/departmentColors'
 
 const store = useAppStore()
 const router = useRouter()

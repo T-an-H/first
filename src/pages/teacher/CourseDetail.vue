@@ -3341,20 +3341,28 @@ async function handleExcelImport(event: Event) {
     const ws = wb.Sheets[wb.SheetNames[0]]
     const data: Record<string, string>[] = XLSX.utils.sheet_to_json(ws)
     const keys = Object.keys(data[0] || {})
-    if (keys.length < 2) {
-      alert('Excel 格式不正确，请确保第一列为学生姓名/学号，第二列为成绩')
+    const normalizedExamName = selectedExam.value.trim()
+    const nameKey = keys.find((key) => ['学生姓名', '姓名'].includes(key.trim())) || keys[0]
+    const studentIdKey = keys.find((key) => ['学生学号', '学号', '学生ID', 'studentId'].includes(key.trim()))
+    const scoreKey = keys.find((key) => key.trim() === normalizedExamName)
+      || keys.find((key) => ['成绩', '分数', '得分'].includes(key.trim()))
+      || (keys.length === 2 ? keys[1] : keys[keys.length - 1])
+    if (keys.length < 2 || !nameKey || !scoreKey || scoreKey === nameKey) {
+      alert('Excel 格式不正确，请包含学生姓名/学号和成绩列')
       return
     }
-    const nameKey = keys[0]
-    const scoreKey = keys[1]
     let imported = 0
     const scores: any[] = []
     for (const row of data) {
       const name = String(row[nameKey] || '').trim().toLowerCase()
+      const studentId = studentIdKey ? String(row[studentIdKey] || '').trim().toLowerCase() : ''
       const rawScore = parseFloat(String(row[scoreKey] || '').trim())
-      if (isNaN(rawScore) || !name) continue
+      if (isNaN(rawScore) || (!name && !studentId)) continue
       const student = store.students.find(
-        (s) => s.name.toLowerCase() === name || s.id.toLowerCase() === name
+        (s) => s.name.toLowerCase() === name
+          || s.id.toLowerCase() === name
+          || s.id.toLowerCase() === studentId
+          || String(s.studentId || '').toLowerCase() === studentId
       )
       if (!student) continue
       const existing = existingScores.find((s) => s.studentId === student.id)
