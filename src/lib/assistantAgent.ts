@@ -283,9 +283,9 @@ function buildTeacherActions(teacherCourses: Course[]): AssistantPageAction[] {
       ),
       createAction(
         `teacher.course.${course.id}.homework`,
-        `打开《${course.title}》作业管理`,
-        `进入《${course.title}》的作业管理标签页`,
-        { path: coursePath, query: { tab: 'homework' } },
+        `打开《${course.title}》课程管理测试题目`,
+        `进入《${course.title}》课程管理，在测试题目中布置作业`,
+        { path: coursePath, query: { tab: 'course-mgmt' } },
         [...courseKeywords, '作业管理', '布置作业', '作业'],
       ),
       createAction(

@@ -91,6 +91,21 @@ router.delete('/chapter/:id', async (req, res) => {
   }
 });
 
+async function findOrCreateChapterByTitle(courseId, title) {
+  const [rows] = await pool.execute(
+    'SELECT id FROM chapters WHERE course_id = ? AND title = ? ORDER BY created_at LIMIT 1',
+    [courseId, title]
+  );
+  if (rows.length > 0) return rows[0].id;
+
+  const id = `ch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  await pool.execute(
+    'INSERT INTO chapters (id, course_id, title, order_index) VALUES (?, ?, ?, ?)',
+    [id, courseId, title, 0]
+  );
+  return id;
+}
+
 // ==================== 教师端：作业管理 ====================
 
 /** POST /api/homeworks/generate — AI 出题（支持分层3套 / 统一1套） */
@@ -114,6 +129,10 @@ router.post('/generate', async (req, res) => {
         ];
 
     const result = { groupId, homeworks: [] };
+    let effectiveChapterId = chapterId || null;
+    if (!effectiveChapterId && chapterTitle && chapterTitle !== '全部章节') {
+      effectiveChapterId = await findOrCreateChapterByTitle(courseId, chapterTitle.trim());
+    }
 
     // 根据模式出题：分层三套 or 统一一套
     for (const { tier, label, promptTier } of tierConfigs) {
@@ -133,7 +152,7 @@ router.post('/generate', async (req, res) => {
 
       await pool.execute(
         'INSERT INTO homeworks (id, course_id, chapter_id, title, description, status, created_by, tier, group_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [homeworkId, courseId, chapterId || null, homeworkTitle, requirement, 'draft', teacherName || 'teacher', tier, groupId]
+        [homeworkId, courseId, effectiveChapterId, homeworkTitle, requirement, 'draft', teacherName || 'teacher', tier, groupId]
       );
 
       for (let i = 0; i < questions.length; i++) {

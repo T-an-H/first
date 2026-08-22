@@ -5,8 +5,10 @@
 
 const API_PROTOCOL = window.location.protocol === 'https:' ? 'https:' : 'http:'
 const API_HOST = window.location.hostname || '127.0.0.1'
-const JAVA_API_PORT = (import.meta.env.VITE_JAVA_API_PORT as string | undefined) ?? '8080'
-const JAVA_API_BASE = (import.meta.env.VITE_JAVA_API_BASE as string | undefined) ?? `${API_PROTOCOL}//${API_HOST}:${JAVA_API_PORT}/api`
+// The course platform's active backend is Express on port 3002. Keep the
+// Java override for deployments that still expose the standalone service.
+const API_PORT = (import.meta.env.VITE_API_PORT as string | undefined) ?? '3002'
+const JAVA_API_BASE = (import.meta.env.VITE_JAVA_API_BASE as string | undefined) ?? `${API_PROTOCOL}//${API_HOST}:${API_PORT}/api`
 
 type RequestOptions = RequestInit & {
   timeoutMs?: number

@@ -130,6 +130,9 @@
 
         <!-- ===== 4. 测试题目 ===== -->
         <div v-if="activeSection === 'test'" class="space-y-4">
+          <div class="border-b border-gray-100 pb-4 mb-2">
+            <StudentHomework :course-id="courseId" :student-id="myStudentId" :chapter-title="project.name" />
+          </div>
           <div>
             <h5 class="text-sm font-semibold text-gray-700 mb-2">教师上传的测试题目</h5>
             <div v-if="files.test.length === 0" class="text-center py-6 text-gray-400 text-sm border border-dashed border-gray-200 rounded-lg">暂无测试题目</div>
@@ -229,6 +232,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { X, FileText, Upload, CheckCircle, BookOpen, Wrench, ClipboardCheck, FileQuestion, Star, GitBranch } from 'lucide-vue-next'
+import StudentHomework from '@/components/Homework/StudentHomework.vue'
 import { javaListProjectFiles, javaUpsertProjectProgress, javaListProjectProgress, javaGetQuestionnaire, javaListEvalResponses, javaSubmitEvalResponse } from '@/api/knowledgeGraph'
 
 const props = defineProps<{

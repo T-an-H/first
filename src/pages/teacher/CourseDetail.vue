@@ -1737,10 +1737,6 @@
     </div>
 
     <!-- ===== 素质评价 Tab ===== -->
-    <!-- Tab: 作业管理 -->
-    <div v-if="activeTab === 'homework'" class="space-y-6">
-      <TeacherHomework :course-id="courseId" />
-    </div>
 
     <div v-if="activeTab === 'quality-eval'" class="space-y-6">
       <div class="bg-gradient-to-br from-emerald-50 to-cyan-50 rounded-xl p-5 border border-emerald-100">
@@ -1893,7 +1889,6 @@ import { useAppStore } from '@/stores/app'
 import GradeConfig from '@/components/GradeConfig.vue'
 import Slider from '@/components/GradeConfig/Slider.vue'
 import Section from '@/components/GradeConfig/Section.vue'
-import TeacherHomework from '@/components/Homework/TeacherHomework.vue'
 import KnowledgeGraph from '@/components/knowledge/KnowledgeGraph.vue'
 import {
   EvalTemplateLabels, EvalTemplateDescs, TEMPLATE_EVAL_TYPES,
@@ -2061,7 +2056,6 @@ const tabList = [
   { key: 'students',     label: '学生管理', icon: Users },
   { key: 'course-mgmt',  label: '课程管理', icon: Network },
   { key: 'comments',     label: '评价管理', icon: ClipboardCheck },
-  { key: 'homework',     label: '作业管理', icon: BookOpen },
   { key: 'quality-eval', label: '素质评价', icon: UserCheck },
   { key: 'grade-config', label: '成绩配置', icon: Settings },
   { key: 'grade-entry',  label: '成绩管理', icon: TrendingUp },

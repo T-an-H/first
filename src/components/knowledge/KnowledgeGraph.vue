@@ -325,7 +325,7 @@ async function confirmImport() {
   if (!parsedRows.value.length) return
   importing.value = true
   try {
-    await javaAddProjectsBulk(parsedRows.value)
+    await javaAddProjectsBulk(parsedRows.value.map((project) => ({ ...project, courseId: props.courseId })))
     showUploadModal.value = false
     await loadProjects()
     importMsg.value = { success: true, text: `成功生成 ${parsedCount.value} 个知识图谱项目` }

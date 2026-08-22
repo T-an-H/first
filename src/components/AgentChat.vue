@@ -755,7 +755,7 @@ function buildTeacherCourseSelectionIntent(
     comments: '你想打开哪门课的评价管理？',
     'grade-config': '你想打开哪门课的成绩配置？',
     'grade-entry': '你想打开哪门课的成绩管理？',
-    homework: '你想打开哪门课的作业管理？',
+    homework: '你想打开哪门课程的课程管理，在测试题目中布置作业？',
     students: '你想打开哪门课的学生管理？',
   }
 
@@ -859,7 +859,7 @@ function buildTeacherCourseActionIntent(action: TeacherCourseAction, course: Cou
     comments: 'comments',
     'grade-config': 'grade-config',
     'grade-entry': 'grade-entry',
-    homework: 'homework',
+    homework: 'course-mgmt',
     students: 'students',
   }
 
@@ -868,7 +868,7 @@ function buildTeacherCourseActionIntent(action: TeacherCourseAction, course: Cou
     comments: `我带你去《${course.title}》的评价管理。`,
     'grade-config': `我带你去《${course.title}》的成绩配置。`,
     'grade-entry': `我带你去《${course.title}》的成绩管理。`,
-    homework: `我带你去《${course.title}》的作业管理。`,
+    homework: `我带你去《${course.title}》的课程管理测试题目。`,
     students: `我带你去《${course.title}》的学生管理。`,
   }
 

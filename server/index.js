@@ -23,6 +23,8 @@ import assistantRoutes from './routes/assistant.js';
 import { warmAssistantModel } from './assistant-agent.js';
 import qualityEvaluationRoutes from './routes/qualityEvaluations.js';
 import ensureAdminSchema from './bootstrap/ensureAdminSchema.js';
+import ensureProjectSchema from './bootstrap/ensureProjectSchema.js';
+import projectRoutes from './routes/projects.js';
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -96,10 +98,12 @@ app.use('/api/quality-evaluations', qualityEvaluationRoutes);
 // AI 分层测试路由
 app.use('/api/tier-test', tierTestRoutes);
 app.use('/api/assistant', assistantRoutes);
+app.use('/api', projectRoutes);
 
 // ====== 启动服务器 ======
 async function start() {
   await ensureAdminSchema();
+  await ensureProjectSchema();
 
   app.listen(PORT, () => {
     void warmAssistantModel();

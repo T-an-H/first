@@ -13,35 +13,17 @@
         <BookOpen class="w-5 h-5 text-gray-400" />
         <h2 class="text-lg font-semibold text-gray-900">作业管理</h2>
       </div>
-      <button @click="openCreateDialog"
+      <button v-if="canManage !== false" @click="openCreateDialog"
         class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
         <Plus class="w-4 h-4" />
         布置新作业
       </button>
     </div>
 
-    <!-- 章节管理 -->
-    <div class="flex items-center gap-2 flex-wrap">
-      <span class="text-xs text-gray-400 mr-1">章节：</span>
-      <button v-for="ch in chapters" :key="ch.id"
-        @click="selectedChapterId = ch.id"
-        :class="`text-xs px-3 py-1.5 rounded-lg transition-colors ${selectedChapterId === ch.id ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`">
-        {{ ch.title }}
-        <button @click.stop="deleteChapter(ch.id, ch.title)"
-          class="ml-1 p-0.5 rounded hover:bg-red-100 hover:text-red-500 text-gray-400" title="删除章节">✕</button>
-      </button>
-      <button @click="showAddChapter = true"
-        class="text-xs px-3 py-1.5 rounded-lg border border-dashed border-gray-300 text-gray-500 hover:text-gray-700 hover:border-gray-400 hover:bg-gray-50">
-        + 添加章节
-      </button>
-    </div>
-
-    <!-- 新增章节输入框 -->
-    <div v-if="showAddChapter" class="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
-      <input v-model="newChapterTitle" placeholder="输入章节名称（如：第1章 变量）"
-        class="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      <button @click="addChapter" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">确定</button>
-      <button @click="showAddChapter = false; newChapterTitle = ''" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">取消</button>
+    <!-- 章节：由新增项目名称代替 -->
+    <div v-if="chapterTitle" class="flex items-center gap-2">
+      <span class="text-xs text-gray-400">章节：</span>
+      <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">{{ chapterTitle }}</span>
     </div>
 
     <!-- 作业列表 -->
@@ -103,16 +85,6 @@
         </div>
 
         <div class="p-6 space-y-5">
-          <!-- 选择章节 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">选择章节（可选）</label>
-            <select v-model="createForm.chapterId"
-              class="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">全部章节</option>
-              <option v-for="ch in chapters" :key="ch.id" :value="ch.id">{{ ch.title }}</option>
-            </select>
-          </div>
-
           <!-- 输入要求 -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -284,19 +256,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onBeforeUnmount, onMounted } from 'vue'
+import { computed, ref, onBeforeUnmount, onMounted, watch } from 'vue'
 import { BookOpen, Mic, MicOff, Plus, Sparkles, X, Trash2 } from 'lucide-vue-next'
 import { API_BASE } from '@/api'
 
-const props = defineProps<{ courseId: string }>()
+const props = defineProps<{ courseId: string; chapterTitle?: string; canManage?: boolean }>()
 
 const API = `${API_BASE}/homeworks`
 
 // ====== 状态 ======
-const chapters = ref<any[]>([])
-const selectedChapterId = ref<string>('')
-const showAddChapter = ref(false)
-const newChapterTitle = ref('')
 const homeworks = ref<any[]>([])
 
 // Toast
@@ -349,8 +317,7 @@ interface SpeechRecognitionLike {
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
 
 const showCreateDialog = ref(false)
-const createForm = ref<{ chapterId: string; requirement: string; mode: GenerateMode }>({
-  chapterId: '',
+const createForm = ref<{ requirement: string; mode: GenerateMode }>({
   requirement: '',
   mode: 'tiered',
 })
@@ -390,7 +357,6 @@ const viewingQuestions = ref<any[]>([])
 
 onMounted(() => {
   isVoiceSupported.value = Boolean(getSpeechRecognitionConstructor())
-  loadChapters()
   loadHomeworks()
 })
 
@@ -398,60 +364,19 @@ onBeforeUnmount(() => {
   voiceRecognition?.stop()
   voiceRecognition = null
 })
-
-// ====== 章节管理 ======
-async function loadChapters() {
-  try {
-    const res = await fetch(`${API}/chapters/${props.courseId}`)
-    const data = await res.json()
-    if (data.success) chapters.value = data.chapters
-  } catch (e) { console.error('加载章节失败:', e) }
-}
-
-async function addChapter() {
-  if (!newChapterTitle.value.trim()) return
-  try {
-    const res = await fetch(`${API}/chapter`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courseId: props.courseId, title: newChapterTitle.value.trim() }),
-    })
-    const data = await res.json()
-    if (data.success) {
-      chapters.value.push(data.chapter)
-      newChapterTitle.value = ''
-      showToast('章节添加成功')
-    } else {
-      showToast('添加失败：' + (data.message || '未知错误'), 'error')
-    }
-  } catch (e: any) {
-    showToast('添加失败：' + e.message, 'error')
-  }
-}
-
-async function deleteChapter(id: string, title: string) {
-  if (!confirm(`确认删除章节「${title}」？`)) return
-  try {
-    const res = await fetch(`${API}/chapter/${id}`, { method: 'DELETE' })
-    const data = await res.json()
-    if (data.success) {
-      chapters.value = chapters.value.filter(c => c.id !== id)
-      if (selectedChapterId.value === id) selectedChapterId.value = ''
-      showToast('章节已删除')
-    } else {
-      showToast('删除失败：' + (data.message || ''), 'error')
-    }
-  } catch (e: any) {
-    showToast('删除失败：' + e.message, 'error')
-  }
-}
+watch(() => props.chapterTitle, () => {
+  loadHomeworks()
+})
 
 // ====== 作业列表 ======
 async function loadHomeworks() {
   try {
     const res = await fetch(`${API}/${props.courseId}`)
     const data = await res.json()
-    if (data.success) homeworks.value = data.homeworks
+    if (data.success) {
+      const all = data.homeworks || []
+      homeworks.value = props.chapterTitle ? all.filter((hw: any) => hw.chapterTitle === props.chapterTitle) : all
+    }
   } catch (e) { console.error('加载作业列表失败:', e) }
 }
 
@@ -462,15 +387,14 @@ async function aiGenerate() {
   generatedGroups.value = []
 
   try {
-    const chapter = chapters.value.find(c => c.id === createForm.value.chapterId)
     const res = await fetch(`${API}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         courseId: props.courseId,
-        chapterId: createForm.value.chapterId || null,
+        chapterId: null,
         courseTitle: '当前课程',
-        chapterTitle: chapter?.title || '全部章节',
+        chapterTitle: props.chapterTitle || '全部章节',
         requirement: createForm.value.requirement,
         generateMode: createForm.value.mode,
       }),
@@ -531,7 +455,7 @@ async function saveAsDraft() {
 
 function openCreateDialog() {
   showCreateDialog.value = true
-  createForm.value = { chapterId: selectedChapterId.value, requirement: '', mode: 'tiered' }
+  createForm.value = { requirement: '', mode: 'tiered' }
   generatedGroups.value = []
   generatedGroupId.value = ''
   voiceError.value = ''
@@ -542,7 +466,7 @@ function closeCreateDialog() {
     voiceRecognition?.stop()
   }
   showCreateDialog.value = false
-  createForm.value = { chapterId: '', requirement: '', mode: 'tiered' }
+  createForm.value = { requirement: '', mode: 'tiered' }
   generatedGroups.value = []
   generatedGroupId.value = ''
   aiLoading.value = false

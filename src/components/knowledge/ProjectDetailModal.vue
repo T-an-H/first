@@ -202,6 +202,9 @@
               </button>
             </div>
           </div>
+          <div class="border-b border-gray-100 pb-4 mb-4">
+            <TeacherHomework :course-id="courseId" :chapter-title="project.name" :can-manage="canManage" />
+          </div>
           <div v-if="files.test.length === 0" class="text-center py-8 text-gray-400 text-sm">暂无测试题目</div>
           <ul v-else class="space-y-1.5 mb-4">
             <li v-for="f in files.test" :key="f.id" class="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-2">
@@ -346,6 +349,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { X, FileText, Upload, CheckCircle, Clock, Plus, Pencil, GitBranch, BookOpen, ClipboardCheck, ListChecks, FileQuestion, Star, Wrench } from 'lucide-vue-next'
+import TeacherHomework from '@/components/Homework/TeacherHomework.vue'
 import { javaListProjectFiles, javaAddProjectFile, javaDeleteProjectFile, javaListProjectProgress, javaUpsertProjectProgress, javaGradeProjectProgress, javaGetQuestionnaire, javaSaveQuestionnaire, javaListEvalResponses, javaSubmitEvalResponse } from '@/api/knowledgeGraph'
 
 const props = defineProps<{

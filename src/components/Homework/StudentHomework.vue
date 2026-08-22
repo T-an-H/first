@@ -221,7 +221,7 @@ import { API_BASE } from '@/api'
 import { getStoredStudentSession } from '@/lib/studentSession'
 import { useAppStore } from '@/stores/app'
 
-const props = defineProps<{ courseId: string; studentId: string; tier?: string }>()
+const props = defineProps<{ courseId: string; studentId: string; tier?: string; chapterTitle?: string }>()
 
 const router = useRouter()
 const store = useAppStore()
@@ -250,7 +250,7 @@ onMounted(async () => {
 })
 
 watch(
-  () => [props.courseId, effectiveStudentId.value, props.tier],
+  () => [props.courseId, effectiveStudentId.value, props.tier, props.chapterTitle],
   async () => {
     await fetchStudentTier()
     await loadHomeworks()
@@ -297,8 +297,9 @@ async function loadHomeworks() {
     const res = await fetch(`${API}/student/${props.courseId}${query ? `?${query}` : ''}`)
     const data = await res.json()
     if (data.success) {
-      homeworks.value = data.homeworks
-      store.setStudentHomeworkSummaries(props.courseId, data.homeworks)
+      const all = data.homeworks || []
+      homeworks.value = props.chapterTitle ? all.filter((hw: any) => hw.chapterTitle === props.chapterTitle) : all
+      store.setStudentHomeworkSummaries(props.courseId, all)
       store.generateAutoTodos()
     }
   } catch (e) {
